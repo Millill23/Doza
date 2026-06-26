@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url("https://fonts.googleapis.com/css2?family=Cormorant:wght@400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap");
+
+@layer base {
+  html {
+    background-color: #0e0d0a;
+    color: #f5f1e8;
+  }
+  body {
+    font-family: "Montserrat", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4 {
+    font-family: "Cormorant", Georgia, serif;
+  }
+  :focus-visible {
+    outline: 2px solid #c9a24b;
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  .text-gold-gradient {
+    background: linear-gradient(135deg, #f2d98d 0%, #c9a24b 45%, #a57c2b 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}

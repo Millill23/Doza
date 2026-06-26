@@ -1,0 +1,79 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { prisma } from "@doza/db";
+
+async function setting(key: string, fallback: string) {
+  const s = await prisma.setting.findUnique({ where: { key } });
+  return s?.value ?? fallback;
+}
+
+const percent = await setting("loyalty_percent", "5");
+const days = await setting("loyalty_days", "180");
+const daysNum = Number(days);
+const expiryText =
+  daysNum > 0 ? `${daysNum} дней с момента начисления` : "бессрочно";
+---
+
+<Layout title="Программа лояльности — DOZA">
+  <section class="container-luxe max-w-3xl py-12">
+    <header class="mb-10 text-center">
+      <p class="mb-3 text-xs font-light uppercase tracking-[0.25em] text-gold-500">
+        Покупателям
+      </p>
+      <h1 class="font-serif text-4xl font-semibold text-gold-gradient sm:text-5xl">
+        Программа лояльности
+      </h1>
+    </header>
+
+    <div class="space-y-6">
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div class="rounded-2xl border border-gold-500/40 bg-ink-700 p-6 text-center shadow-gold">
+          <p class="font-serif text-5xl text-gold-gradient">{percent}%</p>
+          <p class="mt-2 text-sm text-ivory-muted">возвращается баллами с каждой покупки</p>
+        </div>
+        <div class="rounded-2xl border border-ink-600/60 bg-ink-700 p-6 text-center">
+          <p class="font-serif text-3xl text-ivory">1 балл = 1 BYN</p>
+          <p class="mt-2 text-sm text-ivory-muted">баллами можно оплатить следующий заказ</p>
+        </div>
+      </div>
+
+      <div class="rounded-2xl border border-ink-600/60 bg-ink-700 p-6">
+        <h2 class="mb-3 font-serif text-2xl text-ivory">Как это работает</h2>
+        <ul class="space-y-3 text-ivory-muted">
+          <li class="flex gap-3">
+            <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-botanical-500"></span>
+            <span>За каждую покупку — онлайн или в магазине — начисляется
+              <span class="text-ivory">{percent}%</span> от суммы баллами.</span>
+          </li>
+          <li class="flex gap-3">
+            <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-botanical-500"></span>
+            <span>Баллы привязаны к вашему номеру телефона — никаких карт не нужно.</span>
+          </li>
+          <li class="flex gap-3">
+            <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-botanical-500"></span>
+            <span>Списать баллы можно при следующей покупке — частично или полностью,
+              без ограничений по минимальной сумме.</span>
+          </li>
+          <li class="flex gap-3">
+            <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-botanical-500"></span>
+            <span>Срок действия баллов: <span class="text-ivory">{expiryText}</span>.
+              Сначала списываются баллы с ближайшим сроком сгорания.</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="rounded-2xl border border-ink-600/60 bg-ink-700 p-6 text-center">
+        <h2 class="mb-2 font-serif text-2xl text-ivory">Проверить баланс</h2>
+        <p class="mb-5 text-sm text-ivory-muted">
+          Узнайте текущий баланс баллов и ближайшую дату сгорания в личном кабинете.
+        </p>
+        <a
+          href="/account"
+          class="inline-flex h-11 items-center rounded-full bg-gold-gradient px-6 text-sm font-medium text-ink-900 transition-opacity hover:opacity-90"
+        >
+          Личный кабинет
+        </a>
+      </div>
+    </div>
+  </section>
+</Layout>

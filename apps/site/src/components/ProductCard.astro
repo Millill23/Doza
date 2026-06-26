@@ -1,0 +1,68 @@
+---
+import type { ProductCard } from "../lib/types";
+import { GENDER_LABELS } from "../lib/types";
+import { formatByn } from "@doza/shared";
+
+interface Props {
+  product: ProductCard;
+}
+
+const { product } = Astro.props;
+---
+
+<a
+  href={`/product/${product.slug}`}
+  class="group relative block overflow-hidden rounded-xl border border-ink-600/60 bg-ink-700 transition-all duration-300 hover:border-gold-500/70 hover:shadow-gold"
+>
+  <!-- Фото -->
+  <div class="relative aspect-[3/4] overflow-hidden bg-ink-900">
+    <img
+      src={product.image}
+      alt={`${product.brand} ${product.name}`}
+      loading="lazy"
+      decoding="async"
+      class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+    />
+    <!-- затемнение снизу -->
+    <div
+      class="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-ink-700/90 to-transparent"
+    >
+    </div>
+    <!-- бейдж гендера -->
+    <span
+      class="absolute left-3 top-3 rounded-full border border-gold-500/30 bg-ink-900/70 px-2.5 py-1 text-[11px] font-light text-gold-400 backdrop-blur-sm"
+    >
+      {GENDER_LABELS[product.gender]}
+    </span>
+    <!-- плашка повышенного кешбэка -->
+    {product.cashbackBoosted && (
+      <span
+        class="absolute right-3 top-3 rounded-full bg-gold-gradient px-2.5 py-1 text-[11px] font-semibold text-ink-900 shadow-gold"
+      >
+        Вернём {product.cashbackPercent}% баллами
+      </span>
+    )}
+  </div>
+
+  <!-- Контент -->
+  <div class="space-y-2 p-5">
+    <div
+      class="text-[11px] font-medium uppercase tracking-luxe text-gold-500"
+    >
+      {product.brand}
+    </div>
+    <h3 class="font-serif text-xl font-medium leading-tight text-ivory">
+      {product.name}
+    </h3>
+    <div class="flex items-center justify-between pt-1">
+      <span class="text-base font-medium text-gold-400">
+        от {formatByn(product.priceFrom)}
+      </span>
+      <span
+        class="translate-y-1 text-sm font-light text-ivory-faint opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:text-gold-400 group-hover:opacity-100"
+      >
+        Подробнее →
+      </span>
+    </div>
+  </div>
+</a>

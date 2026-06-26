@@ -1,0 +1,301 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Справочники ───────────────────────────────────────────────────────────────
+
+model Brand {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  slug     String    @unique
+  products Product[]
+}
+
+model Setting {
+  key   String @id
+  value String
+}
+
+// ─── Пользователи CRM ──────────────────────────────────────────────────────────
+
+model CrmUser {
+  id           Int           @id @default(autoincrement())
+  email        String        @unique
+  passwordHash String        @map("password_hash")
+  name         String
+  role         CrmRole
+  isActive     Boolean       @default(true) @map("is_active")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  offlineSales OfflineSale[]
+  inventoryLog InventoryLog[]
+
+  @@map("crm_users")
+}
+
+enum CrmRole {
+  admin
+  seller
+  marketer
+}
+
+// ─── Товары ────────────────────────────────────────────────────────────────────
+
+model Product {
+  id                     Int              @id @default(autoincrement())
+  brandId                Int              @map("brand_id")
+  brand                  Brand            @relation(fields: [brandId], references: [id])
+  name                   String
+  slug                   String           @unique
+  gender                 Gender
+  notesTop               String?          @map("notes_top")
+  notesMid               String?          @map("notes_mid")
+  notesBase              String?          @map("notes_base")
+  description            String?
+  isArchived             Boolean          @default(false) @map("is_archived")
+  loyaltyPercentOverride Decimal?         @map("loyalty_percent_override") @db.Decimal(5, 2)
+  lowStockThreshold      Int?             @map("low_stock_threshold")
+  photos                 ProductPhoto[]
+  volumes                ProductVolume[]
+  similarTo              ProductSimilar[] @relation("ProductSimilarFrom")
+  similarFrom            ProductSimilar[] @relation("ProductSimilarTo")
+  inventory              Inventory?
+  inventoryLog           InventoryLog[]
+  orderItems             OrderItem[]
+  offlineSaleItems       OfflineSaleItem[]
+
+  @@map("products")
+}
+
+enum Gender {
+  male
+  female
+  unisex
+}
+
+model ProductPhoto {
+  id        Int     @id @default(autoincrement())
+  productId Int     @map("product_id")
+  product   Product @relation(fields: [productId], references: [id])
+  url       String
+  sortOrder Int     @default(0) @map("sort_order")
+
+  @@map("product_photos")
+}
+
+model ProductVolume {
+  id        Int     @id @default(autoincrement())
+  productId Int     @map("product_id")
+  product   Product @relation(fields: [productId], references: [id])
+  volumeMl  Int     @map("volume_ml")
+  priceByn  Decimal @map("price_byn") @db.Decimal(10, 2)
+  isActive  Boolean @default(true) @map("is_active")
+
+  @@unique([productId, volumeMl])
+  @@map("product_volumes")
+}
+
+model ProductSimilar {
+  productId   Int     @map("product_id")
+  product     Product @relation("ProductSimilarFrom", fields: [productId], references: [id])
+  similarId   Int     @map("similar_id")
+  similar     Product @relation("ProductSimilarTo", fields: [similarId], references: [id])
+
+  @@id([productId, similarId])
+  @@map("product_similar")
+}
+
+// ─── Склад ────────────────────────────────────────────────────────────────────
+
+model Inventory {
+  productId  Int     @id @map("product_id")
+  product    Product @relation(fields: [productId], references: [id])
+  quantityMl Int     @default(0) @map("quantity_ml")
+
+  @@map("inventory")
+}
+
+model InventoryLog {
+  id        Int      @id @default(autoincrement())
+  productId Int      @map("product_id")
+  product   Product  @relation(fields: [productId], references: [id])
+  deltaMl   Int      @map("delta_ml")
+  reason    String
+  refType   String?  @map("ref_type")
+  refId     Int?     @map("ref_id")
+  userId    Int?     @map("user_id")
+  user      CrmUser? @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("inventory_log")
+}
+
+// ─── Клиенты ──────────────────────────────────────────────────────────────────
+
+model Customer {
+  id              Int              @id @default(autoincrement())
+  phone           String           @unique
+  name            String
+  birthday        DateTime?        @db.Date
+  registeredAt    DateTime         @default(now()) @map("registered_at")
+  lastPurchaseAt  DateTime?        @map("last_purchase_at")
+  lastPurchaseSum Decimal?         @map("last_purchase_sum") @db.Decimal(10, 2)
+  dates           CustomerDate[]
+  orders          Order[]
+  offlineSales    OfflineSale[]
+  loyaltyBatches  LoyaltyBatch[]
+  loyaltyLog      LoyaltyLog[]
+
+  @@map("customers")
+}
+
+model CustomerDate {
+  id          Int      @id @default(autoincrement())
+  customerId  Int      @map("customer_id")
+  customer    Customer @relation(fields: [customerId], references: [id])
+  date        DateTime @db.Date
+  description String
+
+  @@map("customer_dates")
+}
+
+// ─── Лояльность ───────────────────────────────────────────────────────────────
+
+model LoyaltyBatch {
+  id         Int          @id @default(autoincrement())
+  customerId Int          @map("customer_id")
+  customer   Customer     @relation(fields: [customerId], references: [id])
+  amountByn  Decimal      @map("amount_byn") @db.Decimal(10, 2)
+  expiresAt  DateTime?    @map("expires_at")
+  createdAt  DateTime     @default(now()) @map("created_at")
+  refType    String?      @map("ref_type")
+  refId      Int?         @map("ref_id")
+  log        LoyaltyLog[]
+
+  @@map("loyalty_batches")
+}
+
+model LoyaltyLog {
+  id         Int          @id @default(autoincrement())
+  customerId Int          @map("customer_id")
+  customer   Customer     @relation(fields: [customerId], references: [id])
+  batchId    Int?         @map("batch_id")
+  batch      LoyaltyBatch? @relation(fields: [batchId], references: [id])
+  deltaByn   Decimal      @map("delta_byn") @db.Decimal(10, 2)
+  opType     LoyaltyOp    @map("op_type")
+  refType    String?      @map("ref_type")
+  refId      Int?         @map("ref_id")
+  createdAt  DateTime     @default(now()) @map("created_at")
+
+  @@map("loyalty_log")
+}
+
+enum LoyaltyOp {
+  earned
+  spent
+  expired
+}
+
+// ─── Онлайн-заказы ────────────────────────────────────────────────────────────
+
+model Order {
+  id              Int         @id @default(autoincrement())
+  customerId      Int?        @map("customer_id")
+  customer        Customer?   @relation(fields: [customerId], references: [id])
+  customerName    String      @map("customer_name")
+  customerPhone   String      @map("customer_phone")
+  status          OrderStatus @default(new)
+  deliveryType    DeliveryType @map("delivery_type")
+  address         String?
+  comment         String?
+  totalByn        Decimal     @map("total_byn") @db.Decimal(10, 2)
+  loyaltySpentByn Decimal     @default(0) @map("loyalty_spent_byn") @db.Decimal(10, 2)
+  trackingNumber  String?     @map("tracking_number")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+  items           OrderItem[]
+
+  @@map("orders")
+}
+
+enum OrderStatus {
+  new
+  confirmed
+  shipped
+  closed
+  rejected
+  returned
+}
+
+enum DeliveryType {
+  pickup
+  post
+}
+
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  orderId   Int     @map("order_id")
+  order     Order   @relation(fields: [orderId], references: [id])
+  productId Int     @map("product_id")
+  product   Product @relation(fields: [productId], references: [id])
+  volumeMl  Int     @map("volume_ml")
+  qty       Int
+  priceByn  Decimal @map("price_byn") @db.Decimal(10, 2)
+
+  @@map("order_items")
+}
+
+// ─── Оффлайн-продажи ──────────────────────────────────────────────────────────
+
+model OfflineSale {
+  id              Int               @id @default(autoincrement())
+  customerId      Int?              @map("customer_id")
+  customer        Customer?         @relation(fields: [customerId], references: [id])
+  sellerId        Int               @map("seller_id")
+  seller          CrmUser           @relation(fields: [sellerId], references: [id])
+  status          OfflineSaleStatus @default(open)
+  totalByn        Decimal           @default(0) @map("total_byn") @db.Decimal(10, 2)
+  loyaltySpentByn Decimal           @default(0) @map("loyalty_spent_byn") @db.Decimal(10, 2)
+  createdAt       DateTime          @default(now()) @map("created_at")
+  closedAt        DateTime?         @map("closed_at")
+  items           OfflineSaleItem[]
+  edits           OfflineSaleEdit[]
+
+  @@map("offline_sales")
+}
+
+enum OfflineSaleStatus {
+  open
+  closed
+  cancelled
+}
+
+model OfflineSaleItem {
+  id       Int         @id @default(autoincrement())
+  saleId   Int         @map("sale_id")
+  sale     OfflineSale @relation(fields: [saleId], references: [id])
+  productId Int        @map("product_id")
+  product   Product    @relation(fields: [productId], references: [id])
+  volumeMl  Int        @map("volume_ml")
+  qty       Int
+  priceByn  Decimal    @map("price_byn") @db.Decimal(10, 2)
+
+  @@map("offline_sale_items")
+}
+
+model OfflineSaleEdit {
+  id                Int         @id @default(autoincrement())
+  saleId            Int         @map("sale_id")
+  sale              OfflineSale @relation(fields: [saleId], references: [id])
+  userId            Int         @map("user_id")
+  editedAt          DateTime    @default(now()) @map("edited_at")
+  changeDescription String      @map("change_description")
+  beforeJson        Json        @map("before_json")
+  afterJson         Json        @map("after_json")
+
+  @@map("offline_sale_edits")
+}

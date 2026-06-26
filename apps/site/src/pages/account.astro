@@ -1,0 +1,18 @@
+---
+import Layout from "../layouts/Layout.astro";
+import AccountApp from "../components/AccountApp.tsx";
+---
+
+<Layout title="Личный кабинет — DOZA">
+  <section class="container-luxe py-12">
+    <header class="mb-10 text-center">
+      <p class="mb-3 text-xs font-light uppercase tracking-[0.25em] text-gold-500">
+        Программа лояльности
+      </p>
+      <h1 class="font-serif text-4xl font-semibold text-gold-gradient sm:text-5xl">
+        Личный кабинет
+      </h1>
+    </header>
+    <AccountApp client:only="react" />
+  </section>
+</Layout>

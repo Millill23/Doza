@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ink-900: #0e0d0a;
+  --ink-800: #15130e;
+  --ink-700: #1e1b14;
+  --gold-300: #f2d98d;
+  --gold-500: #c9a24b;
+  --gold-600: #a57c2b;
+  --text-primary: #f5f1e8;
+  --text-muted: #b6ad98;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    background-color: var(--ink-900);
+    color: var(--text-primary);
+  }
+
+  body {
+    font-family: "Montserrat", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    min-height: 100dvh;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: "Cormorant", Georgia, serif;
+    font-weight: 500;
+    line-height: 1.1;
+  }
+
+  ::selection {
+    background: rgba(201, 162, 75, 0.3);
+    color: var(--text-primary);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--gold-500);
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  .text-gold-gradient {
+    background: linear-gradient(135deg, #f2d98d 0%, #c9a24b 45%, #a57c2b 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  .container-luxe {
+    width: 100%;
+    max-width: 1280px;
+    margin-inline: auto;
+    padding-inline: 1.25rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

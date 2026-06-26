@@ -1,0 +1,19 @@
+node_modules/
+.env
+.env.local
+dist/
+.next/
+.astro/
+*.tsbuildinfo
+.mcp.json
+
+# локальные конфиги инструментов
+.claude/
+
+# временные артефакты разбора ТЗ
+tz_unpacked/
+tz_text.txt
+
+# загруженные фото (хранятся вне git)
+uploads/*
+!uploads/.gitkeep

@@ -1,0 +1,16 @@
+{
+  "name": "doza",
+  "private": true,
+  "scripts": {
+    "dev:site": "pnpm --filter @doza/site dev",
+    "dev:crm": "pnpm --filter @doza/crm dev",
+    "db:migrate": "pnpm --filter @doza/db prisma migrate dev",
+    "db:generate": "pnpm --filter @doza/db prisma generate",
+    "db:studio": "pnpm --filter @doza/db prisma studio",
+    "build": "pnpm --filter @doza/db prisma generate && pnpm -r build"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}

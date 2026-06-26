@@ -1,0 +1,47 @@
+---
+import "../styles/global.css";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = "DOZA — оригинальная парфюмерия на розлив",
+  description = "DOZA — магазин оригинальной парфюмерии на розлив. Подберите свой аромат: верхние, средние и базовые ноты, любой объём от 2 мл.",
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/png" href="/logo.png" />
+
+    <!-- Preconnect для Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Cormorant:wght@400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap"
+    />
+
+    <title>{title}</title>
+
+    <!-- Критический CSS: фон до загрузки, чтобы не было FOUC -->
+    <style is:inline>
+      html { background-color: #0e0d0a; color: #f5f1e8; }
+    </style>
+  </head>
+  <body class="bg-ink-900 text-ivory antialiased">
+    <Header />
+    <main>
+      <slot />
+    </main>
+    <Footer />
+  </body>
+</html>

@@ -1,0 +1,14 @@
+# Нормализация переводов строк: в репозитории всегда LF.
+# Это гарантирует корректную работу shell-скриптов и Dockerfile при сборке на Linux,
+# даже если коммит делается с Windows.
+* text=auto eol=lf
+
+# Бинарные файлы — без изменений
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.docx binary
+*.pdf binary

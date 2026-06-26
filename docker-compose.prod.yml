@@ -1,0 +1,36 @@
+# Production-оверрайд для деплоя за Plesk (или любым внешним reverse-proxy).
+#
+# Запуск:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Миграции + сид (однократно после первого запуска / после git pull):
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile tools run --rm migrate
+#
+# Отличия от базового docker-compose.yml:
+#  - site/crm слушают ТОЛЬКО на 127.0.0.1 — наружу их публикует Plesk (nginx + SSL);
+#  - nginx-контейнер выключен (его роль выполняет nginx самого Plesk);
+#  - добавлен одноразовый сервис migrate (prisma migrate deploy + seed).
+
+services:
+  site:
+    ports:
+      - "127.0.0.1:4321:4321"
+
+  crm:
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  # nginx-контейнер не нужен — фронтит Plesk. Прячем в неактивный профиль.
+  nginx:
+    profiles:
+      - disabled
+
+  migrate:
+    build:
+      context: .
+      dockerfile: packages/db/Dockerfile.migrate
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles:
+      - tools

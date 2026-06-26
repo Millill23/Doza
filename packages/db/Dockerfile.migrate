@@ -1,0 +1,25 @@
+# Одноразовый образ для применения миграций и сидирования БД в продакшене.
+# В рантайм-образах site/crm нет Prisma CLI, поэтому миграции гоняем отдельно.
+#
+# Контекст сборки — корень репозитория (см. docker-compose.prod.yml).
+# Использование:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile tools run --rm migrate
+
+FROM node:22-alpine
+WORKDIR /app
+
+# Ставим зависимости пакета @doza/db обычным npm (без pnpm-воркспейса —
+# так надёжнее, т.к. в образ копируется только packages/db).
+COPY packages/db/package.json ./package.json
+RUN npm install --no-audit --no-fund
+
+# Схема, миграции и сид
+COPY packages/db/prisma ./prisma
+COPY packages/db/src ./src
+
+# Сгенерировать Prisma Client (нужен для seed.mjs)
+RUN npx prisma generate
+
+# migrate deploy — применяет существующие миграции (без интерактива),
+# затем seed — наполняет справочники/настройки/админа (upsert, идемпотентно).
+CMD sh -c "npx prisma migrate deploy && node prisma/seed.mjs"

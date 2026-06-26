@@ -1,0 +1,29 @@
+{
+  "name": "@doza/site",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev --port 4321",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@doza/db": "workspace:*",
+    "@doza/shared": "workspace:*",
+    "@astrojs/node": "^8.3.4",
+    "@astrojs/react": "^3.6.2",
+    "@astrojs/tailwind": "^5.1.2",
+    "astro": "^4.16.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwindcss": "^3.4.14",
+    "fuse.js": "^7.0.0",
+    "sharp": "^0.33.5",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.5.4"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1"
+  }
+}
