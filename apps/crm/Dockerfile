@@ -32,5 +32,11 @@ COPY --from=builder /app/apps/crm/.next/static ./apps/crm/.next/static
 # Prisma engine (нужен в рантайме)
 COPY --from=builder /app/node_modules/.pnpm/@prisma+client* ./node_modules/.pnpm/
 
+# Next standalone не кладёт движок Prisma туда, где его ищет рантайм.
+# Копируем libquery_engine в путь поиска Prisma (.next/server).
+RUN ENGINE=$(find /app -name 'libquery_engine-*.so.node' 2>/dev/null | head -1) && \
+    cp "$ENGINE" /app/apps/crm/.next/server/ && \
+    echo "Prisma engine: $ENGINE -> .next/server/"
+
 EXPOSE 3000
 CMD ["node", "apps/crm/server.js"]
