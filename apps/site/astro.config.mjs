@@ -11,4 +11,11 @@ export default defineConfig({
     tailwind({ applyBaseStyles: false }),
   ],
   server: { port: 4321 },
+  vite: {
+    ssr: {
+      // Не инлайнить Prisma в SSR-бандл — иначе ломается импорт ".prisma/client/default".
+      // Node разрешит их в рантайме из node_modules.
+      external: ["@prisma/client", ".prisma/client"],
+    },
+  },
 });
