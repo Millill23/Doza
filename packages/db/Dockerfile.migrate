@@ -6,6 +6,7 @@
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile tools run --rm migrate
 
 FROM node:22-alpine
+RUN apk add --no-cache openssl
 WORKDIR /app
 
 # Ставим зависимости пакета @doza/db обычным npm (без pnpm-воркспейса —

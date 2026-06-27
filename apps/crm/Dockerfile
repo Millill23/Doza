@@ -1,5 +1,6 @@
 # ── Сборка ──────────────────────────────────────────────────────────────────
 FROM node:22-alpine AS builder
+RUN apk add --no-cache openssl
 RUN corepack enable
 WORKDIR /app
 
@@ -19,6 +20,7 @@ RUN pnpm --filter @doza/crm build
 
 # ── Рантайм (standalone) ────────────────────────────────────────────────────
 FROM node:22-alpine AS runner
+RUN apk add --no-cache openssl
 WORKDIR /app
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
