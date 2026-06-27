@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@doza/db";
 import { formatByn, formatPhone } from "@doza/shared";
 import { topByMl, topByRevenue, topCustomers, upcomingDates } from "@/lib/analytics-data";
+import { requireRole } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 }
 
 export default async function AnalyticsPage() {
+  await requireRole(["admin", "marketer"]);
   const [byMl, byRev, customers, dates, lowStock] = await Promise.all([
     topByMl(8),
     topByRevenue(8),

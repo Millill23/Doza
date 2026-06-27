@@ -4,6 +4,7 @@ import { prisma } from "@doza/db";
 import { formatByn, formatPhone } from "@doza/shared";
 import { ORDER_STATUS_LABEL, ORDER_STATUS_STYLE, DELIVERY_LABEL } from "@/lib/labels";
 import OrderActions from "@/components/OrderActions";
+import { requireRole } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ export default async function OrderDetailPage({
 }: {
   params: { id: string };
 }) {
+  await requireRole(["admin", "seller"]);
   const id = Number(params.id);
   if (!Number.isFinite(id)) notFound();
 

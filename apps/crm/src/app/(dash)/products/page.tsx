@@ -4,10 +4,12 @@ import { formatByn } from "@doza/shared";
 import { GENDER_LABEL } from "@/lib/labels";
 import StockInput from "@/components/StockInput";
 import DuplicateButton from "@/components/DuplicateButton";
+import { requireRole } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProductsPage() {
+  await requireRole(["admin"]);
   const products = await prisma.product.findMany({
     include: {
       brand: true,

@@ -1,10 +1,12 @@
 import { prisma } from "@doza/db";
 import { formatByn, formatPhone } from "@doza/shared";
 import { loyaltyStats } from "@/lib/analytics-data";
+import { requireRole } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function LoyaltyPage() {
+  await requireRole(["admin", "marketer"]);
   const now = new Date();
   const soon = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 

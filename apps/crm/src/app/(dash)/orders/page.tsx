@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@doza/db";
 import { formatByn, formatPhone } from "@doza/shared";
 import { ORDER_STATUS_LABEL, ORDER_STATUS_STYLE, DELIVERY_LABEL } from "@/lib/labels";
+import { requireRole } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ export default async function OrdersPage({
 }: {
   searchParams: { status?: string };
 }) {
+  await requireRole(["admin", "seller"]);
   const status = searchParams.status ?? "all";
   const where = status !== "all" ? { status: status as never } : {};
 
