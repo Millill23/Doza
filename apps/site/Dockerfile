@@ -31,6 +31,7 @@ ENV PORT=4321
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/apps/site/node_modules ./apps/site/node_modules
 COPY --from=builder /app/apps/site/dist ./apps/site/dist
 COPY --from=builder /app/apps/site/package.json ./apps/site/package.json
 
