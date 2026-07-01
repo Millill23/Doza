@@ -1,4 +1,7 @@
 ---
+import { prisma } from "@doza/db";
+import { getCustomerId } from "../lib/customer-auth";
+
 const links = [
   { href: "/catalog", label: "Каталог" },
   { href: "/finder", label: "Подобрать аромат" },
@@ -7,6 +10,17 @@ const links = [
   { href: "/catalog?gender=unisex", label: "Унисекс" },
   { href: "/about", label: "О нас" },
 ];
+
+// Определяем вошедшего покупателя (для показа имени в шапке)
+const customerId = getCustomerId(Astro.cookies);
+let customerName: string | null = null;
+if (customerId) {
+  const c = await prisma.customer.findUnique({
+    where: { id: customerId },
+    select: { name: true },
+  });
+  customerName = c?.name ?? null;
+}
 ---
 
 <header
@@ -39,11 +53,27 @@ const links = [
 
     <!-- Действия -->
     <div class="flex items-center gap-4">
-      <a
-        href="/account"
-        class="hidden text-sm font-light text-ivory-muted transition-colors duration-200 hover:text-gold-400 sm:inline"
-        >Кабинет</a
-      >
+      {
+        customerName ? (
+          <a
+            href="/account"
+            class="hidden items-center gap-2 text-sm font-light text-ivory-muted transition-colors duration-200 hover:text-gold-400 sm:inline-flex"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            <span class="max-w-[120px] truncate">{customerName}</span>
+          </a>
+        ) : (
+          <a
+            href="/login"
+            class="hidden text-sm font-light text-ivory-muted transition-colors duration-200 hover:text-gold-400 sm:inline"
+          >
+            Войти
+          </a>
+        )
+      }
       <a
         href="/cart"
         class="inline-flex h-10 items-center gap-2 rounded-full border border-gold-600/40 px-4 text-sm text-gold-400 transition-colors duration-200 hover:border-gold-500 hover:text-gold-300"

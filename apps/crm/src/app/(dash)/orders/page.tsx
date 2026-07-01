@@ -62,6 +62,7 @@ export default async function OrdersPage({
                 <th className="px-4 py-3">Сумма</th>
                 <th className="px-4 py-3">Статус</th>
                 <th className="px-4 py-3">Дата</th>
+                <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
@@ -89,6 +90,17 @@ export default async function OrdersPage({
                   </td>
                   <td className="px-4 py-3 text-xs text-ivory-faint">
                     {o.createdAt.toLocaleDateString("ru-RU")}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Link
+                      href={`/orders/${o.id}`}
+                      className="inline-flex items-center gap-1 rounded-lg border border-gold-600/50 px-3 py-1.5 text-xs text-gold-400 transition-colors hover:border-gold-500 hover:text-gold-300"
+                    >
+                      Перейти
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 12h14M12 5l7 7-7 7" />
+                      </svg>
+                    </Link>
                   </td>
                 </tr>
               ))}
