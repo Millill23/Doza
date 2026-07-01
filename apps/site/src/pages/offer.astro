@@ -1,0 +1,65 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { COMPANY } from "../lib/company";
+---
+
+<Layout title="Публичная оферта — DOZA">
+  <section class="container-luxe max-w-3xl py-12">
+    <h1 class="mb-8 font-serif text-3xl font-semibold text-gold-gradient sm:text-4xl">
+      Публичная оферта
+    </h1>
+
+    <div class="space-y-6 text-sm leading-relaxed text-ivory-muted">
+      <p>
+        {COMPANY.legalName} (УНП {COMPANY.unp}), далее — Продавец, публикует
+        настоящую публичную оферту о продаже товаров дистанционным способом через
+        интернет-магазин {COMPANY.siteDomain}.
+      </p>
+
+      <div>
+        <h2 class="mb-2 font-serif text-xl text-ivory">1. Общие положения</h2>
+        <p>Оформление заказа на сайте является акцептом оферты и означает согласие
+          покупателя с её условиями, условиями доставки и оплаты, а также с
+          Политикой обработки персональных данных.</p>
+      </div>
+
+      <div>
+        <h2 class="mb-2 font-serif text-xl text-ivory">2. Товар</h2>
+        <p>Продавец реализует парфюмерную продукцию на розлив. Характеристики,
+          объёмы и цены указаны на страницах товаров. Цены указаны в белорусских
+          рублях (BYN).</p>
+      </div>
+
+      <div>
+        <h2 class="mb-2 font-serif text-xl text-ivory">3. Оформление и оплата</h2>
+        <p>Оплата производится при получении заказа — в магазине или на почте.
+          Предоплата не требуется. При получении покупателю выдаётся документ,
+          подтверждающий покупку.</p>
+      </div>
+
+      <div>
+        <h2 class="mb-2 font-serif text-xl text-ivory">4. Доставка</h2>
+        <p>Самовывоз из магазина или доставка почтой по территории Республики
+          Беларусь. Подробности — на странице «Доставка и оплата».</p>
+      </div>
+
+      <div>
+        <h2 class="mb-2 font-serif text-xl text-ivory">5. Возврат</h2>
+        <p>Возврат и обмен товара осуществляются в соответствии с
+          законодательством Республики Беларусь о защите прав потребителей.
+          Обращения принимаются по адресу {COMPANY.email}.</p>
+      </div>
+
+      <div>
+        <h2 class="mb-2 font-serif text-xl text-ivory">6. Реквизиты продавца</h2>
+        <p>{COMPANY.legalName}, УНП {COMPANY.unp}, {COMPANY.legalAddress}.
+          Тел.: {COMPANY.phones.join(", ")}. Email: {COMPANY.email}.
+          Режим работы: {COMPANY.workingHours}.</p>
+      </div>
+    </div>
+
+    <p class="mt-8 text-xs text-ivory-faint">
+      ⚠️ Шаблон. Перед публикацией согласуйте текст с юристом.
+    </p>
+  </section>
+</Layout>

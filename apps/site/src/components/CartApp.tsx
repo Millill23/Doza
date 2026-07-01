@@ -37,6 +37,7 @@ export default function CartApp() {
   const [delivery, setDelivery] = useState<"pickup" | "post">("pickup");
   const [address, setAddress] = useState("");
   const [comment, setComment] = useState("");
+  const [consent, setConsent] = useState(false);
 
   // лояльность
   const [balance, setBalance] = useState(0);
@@ -359,6 +360,27 @@ export default function CartApp() {
           </div>
         </div>
 
+        {/* Согласие на обработку персональных данных */}
+        <label className="flex cursor-pointer items-start gap-2.5 text-xs leading-relaxed text-ivory-muted">
+          <input
+            type="checkbox"
+            checked={consent}
+            onChange={(e) => setConsent(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-gold-500"
+          />
+          <span>
+            Я согласен(а) на обработку персональных данных в соответствии с{" "}
+            <a href="/privacy" target="_blank" className="text-gold-400 underline-offset-2 hover:underline">
+              Политикой обработки персональных данных
+            </a>{" "}
+            и принимаю условия{" "}
+            <a href="/offer" target="_blank" className="text-gold-400 underline-offset-2 hover:underline">
+              публичной оферты
+            </a>
+            .
+          </span>
+        </label>
+
         {error && (
           <p className="rounded-lg border border-red-500/40 bg-red-500/10 p-2.5 text-sm text-red-300">
             {error}
@@ -366,8 +388,8 @@ export default function CartApp() {
         )}
 
         <button
-          type="submit" disabled={submitting}
-          className="inline-flex h-12 w-full cursor-pointer items-center justify-center rounded-full bg-gold-gradient text-base font-medium text-ink-900 shadow-gold transition-all hover:shadow-gold-lg disabled:opacity-60"
+          type="submit" disabled={submitting || !consent}
+          className="inline-flex h-12 w-full cursor-pointer items-center justify-center rounded-full bg-gold-gradient text-base font-medium text-ink-900 shadow-gold transition-all hover:shadow-gold-lg disabled:cursor-not-allowed disabled:opacity-60"
         >
           {submitting ? "Оформляем…" : "Оформить заказ"}
         </button>

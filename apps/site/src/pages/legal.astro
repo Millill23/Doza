@@ -1,0 +1,56 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { COMPANY, COMPANY_FILLED } from "../lib/company";
+
+const rows = [
+  ["Полное наименование", COMPANY.legalName],
+  ["УНП", COMPANY.unp],
+  ["Юридический адрес", COMPANY.legalAddress],
+  ["Фактический адрес", COMPANY.actualAddress],
+  ["Дата государственной регистрации", COMPANY.registrationDate],
+  ["Орган, осуществивший регистрацию", COMPANY.registrationAuthority],
+  ["№ в Торговом реестре РБ", COMPANY.tradeRegisterNumber],
+  ["Дата регистрации в Торговом реестре", COMPANY.tradeRegisterDate],
+  ["Телефоны", COMPANY.phones.join(", ")],
+  ["Электронная почта", COMPANY.email],
+  ["Режим работы", COMPANY.workingHours],
+  ["Рассмотрение претензий", COMPANY.complaintsContact],
+];
+---
+
+<Layout title="Юридическая информация — DOZA">
+  <section class="container-luxe max-w-3xl py-12">
+    <h1 class="mb-8 font-serif text-4xl font-semibold text-gold-gradient sm:text-5xl">
+      Юридическая информация
+    </h1>
+
+    {!COMPANY_FILLED && (
+      <p class="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">
+        ⚠️ Реквизиты пока не заполнены (плейсхолдеры). Заполните файл
+        <code class="mx-1 rounded bg-ink-800 px-1.5 py-0.5 text-gold-400">apps/site/src/lib/company.ts</code>.
+      </p>
+    )}
+
+    <div class="overflow-hidden rounded-2xl border border-ink-600/60 bg-ink-700">
+      <dl class="divide-y divide-ink-600/40">
+        {rows.map(([label, value]) => (
+          <div class="grid grid-cols-1 gap-1 px-5 py-4 sm:grid-cols-[280px_1fr] sm:gap-4">
+            <dt class="text-sm text-ivory-faint">{label}</dt>
+            <dd class="text-sm text-ivory">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+
+    <p class="mt-6 text-sm text-ivory-muted">
+      Продавец является администратором сайта {COMPANY.siteDomain}. Вся информация
+      на сайте соответствует требованиям законодательства Республики Беларусь.
+    </p>
+    <p class="mt-3 text-sm text-ivory-muted">
+      См. также:
+      <a href="/privacy" class="text-gold-400 hover:text-gold-300">Политика обработки персональных данных</a>,
+      <a href="/offer" class="text-gold-400 hover:text-gold-300">Публичная оферта</a>,
+      <a href="/delivery" class="text-gold-400 hover:text-gold-300">Доставка и оплата</a>.
+    </p>
+  </section>
+</Layout>
