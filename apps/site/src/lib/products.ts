@@ -138,3 +138,32 @@ export async function getBrands(): Promise<string[]> {
   });
   return brands.map((b) => b.name);
 }
+
+export interface FinderProduct extends ProductCard {
+  /** склеенные ноты (для скоринга подбора аромата) */
+  notes: string;
+}
+
+/** Товары для квиз-подборщика: карточка + строка нот. */
+export async function getFinderProducts(): Promise<FinderProduct[]> {
+  const [products, globalPercent] = await Promise.all([
+    prisma.product.findMany({
+      where: { isArchived: false },
+      include: cardInclude,
+      orderBy: { id: "asc" },
+    }),
+    getGlobalCashback(),
+  ]);
+
+  return (products as unknown as (ProductWithRels & {
+    notesTop: string | null;
+    notesMid: string | null;
+    notesBase: string | null;
+  })[]).map((p) => ({
+    ...toCard(p, globalPercent),
+    notes: [p.notesTop, p.notesMid, p.notesBase]
+      .filter(Boolean)
+      .join(", ")
+      .toLowerCase(),
+  }));
+}
