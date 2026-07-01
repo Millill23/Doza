@@ -2,9 +2,31 @@
 
 import { prisma } from "@doza/db";
 import { getBalance, earnPoints, spendPoints } from "@doza/db/loyalty";
+import { createSmsCode, verifySmsCode } from "@doza/db/sms-codes";
 import { normalizePhone } from "@doza/shared";
+import { sendSms } from "@doza/shared/sms";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/session";
+
+/** Отправить покупателю SMS-код для подтверждения списания баллов. */
+export async function requestLoyaltySpendOtp(phoneRaw: string, amount: number) {
+  await requireRole(["admin", "seller"]);
+  const phone = normalizePhone(phoneRaw);
+  if (phone.length < 9) throw new Error("Некорректный телефон");
+  if (amount <= 0) throw new Error("Укажите количество баллов");
+
+  const customer = await prisma.customer.findUnique({ where: { phone } });
+  if (!customer) throw new Error("Клиент не найден");
+  const balance = await getBalance(customer.id);
+  if (balance <= 0) throw new Error("У клиента нет баллов");
+
+  const code = await createSmsCode(phone, "loyalty_spend", { amount });
+  const sms = await sendSms(
+    phone,
+    `${code} - Код подтверждения для списания ${amount} баллов`,
+  );
+  return { ok: true, smsSent: sms.ok, balance };
+}
 
 async function getSetting(key: string, fallback: number): Promise<number> {
   const s = await prisma.setting.findUnique({ where: { key } });
@@ -38,6 +60,7 @@ interface CreateSaleInput {
   phone?: string;
   name?: string;
   loyaltySpend?: number;
+  loyaltyOtp?: string;
 }
 
 /** Создать и сразу закрыть оффлайн-продажу. */
@@ -83,9 +106,16 @@ export async function createOfflineSale(input: CreateSaleInput) {
     }
   }
 
-  // Списание баллов
+  // Списание баллов — требует подтверждения кодом из SMS
   let loyaltySpent = 0;
   if (customerId && input.loyaltySpend && input.loyaltySpend > 0) {
+    const phone = normalizePhone(input.phone ?? "");
+    const otp = await verifySmsCode(phone, "loyalty_spend", input.loyaltyOtp ?? "");
+    if (!otp.ok) {
+      throw new Error(
+        otp.error ?? "Списание баллов не подтверждено кодом из SMS",
+      );
+    }
     const balance = await getBalance(customerId);
     loyaltySpent = Math.min(input.loyaltySpend, balance, total);
     loyaltySpent = Math.round(loyaltySpent * 100) / 100;

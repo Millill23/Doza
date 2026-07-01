@@ -1,7 +1,11 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { createOfflineSale, lookupCustomer } from "@/lib/actions/cash";
+import {
+  createOfflineSale,
+  lookupCustomer,
+  requestLoyaltySpendOtp,
+} from "@/lib/actions/cash";
 
 interface VolumeOpt {
   volumeMl: number;
@@ -34,6 +38,8 @@ export default function CashRegister({ products }: { products: ProductOpt[] }) {
   const [foundName, setFoundName] = useState<string | null>(null);
   const [usePoints, setUsePoints] = useState(false);
   const [spend, setSpend] = useState(0);
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
   const [pending, startTransition] = useTransition();
   const [done, setDone] = useState<{ saleId: number; toPay: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -95,8 +101,38 @@ export default function CashRegister({ products }: { products: ProductOpt[] }) {
     });
   }
 
+  function sendOtp() {
+    setError(null);
+    startTransition(async () => {
+      try {
+        const r = await requestLoyaltySpendOtp(phone, effSpend);
+        setOtpSent(true);
+        if (!r.smsSent)
+          setError("SMS не настроены — код не отправлен. Обратитесь к администратору.");
+      } catch (e) {
+        setError((e as Error).message);
+      }
+    });
+  }
+
+  function resetCart() {
+    setCart([]);
+    setPhone("");
+    setName("");
+    setBalance(0);
+    setFoundName(null);
+    setUsePoints(false);
+    setSpend(0);
+    setOtp("");
+    setOtpSent(false);
+  }
+
   function closeSale() {
     setError(null);
+    if (effSpend > 0 && !otp.trim()) {
+      setError("Введите код подтверждения списания баллов из SMS");
+      return;
+    }
     startTransition(async () => {
       try {
         const res = await createOfflineSale({
@@ -108,15 +144,10 @@ export default function CashRegister({ products }: { products: ProductOpt[] }) {
           phone: phone || undefined,
           name: name || undefined,
           loyaltySpend: effSpend,
+          loyaltyOtp: otp || undefined,
         });
         setDone({ saleId: res.saleId, toPay: res.toPay });
-        setCart([]);
-        setPhone("");
-        setName("");
-        setBalance(0);
-        setFoundName(null);
-        setUsePoints(false);
-        setSpend(0);
+        resetCart();
       } catch (e) {
         setError((e as Error).message);
       }
@@ -237,16 +268,55 @@ export default function CashRegister({ products }: { products: ProductOpt[] }) {
         {balance > 0 && (
           <div className="rounded-lg border border-botanical-500/40 bg-botanical-700/20 p-3">
             <label className="flex items-center gap-2 text-sm text-ivory">
-              <input type="checkbox" checked={usePoints} onChange={(e) => setUsePoints(e.target.checked)} className="h-4 w-4 accent-botanical-500" />
+              <input
+                type="checkbox"
+                checked={usePoints}
+                onChange={(e) => {
+                  setUsePoints(e.target.checked);
+                  setOtpSent(false);
+                  setOtp("");
+                }}
+                className="h-4 w-4 accent-botanical-500"
+              />
               Списать баллы (до {byn(maxSpend)})
             </label>
             {usePoints && (
-              <input
-                type="number" min={0} max={maxSpend} step="0.01"
-                value={spend || maxSpend}
-                onChange={(e) => setSpend(Number(e.target.value))}
-                className="mt-2 h-9 w-full rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory focus:border-gold-500 focus:outline-none"
-              />
+              <>
+                <input
+                  type="number" min={0} max={maxSpend} step="0.01"
+                  value={spend || maxSpend}
+                  onChange={(e) => { setSpend(Number(e.target.value)); setOtpSent(false); setOtp(""); }}
+                  className="mt-2 h-9 w-full rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory focus:border-gold-500 focus:outline-none"
+                />
+                {!otpSent ? (
+                  <button
+                    type="button"
+                    onClick={sendOtp}
+                    disabled={pending || effSpend <= 0}
+                    className="mt-2 w-full rounded-lg border border-gold-600/50 py-2 text-xs text-gold-400 transition-colors hover:border-gold-500 disabled:opacity-50"
+                  >
+                    Отправить код клиенту по SMS
+                  </button>
+                ) : (
+                  <div className="mt-2">
+                    <input
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value)}
+                      inputMode="numeric"
+                      placeholder="Код из SMS клиента"
+                      className="h-9 w-full rounded-lg border border-gold-600/50 bg-ink-800 px-3 text-sm text-ivory focus:border-gold-500 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={sendOtp}
+                      disabled={pending}
+                      className="mt-1 text-xs text-ivory-faint hover:text-gold-400"
+                    >
+                      Отправить код повторно
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}

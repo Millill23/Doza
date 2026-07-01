@@ -13,8 +13,18 @@ export default async function CustomersPage() {
 
   return (
     <div>
-      <h1 className="mb-1 font-serif text-3xl text-ivory">Клиенты</h1>
-      <p className="mb-6 text-sm text-ivory-faint">{customers.length} клиентов</p>
+      <div className="mb-6 flex items-end justify-between">
+        <div>
+          <h1 className="mb-1 font-serif text-3xl text-ivory">Клиенты</h1>
+          <p className="text-sm text-ivory-faint">{customers.length} клиентов</p>
+        </div>
+        <Link
+          href="/customers/register"
+          className="rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-ink-900 transition-opacity hover:opacity-90"
+        >
+          + Зарегистрировать клиента
+        </Link>
+      </div>
 
       {customers.length === 0 ? (
         <p className="rounded-xl border border-ink-600/60 bg-ink-700 p-10 text-center text-ivory-muted">

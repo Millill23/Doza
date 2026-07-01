@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "./index";
 
 /**
@@ -30,7 +31,7 @@ export async function createSmsCode(
       phone,
       purpose,
       code,
-      meta: meta ?? undefined,
+      meta: (meta ?? Prisma.JsonNull) as Prisma.InputJsonValue,
       expiresAt: new Date(Date.now() + TTL_MS),
     },
   });
