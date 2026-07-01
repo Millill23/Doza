@@ -12,16 +12,16 @@ export const COMPANY = {
   actualAddress: 'г. Новополоцк, ул. Нефтяников, д. 6 (ТЦ «Зодиак»), 1 этаж',
 
   // Госрегистрация
-  registrationDate: "⟨дата госрегистрации, дд.мм.гггг⟩",
-  registrationAuthority: "⟨Новополоцкий горисполком / уточнить⟩",
+  registrationDate: "03.02.2025",
+  registrationAuthority: "Новополоцкий городской исполнительный комитет",
 
   // Торговый реестр РБ
-  tradeRegisterNumber: "⟨№ в Торговом реестре⟩",
-  tradeRegisterDate: "⟨дата регистрации в Торговом реестре⟩",
+  tradeRegisterNumber: "⟨№ в Торговом реестре (ожидается)⟩",
+  tradeRegisterDate: "⟨дата регистрации в Торговом реестре (ожидается)⟩",
 
   // Контакты и режим работы
   phones: ["+375 (29) 245-33-33"],
-  email: "⟨email для связи⟩",
+  email: "aclassaliance@gmail.com",
   workingHours: "Ежедневно 10:00–20:00, без выходных",
 
   // Банковские реквизиты
@@ -30,7 +30,7 @@ export const COMPANY = {
   bankBic: "ALFABY2X",
 
   // Лицо для рассмотрения претензий
-  complaintsContact: "⟨ФИО / должность, контакт для претензий⟩",
+  complaintsContact: "Директор Женункий Кирилл Олегович",
 
   // Домены
   siteDomain: "doza-parfum.by",
