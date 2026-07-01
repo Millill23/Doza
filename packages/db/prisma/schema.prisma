@@ -142,6 +142,8 @@ model Customer {
   id              Int              @id @default(autoincrement())
   phone           String           @unique
   name            String
+  passwordHash    String?          @map("password_hash")
+  phoneVerified   Boolean          @default(false) @map("phone_verified")
   birthday        DateTime?        @db.Date
   registeredAt    DateTime         @default(now()) @map("registered_at")
   lastPurchaseAt  DateTime?        @map("last_purchase_at")
@@ -153,6 +155,22 @@ model Customer {
   loyaltyLog      LoyaltyLog[]
 
   @@map("customers")
+}
+
+/// Одноразовые SMS-коды (регистрация, сброс пароля, списание баллов и т.д.)
+model SmsCode {
+  id        Int      @id @default(autoincrement())
+  phone     String
+  code      String
+  purpose   String // register | reset | loyalty_spend | offline_register
+  expiresAt DateTime @map("expires_at")
+  attempts  Int      @default(0)
+  consumed  Boolean  @default(false)
+  meta      Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([phone, purpose])
+  @@map("sms_codes")
 }
 
 model CustomerDate {

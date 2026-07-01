@@ -18,6 +18,7 @@
   },
   "exports": {
     ".": "./src/index.ts",
-    "./loyalty": "./src/loyalty.ts"
+    "./loyalty": "./src/loyalty.ts",
+    "./sms-codes": "./src/sms-codes.ts"
   }
 }

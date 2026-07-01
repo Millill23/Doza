@@ -1,0 +1,16 @@
+---
+import Layout from "../layouts/Layout.astro";
+import LoginForm from "../components/LoginForm.tsx";
+import { getCustomerId } from "../lib/customer-auth";
+
+if (getCustomerId(Astro.cookies)) return Astro.redirect("/account");
+---
+
+<Layout title="Вход — DOZA">
+  <section class="container-luxe py-12">
+    <header class="mb-8 text-center">
+      <h1 class="font-serif text-4xl font-semibold text-gold-gradient">Вход в кабинет</h1>
+    </header>
+    <LoginForm client:load />
+  </section>
+</Layout>

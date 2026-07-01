@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "exports": {
     ".": "./src/index.ts",
-    "./uploads": "./src/uploads.ts"
+    "./uploads": "./src/uploads.ts",
+    "./sms": "./src/sms.ts"
   }
 }

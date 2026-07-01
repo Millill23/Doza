@@ -1,18 +1,55 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import AccountApp from "../components/AccountApp.tsx";
+import AccountPanel from "../components/AccountPanel.tsx";
+import { prisma } from "@doza/db";
+import { getBalance } from "@doza/db/loyalty";
+import { getCustomerId } from "../lib/customer-auth";
+import { formatPhone } from "@doza/shared";
+
+const id = getCustomerId(Astro.cookies);
+if (!id) return Astro.redirect("/login");
+
+const customer = await prisma.customer.findUnique({ where: { id } });
+if (!customer) return Astro.redirect("/login");
+
+const now = new Date();
+const [balance, batches, orders] = await Promise.all([
+  getBalance(id),
+  prisma.loyaltyBatch.findMany({
+    where: {
+      customerId: id,
+      amountByn: { gt: 0 },
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+    },
+    orderBy: { expiresAt: "asc" },
+    select: { amountByn: true, expiresAt: true },
+  }),
+  prisma.order.findMany({
+    where: { customerId: id },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+    select: { id: true, createdAt: true, totalByn: true, status: true },
+  }),
+]);
+
+const STATUS: Record<string, string> = {
+  new: "Новый", confirmed: "Подтверждён", shipped: "Отправлен",
+  closed: "Закрыт", rejected: "Не подтверждён", returned: "Возврат",
+};
 ---
 
 <Layout title="Личный кабинет — DOZA">
   <section class="container-luxe py-12">
-    <header class="mb-10 text-center">
-      <p class="mb-3 text-xs font-light uppercase tracking-[0.25em] text-gold-500">
-        Программа лояльности
-      </p>
-      <h1 class="font-serif text-4xl font-semibold text-gold-gradient sm:text-5xl">
-        Личный кабинет
-      </h1>
+    <header class="mb-8 text-center">
+      <h1 class="font-serif text-4xl font-semibold text-gold-gradient">Личный кабинет</h1>
     </header>
-    <AccountApp client:only="react" />
+    <AccountPanel
+      client:load
+      name={customer.name}
+      phone={formatPhone(customer.phone)}
+      balance={balance}
+      batches={batches.map((b) => ({ amount: Number(b.amountByn), expiresAt: b.expiresAt?.toISOString() ?? null }))}
+      orders={orders.map((o) => ({ id: o.id, date: o.createdAt.toISOString(), total: Number(o.totalByn), status: STATUS[o.status] ?? o.status }))}
+    />
   </section>
 </Layout>

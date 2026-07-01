@@ -83,6 +83,9 @@ importers:
       astro:
         specifier: ^4.16.0
         version: 4.16.19(@types/node@20.19.43)(rollup@4.62.2)(typescript@5.9.3)
+      bcryptjs:
+        specifier: ^2.4.3
+        version: 2.4.3
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
