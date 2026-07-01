@@ -1,5 +1,8 @@
 ---
+import { COMPANY } from "../lib/company";
 const year = new Date().getFullYear();
+const tel = COMPANY.phones[0];
+const telHref = "tel:" + tel.replace(/[^\d+]/g, "");
 ---
 
 <footer class="mt-24 border-t border-ink-600/60 bg-ink-800">
@@ -45,9 +48,9 @@ const year = new Date().getFullYear();
         Контакты
       </h3>
       <ul class="space-y-2 text-sm font-light text-ivory-muted">
-        <li><a href="tel:+375000000000" class="transition-colors hover:text-gold-400">+375 (00) 000-00-00</a></li>
-        <li>Минск, ул. Примерная, 1</li>
-        <li>Ежедневно 10:00–20:00</li>
+        <li><a href={telHref} class="transition-colors hover:text-gold-400">{tel}</a></li>
+        <li>{COMPANY.actualAddress}</li>
+        <li>{COMPANY.workingHours}</li>
       </ul>
     </div>
   </div>
