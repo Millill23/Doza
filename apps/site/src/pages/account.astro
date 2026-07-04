@@ -13,7 +13,7 @@ const customer = await prisma.customer.findUnique({ where: { id } });
 if (!customer) return Astro.redirect("/login");
 
 const now = new Date();
-const [balance, batches, orders] = await Promise.all([
+const [balance, batches, orders, dates] = await Promise.all([
   getBalance(id),
   prisma.loyaltyBatch.findMany({
     where: {
@@ -30,7 +30,15 @@ const [balance, batches, orders] = await Promise.all([
     take: 20,
     select: { id: true, createdAt: true, totalByn: true, status: true },
   }),
+  prisma.customerDate.findMany({
+    where: { customerId: id },
+    orderBy: { date: "asc" },
+  }),
 ]);
+
+const birthdayStr = customer.birthday
+  ? customer.birthday.toISOString().slice(0, 10)
+  : "";
 
 const STATUS: Record<string, string> = {
   new: "Новый", confirmed: "Подтверждён", shipped: "Отправлен",
@@ -50,6 +58,8 @@ const STATUS: Record<string, string> = {
       balance={balance}
       batches={batches.map((b) => ({ amount: Number(b.amountByn), expiresAt: b.expiresAt?.toISOString() ?? null }))}
       orders={orders.map((o) => ({ id: o.id, date: o.createdAt.toISOString(), total: Number(o.totalByn), status: STATUS[o.status] ?? o.status }))}
+      birthday={birthdayStr}
+      dates={dates.map((d) => ({ id: d.id, date: d.date.toISOString(), description: d.description }))}
     />
   </section>
 </Layout>

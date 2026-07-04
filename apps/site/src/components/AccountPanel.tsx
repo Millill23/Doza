@@ -10,12 +10,19 @@ interface Order {
   total: number;
   status: string;
 }
+interface DateItem {
+  id: number;
+  date: string;
+  description: string;
+}
 interface Props {
   name: string;
   phone: string;
   balance: number;
   batches: Batch[];
   orders: Order[];
+  birthday: string;
+  dates: DateItem[];
 }
 
 function byn(n: number) {
@@ -25,7 +32,7 @@ function ru(d: string) {
   return new Date(d).toLocaleDateString("ru-RU");
 }
 
-export default function AccountPanel({ name, phone, balance, batches, orders }: Props) {
+export default function AccountPanel({ name, phone, balance, batches, orders, birthday: birthdayInit, dates: datesInit }: Props) {
   const [showPass, setShowPass] = useState(false);
   const [oldPassword, setOld] = useState("");
   const [newPassword, setNew] = useState("");
@@ -33,9 +40,48 @@ export default function AccountPanel({ name, phone, balance, batches, orders }: 
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Личные данные
+  const [birthday, setBirthday] = useState(birthdayInit);
+  const [bdaySaved, setBdaySaved] = useState(false);
+  const [dates, setDates] = useState<DateItem[]>(datesInit);
+  const [newDate, setNewDate] = useState("");
+  const [newDesc, setNewDesc] = useState("");
+  const [dErr, setDErr] = useState<string | null>(null);
+
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
     window.location.href = "/";
+  }
+
+  async function post(body: Record<string, unknown>) {
+    const r = await fetch("/api/account/profile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return r.json();
+  }
+
+  async function saveBirthday() {
+    setDErr(null);
+    const d = await post({ action: "setBirthday", date: birthday || null });
+    if (d.ok) { setBdaySaved(true); setTimeout(() => setBdaySaved(false), 1500); }
+    else setDErr(d.error || "Ошибка");
+  }
+
+  async function addDate() {
+    setDErr(null);
+    if (!newDate || !newDesc.trim()) { setDErr("Укажите дату и описание"); return; }
+    const d = await post({ action: "addDate", date: newDate, description: newDesc });
+    if (d.ok) {
+      setDates([...dates, { id: d.id, date: new Date(newDate).toISOString(), description: newDesc.trim() }]);
+      setNewDate(""); setNewDesc("");
+    } else setDErr(d.error || "Ошибка");
+  }
+
+  async function removeDate(dateId: number) {
+    const d = await post({ action: "removeDate", id: dateId });
+    if (d.ok) setDates(dates.filter((x) => x.id !== dateId));
   }
 
   async function changePassword(e: React.FormEvent) {
@@ -120,6 +166,56 @@ export default function AccountPanel({ name, phone, balance, batches, orders }: 
         ) : (
           <p className="text-sm text-ivory-faint">Заказов пока нет.</p>
         )}
+      </div>
+
+      {/* Личные данные */}
+      <div className="rounded-2xl border border-ink-600/60 bg-ink-700 p-6">
+        <h2 className="mb-4 font-serif text-xl text-ivory">Личные данные</h2>
+
+        {/* День рождения */}
+        <label className="mb-1.5 block text-xs uppercase tracking-luxe text-gold-500">
+          День рождения
+        </label>
+        <div className="mb-5 flex gap-2">
+          <input
+            type="date"
+            value={birthday}
+            onChange={(e) => setBirthday(e.target.value)}
+            className="h-10 flex-1 rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory focus:border-gold-500 focus:outline-none"
+          />
+          <button onClick={saveBirthday} className="rounded-lg border border-gold-600/50 px-4 text-xs text-gold-400 hover:border-gold-500">
+            {bdaySaved ? "✓" : "Сохранить"}
+          </button>
+        </div>
+
+        {/* Памятные даты */}
+        <p className="mb-2 text-xs uppercase tracking-luxe text-gold-500">
+          Памятные даты (до 3)
+        </p>
+        <ul className="mb-3 space-y-2">
+          {dates.map((d) => (
+            <li key={d.id} className="flex items-center justify-between rounded-lg border border-ink-600/60 bg-ink-800 px-3 py-2 text-sm">
+              <span className="text-ivory">
+                {ru(d.date)} — {d.description}
+              </span>
+              <button onClick={() => removeDate(d.id)} className="text-ivory-faint hover:text-red-300" aria-label="Удалить">✕</button>
+            </li>
+          ))}
+          {dates.length === 0 && <li className="text-sm text-ivory-faint">Пока нет памятных дат.</li>}
+        </ul>
+        {dates.length < 3 && (
+          <div className="space-y-2">
+            <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)}
+              className="h-10 w-full rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory focus:border-gold-500 focus:outline-none" />
+            <input type="text" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder="Например: годовщина"
+              className="h-10 w-full rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory focus:border-gold-500 focus:outline-none" />
+            <button onClick={addDate} disabled={!newDate || !newDesc}
+              className="w-full rounded-lg bg-gold-gradient py-2 text-sm font-medium text-ink-900 disabled:opacity-50">
+              Добавить дату
+            </button>
+          </div>
+        )}
+        {dErr && <p className="mt-2 text-sm text-red-300">{dErr}</p>}
       </div>
 
       {/* Смена пароля */}
