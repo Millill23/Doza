@@ -3,6 +3,7 @@ import "../styles/global.css";
 import Header from "../components/Header.astro";
 import Footer from "../components/Footer.astro";
 import CookieConsent from "../components/CookieConsent.tsx";
+import { SEARCH_VERIFICATION } from "../lib/seo";
 
 interface Props {
   title?: string;
@@ -10,6 +11,7 @@ interface Props {
   canonical?: string;
   ogImage?: string;
   jsonLd?: object[];
+  noindex?: boolean;
 }
 
 const SITE_URL = "https://doza-parfum.by";
@@ -19,6 +21,7 @@ const {
   canonical = SITE_URL + Astro.url.pathname,
   ogImage = SITE_URL + "/logo.png",
   jsonLd = [],
+  noindex = false,
 } = Astro.props;
 ---
 
@@ -29,7 +32,17 @@ const {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
     <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0e0d0a" />
     <link rel="canonical" href={canonical} />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
+    {SEARCH_VERIFICATION.yandex && (
+      <meta name="yandex-verification" content={SEARCH_VERIFICATION.yandex} />
+    )}
+    {SEARCH_VERIFICATION.google && (
+      <meta name="google-site-verification" content={SEARCH_VERIFICATION.google} />
+    )}
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />

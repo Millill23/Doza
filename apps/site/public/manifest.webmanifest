@@ -1,0 +1,13 @@
+{
+  "name": "DOZA — парфюмерия на розлив",
+  "short_name": "DOZA",
+  "description": "Оригинальная парфюмерия на розлив. Любой объём от 2 мл, оплата при получении.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0e0d0a",
+  "theme_color": "#0e0d0a",
+  "lang": "ru",
+  "icons": [
+    { "src": "/logo.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

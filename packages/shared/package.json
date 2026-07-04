@@ -4,6 +4,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./uploads": "./src/uploads.ts",
-    "./sms": "./src/sms.ts"
+    "./sms": "./src/sms.ts",
+    "./indexnow": "./src/indexnow.ts"
   }
 }

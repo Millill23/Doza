@@ -5,6 +5,31 @@ import { COMPANY } from "./company";
 export const SITE_URL = "https://doza-parfum.by";
 export const SITE_NAME = "DOZA — парфюмерия на розлив";
 
+/**
+ * Коды подтверждения прав в вебмастерах (вставьте после регистрации домена).
+ * Яндекс.Вебмастер → «Метатег»; Google Search Console → «HTML-тег».
+ */
+export const SEARCH_VERIFICATION = {
+  yandex: "", // содержимое content="..." из meta name="yandex-verification"
+  google: "", // содержимое content="..." из meta name="google-site-verification"
+};
+
+/** JSON-LD со списком товаров для страницы каталога. */
+export function catalogItemListLd(
+  products: { slug: string; brand: string; name: string }[],
+): object {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    itemListElement: products.slice(0, 50).map((p, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      url: `${SITE_URL}/product/${p.slug}`,
+      name: `${p.brand} ${p.name}`,
+    })),
+  };
+}
+
 function byn(n: number): string {
   return `${n.toFixed(2)} BYN`;
 }

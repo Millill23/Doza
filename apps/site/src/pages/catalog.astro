@@ -2,6 +2,7 @@
 import Layout from "../layouts/Layout.astro";
 import CatalogApp from "../components/CatalogApp.tsx";
 import { getProducts, getBrands } from "../lib/products";
+import { catalogItemListLd } from "../lib/seo";
 import type { Gender } from "../lib/types";
 
 const url = new URL(Astro.request.url);
@@ -19,6 +20,7 @@ const [products, brands] = await Promise.all([getProducts(), getBrands()]);
 <Layout
   title="Каталог парфюмерии на розлив — DOZA"
   description="Каталог оригинальной парфюмерии на розлив: мужские, женские и унисекс ароматы известных брендов. Любой объём от 2 мл, цены в BYN, оплата при получении."
+  jsonLd={[catalogItemListLd(products)]}
 >
   <section class="container-luxe py-12">
     <header class="mb-10 text-center">

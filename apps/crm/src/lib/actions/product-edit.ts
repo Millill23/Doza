@@ -1,9 +1,19 @@
 "use server";
 
 import { prisma } from "@doza/db";
+import { submitIndexNow, SITE_HOST } from "@doza/shared/indexnow";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/session";
+
+/** Уведомить поисковики (IndexNow) об изменении товара. */
+function pingIndexNow(slug: string) {
+  void submitIndexNow([
+    `https://${SITE_HOST}/product/${slug}`,
+    `https://${SITE_HOST}/catalog`,
+    `https://${SITE_HOST}/sitemap.xml`,
+  ]);
+}
 
 export interface VolumeInput {
   id?: number;
@@ -137,6 +147,7 @@ export async function saveProduct(payload: ProductPayload): Promise<number> {
 
   revalidatePath("/products");
   revalidatePath(`/products/${productId}/edit`);
+  if (!payload.isArchived) pingIndexNow(slug);
   return productId;
 }
 
