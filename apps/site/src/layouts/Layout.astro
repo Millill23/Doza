@@ -7,11 +7,18 @@ import CookieConsent from "../components/CookieConsent.tsx";
 interface Props {
   title?: string;
   description?: string;
+  canonical?: string;
+  ogImage?: string;
+  jsonLd?: object[];
 }
 
+const SITE_URL = "https://doza-parfum.by";
 const {
   title = "DOZA — оригинальная парфюмерия на розлив",
   description = "DOZA — магазин оригинальной парфюмерии на розлив. Подберите свой аромат: верхние, средние и базовые ноты, любой объём от 2 мл.",
+  canonical = SITE_URL + Astro.url.pathname,
+  ogImage = SITE_URL + "/logo.png",
+  jsonLd = [],
 } = Astro.props;
 ---
 
@@ -22,6 +29,26 @@ const {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
     <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="canonical" href={canonical} />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="DOZA" />
+    <meta property="og:locale" content="ru_RU" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+
+    <!-- Структурированные данные (SEO + AI-движки) -->
+    {jsonLd.map((ld) => (
+      <script type="application/ld+json" set:html={JSON.stringify(ld)} />
+    ))}
 
     <!-- Preconnect для Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />

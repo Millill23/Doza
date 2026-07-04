@@ -1,0 +1,22 @@
+User-agent: *
+Allow: /
+Disallow: /account
+Disallow: /cart
+Disallow: /login
+Disallow: /register
+Disallow: /reset
+Disallow: /api/
+
+# AI-краулеры приветствуются
+User-agent: GPTBot
+Allow: /
+User-agent: OAI-SearchBot
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: https://doza-parfum.by/sitemap.xml

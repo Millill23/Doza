@@ -1,8 +1,13 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import Hero from "../components/Hero.astro";
+import { organizationLd } from "../lib/seo";
 ---
 
-<Layout>
+<Layout
+  title="DOZA — оригинальная парфюмерия на розлив в Беларуси"
+  description="Оригинальные ароматы на розлив: любой объём от 2 мл до полного флакона. Более 100 позиций люксовой и нишевой парфюмерии. Оплата при получении, доставка по Беларуси, баллы за покупки."
+  jsonLd={[organizationLd()]}
+>
   <Hero />
 </Layout>
