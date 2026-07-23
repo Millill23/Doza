@@ -43,6 +43,11 @@ const LOCAL = new Set([
   "paco-rabanne-lady-million",
   "paco-rabanne-1-million",
   "yves-saint-laurent-black-opium",
+  // batch 2: designer
+  "dolce-gabbana-k",
+  "dolce-gabbana-the-one",
+  "versace-bright-crystal",
+  "bvlgari-omnia-crystalline",
 ]);
 
 // [brand, name, gender, bottleMl, usd, family, notesTop, notesMid, notesBase, description]
