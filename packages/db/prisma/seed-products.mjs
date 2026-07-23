@@ -48,6 +48,9 @@ const LOCAL = new Set([
   "dolce-gabbana-the-one",
   "versace-bright-crystal",
   "bvlgari-omnia-crystalline",
+  "giorgio-armani-si",
+  "givenchy-ange-ou-demon",
+  "gucci-flora-gorgeous-gardenia",
 ]);
 
 // [brand, name, gender, bottleMl, usd, family, notesTop, notesMid, notesBase, description]
