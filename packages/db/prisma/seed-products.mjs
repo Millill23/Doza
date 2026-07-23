@@ -15,6 +15,8 @@ function volumes(usd, bottleMl) {
 }
 function slugify(s) {
   return s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "") // é→e, ì→i, ó→o и т.п.
     .toLowerCase()
     .replace(/&/g, " ")
     .replace(/[`'’.]/g, "")
