@@ -37,7 +37,12 @@ const IMG = {
 // Слаги, для которых уже готово реальное фото флакона (в apps/site/public/img/products/<slug>.webp).
 // Пополняется батчами — по мере обработки фото.
 const LOCAL = new Set([
-  // batch: designer
+  // batch 1: designer
+  "versace-eros",
+  "chanel-coco-mademoiselle",
+  "paco-rabanne-lady-million",
+  "paco-rabanne-1-million",
+  "yves-saint-laurent-black-opium",
 ]);
 
 // [brand, name, gender, bottleMl, usd, family, notesTop, notesMid, notesBase, description]
