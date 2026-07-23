@@ -138,8 +138,8 @@ async function main() {
   const brandMap = {};
   for (const name of brandNames) {
     const b = await prisma.brand.upsert({
-      where: { slug: slugify(name) },
-      update: {},
+      where: { name },
+      update: { slug: slugify(name) },
       create: { name, slug: slugify(name) },
     });
     brandMap[name] = b.id;
