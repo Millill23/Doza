@@ -92,6 +92,11 @@ const faq = productFaq(product);
           >
             {GENDER_LABELS[product.gender]}
           </span>
+          {product.discountPercent > 0 && (
+            <span class="inline-flex items-center gap-1.5 rounded-full bg-botanical-500 px-3 py-1 text-xs font-semibold text-ink-900">
+              Скидка −{product.discountPercent}%
+            </span>
+          )}
           {product.cashbackBoosted ? (
             <span class="inline-flex items-center gap-1.5 rounded-full bg-gold-gradient px-3 py-1 text-xs font-semibold text-ink-900 shadow-gold">
               Вернём {product.cashbackPercent}% баллами!
@@ -116,6 +121,7 @@ const faq = productFaq(product);
           brand={product.brand}
           image={product.image}
           volumes={product.volumes}
+          discountPercent={product.discountPercent}
         />
       </div>
     </div>

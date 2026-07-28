@@ -46,6 +46,18 @@ services:
     expose:
       - "3000"
 
+  # Планировщик: раз в час дёргает напоминания об акциях (идемпотентно)
+  cron:
+    image: alpine:3
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - crm
+    command:
+      - sh
+      - -c
+      - 'while true; do sleep 3600; wget -q -O- "http://crm:3000/api/cron/promo-reminders?key=$${CRON_SECRET}" >/dev/null 2>&1 || true; done'
+
   nginx:
     image: nginx:alpine
     restart: unless-stopped

@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { prisma } from "@doza/db";
 import { getBalance, spendPoints } from "@doza/db/loyalty";
+import { pickActivePromo } from "@doza/db/promos";
 import { normalizePhone, formatByn } from "@doza/shared";
 import { notifyTelegram } from "../../lib/telegram";
 
@@ -59,7 +60,22 @@ export const POST: APIRoute = async ({ request }) => {
         volumeMl: i.volumeMl,
       })),
     },
-    include: { product: { select: { name: true, brand: { select: { name: true } } } } },
+    include: {
+      product: {
+        select: {
+          name: true,
+          brand: { select: { name: true } },
+          promos: {
+            select: {
+              discountPercent: true,
+              cashbackPercent: true,
+              startsAt: true,
+              endsAt: true,
+            },
+          },
+        },
+      },
+    },
   });
 
   const priceMap = new Map<string, (typeof volumeRecords)[number]>();
@@ -78,7 +94,17 @@ export const POST: APIRoute = async ({ request }) => {
     const rec = priceMap.get(`${item.productId}:${item.volumeMl}`);
     const qty = Math.max(1, Math.floor(item.qty || 1));
     if (!rec) return bad(`Позиция недоступна (товар ${item.productId})`);
-    const price = Number(rec.priceByn);
+    const promo = pickActivePromo(
+      rec.product.promos.map((pr) => ({
+        discountPercent: pr.discountPercent != null ? Number(pr.discountPercent) : null,
+        cashbackPercent: pr.cashbackPercent != null ? Number(pr.cashbackPercent) : null,
+        startsAt: pr.startsAt,
+        endsAt: pr.endsAt,
+      })),
+    );
+    const price =
+      Math.round(Number(rec.priceByn) * (1 - promo.discountPercent / 100) * 100) /
+      100;
     total += price * qty;
     orderItems.push({
       productId: item.productId,

@@ -12,8 +12,10 @@ export interface ProductCard {
   name: string;
   gender: Gender;
   image: string;
-  /** минимальная цена среди объёмов */
+  /** минимальная цена среди объёмов (до скидки) */
   priceFrom: number;
+  /** активная скидка на цену, % (0 если нет) */
+  discountPercent: number;
   /** эффективный процент кешбэка баллами (override или глобальный) */
   cashbackPercent: number;
   /** true, если кешбэк повышен относительно глобального */

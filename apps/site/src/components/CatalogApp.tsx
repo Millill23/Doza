@@ -203,45 +203,66 @@ export default function CatalogApp({
   );
 
   // ── Карточка товара ───────────────────────────────────────────────────────
-  const card = (p: ProductCard) => (
-    <a
-      key={p.id}
-      href={`/product/${p.slug}`}
-      className="group relative block overflow-hidden rounded-xl border border-ink-600/60 bg-ink-700 transition-all duration-300 hover:border-gold-500/70 hover:shadow-gold"
-    >
-      <div className="relative aspect-[3/4] overflow-hidden bg-ink-900">
-        <img
-          src={p.image}
-          alt={`${p.brand} ${p.name}`}
-          loading="lazy"
-          decoding="async"
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-ink-700/90 to-transparent" />
-        <span className="absolute left-3 top-3 rounded-full border border-gold-500/30 bg-ink-900/70 px-2.5 py-1 text-[11px] font-light text-gold-400 backdrop-blur-sm">
-          {GENDER_LABELS[p.gender]}
-        </span>
-        {p.cashbackBoosted && (
-          <span className="absolute right-3 top-3 rounded-full bg-gold-gradient px-2.5 py-1 text-[11px] font-semibold text-ink-900 shadow-gold">
-            Вернём {p.cashbackPercent}% баллами
+  const card = (p: ProductCard) => {
+    const disc = p.discountPercent > 0 ? p.discountPercent : 0;
+    const finalFrom =
+      disc > 0
+        ? Math.round(p.priceFrom * (1 - disc / 100) * 100) / 100
+        : p.priceFrom;
+    return (
+      <a
+        key={p.id}
+        href={`/product/${p.slug}`}
+        className="group relative block overflow-hidden rounded-xl border border-ink-600/60 bg-ink-700 transition-all duration-300 hover:border-gold-500/70 hover:shadow-gold"
+      >
+        <div className="relative aspect-[3/4] overflow-hidden bg-ink-900">
+          <img
+            src={p.image}
+            alt={`${p.brand} ${p.name}`}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-ink-700/90 to-transparent" />
+          <span className="absolute left-3 top-3 rounded-full border border-gold-500/30 bg-ink-900/70 px-2.5 py-1 text-[11px] font-light text-gold-400 backdrop-blur-sm">
+            {GENDER_LABELS[p.gender]}
           </span>
-        )}
-      </div>
-      <div className="space-y-2 p-4 sm:p-5">
-        <div className="text-[11px] font-medium uppercase tracking-luxe text-gold-500">
-          {p.brand}
+          {disc > 0 && (
+            <span className="absolute left-3 top-11 rounded-full bg-botanical-500 px-2.5 py-1 text-[11px] font-semibold text-ink-900">
+              −{disc}%
+            </span>
+          )}
+          {p.cashbackBoosted && (
+            <span className="absolute right-3 top-3 rounded-full bg-gold-gradient px-2.5 py-1 text-[11px] font-semibold text-ink-900 shadow-gold">
+              Вернём {p.cashbackPercent}% баллами
+            </span>
+          )}
         </div>
-        <h3 className="font-serif text-lg leading-tight text-ivory sm:text-xl">
-          {p.name}
-        </h3>
-        <div className="pt-1">
-          <span className="text-base font-medium text-gold-400">
-            от {formatByn(p.priceFrom)}
-          </span>
+        <div className="space-y-2 p-4 sm:p-5">
+          <div className="text-[11px] font-medium uppercase tracking-luxe text-gold-500">
+            {p.brand}
+          </div>
+          <h3 className="font-serif text-lg leading-tight text-ivory sm:text-xl">
+            {p.name}
+          </h3>
+          <div className="pt-1">
+            <span className="text-base font-medium text-gold-400">
+              {disc > 0 ? (
+                <>
+                  <span className="mr-1.5 text-sm font-light text-ivory-faint line-through">
+                    {p.priceFrom.toFixed(2)}
+                  </span>
+                  от {formatByn(finalFrom)}
+                </>
+              ) : (
+                <>от {formatByn(p.priceFrom)}</>
+              )}
+            </span>
+          </div>
         </div>
-      </div>
-    </a>
-  );
+      </a>
+    );
+  };
 
   return (
     <div className="grid gap-8 lg:grid-cols-[260px_1fr]">

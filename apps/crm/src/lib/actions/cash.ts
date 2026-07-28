@@ -2,6 +2,7 @@
 
 import { prisma } from "@doza/db";
 import { getBalance, earnPoints, spendPoints } from "@doza/db/loyalty";
+import { pickActivePromo } from "@doza/db/promos";
 import { createSmsCode, verifySmsCode } from "@doza/db/sms-codes";
 import { normalizePhone } from "@doza/shared";
 import { sendSms } from "@doza/shared/sms";
@@ -119,13 +120,41 @@ export async function createOfflineSale(input: CreateSaleInput) {
     }
   }
 
-  // VIP-скидка (действует на всё). Кешбек начисляется на сумму со скидкой.
-  let discount = 0;
-  if (vipCard) {
-    const vipPct = await getSetting("vip_discount_percent", 20);
-    discount = Math.round(total * (vipPct / 100) * 100) / 100;
+  // Скидки по позициям: максимум из VIP-скидки и активной акции на товар.
+  // Кешбек начисляется на сумму со скидкой.
+  const vipPct = vipCard ? await getSetting("vip_discount_percent", 20) : 0;
+  const promoRows = await prisma.promo.findMany({
+    where: { productId: { in: resolved.map((r) => r.productId) } },
+    select: {
+      productId: true,
+      discountPercent: true,
+      cashbackPercent: true,
+      startsAt: true,
+      endsAt: true,
+    },
+  });
+  const promosByProduct = new Map<number, typeof promoRows>();
+  for (const pr of promoRows) {
+    const arr = promosByProduct.get(pr.productId) ?? [];
+    arr.push(pr);
+    promosByProduct.set(pr.productId, arr);
   }
-  const netTotal = Math.round((total - discount) * 100) / 100;
+  let netTotal = 0;
+  for (const r of resolved) {
+    const promo = pickActivePromo(
+      (promosByProduct.get(r.productId) ?? []).map((pr) => ({
+        discountPercent: pr.discountPercent != null ? Number(pr.discountPercent) : null,
+        cashbackPercent: pr.cashbackPercent != null ? Number(pr.cashbackPercent) : null,
+        startsAt: pr.startsAt,
+        endsAt: pr.endsAt,
+      })),
+    );
+    const eff = Math.max(vipPct, promo.discountPercent);
+    const lineNet = (Math.round(r.priceByn * (1 - eff / 100) * 100) / 100) * r.qty;
+    netTotal += lineNet;
+  }
+  netTotal = Math.round(netTotal * 100) / 100;
+  const discount = Math.round((total - netTotal) * 100) / 100;
 
   // Списание баллов — требует подтверждения кодом из SMS
   let loyaltySpent = 0;

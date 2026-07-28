@@ -19,6 +19,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./loyalty": "./src/loyalty.ts",
-    "./sms-codes": "./src/sms-codes.ts"
+    "./sms-codes": "./src/sms-codes.ts",
+    "./promos": "./src/promos.ts"
   }
 }

@@ -8,6 +8,11 @@ interface Props {
 }
 
 const { product } = Astro.props;
+const disc = product.discountPercent > 0 ? product.discountPercent : 0;
+const finalFrom =
+  disc > 0
+    ? Math.round(product.priceFrom * (1 - disc / 100) * 100) / 100
+    : product.priceFrom;
 ---
 
 <a
@@ -34,6 +39,14 @@ const { product } = Astro.props;
     >
       {GENDER_LABELS[product.gender]}
     </span>
+    <!-- плашка скидки -->
+    {disc > 0 && (
+      <span
+        class="absolute left-3 top-11 rounded-full bg-botanical-500 px-2.5 py-1 text-[11px] font-semibold text-ink-900"
+      >
+        −{disc}%
+      </span>
+    )}
     <!-- плашка повышенного кешбэка -->
     {product.cashbackBoosted && (
       <span
@@ -56,7 +69,16 @@ const { product } = Astro.props;
     </h3>
     <div class="flex items-center justify-between pt-1">
       <span class="text-base font-medium text-gold-400">
-        от {formatByn(product.priceFrom)}
+        {disc > 0 ? (
+          <>
+            <span class="mr-1.5 text-sm font-light text-ivory-faint line-through">
+              {product.priceFrom.toFixed(2)}
+            </span>
+            от {formatByn(finalFrom)}
+          </>
+        ) : (
+          <>от {formatByn(product.priceFrom)}</>
+        )}
       </span>
       <span
         class="translate-y-1 text-sm font-light text-ivory-faint opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:text-gold-400 group-hover:opacity-100"

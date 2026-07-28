@@ -69,8 +69,26 @@ model Product {
   inventoryLog           InventoryLog[]
   orderItems             OrderItem[]
   offlineSaleItems       OfflineSaleItem[]
+  promos                 Promo[]
 
   @@map("products")
+}
+
+// ─── Акции (скидки / повышенный кешбек по времени) ──────────────────────────────
+
+model Promo {
+  id              Int       @id @default(autoincrement())
+  productId       Int       @map("product_id")
+  product         Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  discountPercent Decimal?  @map("discount_percent") @db.Decimal(5, 2)
+  cashbackPercent Decimal?  @map("cashback_percent") @db.Decimal(5, 2)
+  startsAt        DateTime? @map("starts_at")
+  endsAt          DateTime? @map("ends_at")
+  reminderSent    Boolean   @default(false) @map("reminder_sent")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@index([productId])
+  @@map("promos")
 }
 
 enum Gender {

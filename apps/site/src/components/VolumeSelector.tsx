@@ -7,6 +7,7 @@ interface Props {
   brand: string;
   image: string;
   volumes: ProductVolume[];
+  discountPercent?: number;
 }
 
 function formatByn(amount: number): string {
@@ -41,10 +42,14 @@ export default function VolumeSelector({
   brand,
   image,
   volumes,
+  discountPercent = 0,
 }: Props) {
   const active = volumes.filter((v) => v.priceByn > 0);
   const [selected, setSelected] = useState<number>(active[0]?.volumeMl ?? 0);
   const [added, setAdded] = useState(false);
+
+  const d = discountPercent > 0 ? discountPercent : 0;
+  const finalPrice = (p: number) => Math.round(p * (1 - d / 100) * 100) / 100;
 
   const current = active.find((v) => v.volumeMl === selected) ?? active[0];
 
@@ -56,7 +61,7 @@ export default function VolumeSelector({
       brand,
       image,
       volumeMl: current.volumeMl,
-      priceByn: current.priceByn,
+      priceByn: finalPrice(current.priceByn),
       qty: 1,
     });
     setAdded(true);
@@ -88,7 +93,16 @@ export default function VolumeSelector({
                   selected === v.volumeMl ? "text-gold-300" : "text-ivory-muted"
                 }`}
               >
-                {formatByn(v.priceByn)}
+                {d > 0 ? (
+                  <>
+                    <span className="mr-1 text-ivory-faint line-through">
+                      {v.priceByn.toFixed(2)}
+                    </span>
+                    {formatByn(finalPrice(v.priceByn))}
+                  </>
+                ) : (
+                  formatByn(v.priceByn)
+                )}
               </span>
             </button>
           ))}
@@ -98,11 +112,26 @@ export default function VolumeSelector({
       <div className="flex items-end justify-between border-t border-ink-600/60 pt-6">
         <div>
           <span className="block text-xs font-light uppercase tracking-wide text-ivory-faint">
-            Цена
+            Цена{d > 0 && <span className="ml-2 text-botanical-300">−{d}%</span>}
           </span>
-          <span className="font-serif text-3xl text-gold-gradient">
-            {current ? formatByn(current.priceByn) : "—"}
-          </span>
+          {current ? (
+            d > 0 ? (
+              <span className="flex items-baseline gap-2">
+                <span className="font-serif text-3xl text-gold-gradient">
+                  {formatByn(finalPrice(current.priceByn))}
+                </span>
+                <span className="text-lg text-ivory-faint line-through">
+                  {current.priceByn.toFixed(2)}
+                </span>
+              </span>
+            ) : (
+              <span className="font-serif text-3xl text-gold-gradient">
+                {formatByn(current.priceByn)}
+              </span>
+            )
+          ) : (
+            <span className="font-serif text-3xl text-gold-gradient">—</span>
+          )}
         </div>
 
         <button

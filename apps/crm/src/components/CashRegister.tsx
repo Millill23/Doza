@@ -15,6 +15,7 @@ interface ProductOpt {
   id: number;
   name: string;
   brand: string;
+  discountPercent: number;
   volumes: VolumeOpt[];
 }
 interface CartLine {
@@ -23,6 +24,7 @@ interface CartLine {
   volumeMl: number;
   priceByn: number;
   qty: number;
+  promoDiscount: number;
 }
 
 function byn(n: number) {
@@ -77,8 +79,14 @@ export default function CashRegister({ products }: { products: ProductOpt[] }) {
   }, [query, brandFilter, products]);
 
   const total = cart.reduce((s, l) => s + l.priceByn * l.qty, 0);
-  const discount = vipPercent > 0 ? Math.round(total * (vipPercent / 100) * 100) / 100 : 0;
-  const netTotal = Math.round((total - discount) * 100) / 100;
+  const netTotal =
+    Math.round(
+      cart.reduce((s, l) => {
+        const eff = Math.max(vipPercent, l.promoDiscount || 0);
+        return s + (Math.round(l.priceByn * (1 - eff / 100) * 100) / 100) * l.qty;
+      }, 0) * 100,
+    ) / 100;
+  const discount = Math.round((total - netTotal) * 100) / 100;
   const maxSpend = Math.min(balance, netTotal);
   const effSpend = usePoints ? Math.min(spend || maxSpend, maxSpend) : 0;
   const toPay = Math.max(0, Math.round((netTotal - effSpend) * 100) / 100);
@@ -101,6 +109,7 @@ export default function CashRegister({ products }: { products: ProductOpt[] }) {
           volumeMl: v.volumeMl,
           priceByn: v.priceByn,
           qty: 1,
+          promoDiscount: p.discountPercent || 0,
         },
       ];
     });
@@ -378,7 +387,7 @@ export default function CashRegister({ products }: { products: ProductOpt[] }) {
           </div>
           {discount > 0 && (
             <div className="flex justify-between text-gold-400">
-              <span>VIP-скидка {vipPercent}%</span><span>−{byn(discount)}</span>
+              <span>Скидка{vipCard ? " (VIP)" : ""}</span><span>−{byn(discount)}</span>
             </div>
           )}
           {effSpend > 0 && (

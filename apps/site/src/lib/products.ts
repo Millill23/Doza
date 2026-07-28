@@ -1,4 +1,5 @@
 import { prisma } from "@doza/db";
+import { pickActivePromo } from "@doza/db/promos";
 import type { ProductCard, ProductDetail, Gender } from "./types";
 
 /**
@@ -21,6 +22,12 @@ type ProductWithRels = {
   brand: { name: string };
   photos: { url: string }[];
   volumes: { volumeMl: number; priceByn: unknown; isActive: boolean }[];
+  promos: {
+    discountPercent: unknown | null;
+    cashbackPercent: unknown | null;
+    startsAt: Date | null;
+    endsAt: Date | null;
+  }[];
 };
 
 /** Глобальный процент кешбэка из настроек (кэшируется на время запроса). */
@@ -35,7 +42,19 @@ function toCard(p: ProductWithRels, globalPercent: number): ProductCard {
     .map((v) => Number(v.priceByn));
   const override =
     p.loyaltyPercentOverride != null ? Number(p.loyaltyPercentOverride) : null;
-  const cashbackPercent = override ?? globalPercent;
+  const promo = pickActivePromo(
+    (p.promos ?? []).map((pr) => ({
+      discountPercent: pr.discountPercent != null ? Number(pr.discountPercent) : null,
+      cashbackPercent: pr.cashbackPercent != null ? Number(pr.cashbackPercent) : null,
+      startsAt: pr.startsAt,
+      endsAt: pr.endsAt,
+    })),
+  );
+  const cashbackPercent = Math.max(
+    globalPercent,
+    override ?? 0,
+    promo.cashbackPercent ?? 0,
+  );
   return {
     id: p.id,
     slug: p.slug,
@@ -44,8 +63,9 @@ function toCard(p: ProductWithRels, globalPercent: number): ProductCard {
     gender: p.gender,
     image: p.photos[0]?.url ?? FALLBACK_IMG,
     priceFrom: prices.length ? Math.min(...prices) : 0,
+    discountPercent: promo.discountPercent,
     cashbackPercent,
-    cashbackBoosted: override != null && override > globalPercent,
+    cashbackBoosted: cashbackPercent > globalPercent,
   };
 }
 
@@ -55,10 +75,18 @@ export interface ProductFilter {
   query?: string;
 }
 
+const promoSelect = {
+  discountPercent: true,
+  cashbackPercent: true,
+  startsAt: true,
+  endsAt: true,
+} as const;
+
 const cardInclude = {
   brand: { select: { name: true } },
   photos: { orderBy: { sortOrder: "asc" as const }, take: 1 },
   volumes: { where: { isActive: true } },
+  promos: { select: promoSelect },
 };
 
 export async function getProducts(
@@ -95,6 +123,7 @@ export async function getProduct(slug: string): Promise<ProductDetail | null> {
       brand: { select: { name: true } },
       photos: { orderBy: { sortOrder: "asc" } },
       volumes: { where: { isActive: true }, orderBy: { volumeMl: "asc" } },
+      promos: { select: promoSelect },
     },
   });
 
