@@ -51,6 +51,17 @@ const LOCAL = new Set([
   "giorgio-armani-si",
   "givenchy-ange-ou-demon",
   "gucci-flora-gorgeous-gardenia",
+  // batch 3: designer
+  "versace-eros-energy",
+  "burberry-weekend",
+  "trussardi-my-name",
+  "narciso-rodriguez-for-her-musc-nude",
+  "calvin-klein-ck-one-shock",
+  "trussardi-ruby-red",
+  "armand-basi-in-red",
+  "calvin-klein-in2u",
+  "chloe-chloe",
+  "gucci-flora-gorgeous-magnolia",
 ]);
 
 // [brand, name, gender, bottleMl, usd, family, notesTop, notesMid, notesBase, description]
