@@ -323,8 +323,22 @@ model OfflineSaleItem {
   volumeMl  Int        @map("volume_ml")
   qty       Int
   priceByn  Decimal    @map("price_byn") @db.Decimal(10, 2)
+  atomizerId Int?      @map("atomizer_id")
+  atomizer   Atomizer? @relation(fields: [atomizerId], references: [id])
 
   @@map("offline_sale_items")
+}
+
+// Атомайзеры (флаконы под розлив), привязаны к объёму
+model Atomizer {
+  id        Int               @id @default(autoincrement())
+  name      String
+  volumeMl  Int               @map("volume_ml")
+  isActive  Boolean           @default(true) @map("is_active")
+  sortOrder Int               @default(0) @map("sort_order")
+  saleItems OfflineSaleItem[]
+
+  @@map("atomizers")
 }
 
 model OfflineSaleEdit {

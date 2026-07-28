@@ -39,6 +39,7 @@ export interface CashItemInput {
   productId: number;
   volumeMl: number;
   qty: number;
+  atomizerId?: number | null;
 }
 
 /** Поиск клиента по телефону + баланс баллов. */
@@ -187,6 +188,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
           volumeMl: r.volumeMl,
           qty: r.qty,
           priceByn: r.priceByn,
+          atomizerId: r.atomizerId ?? null,
         })),
       },
     },

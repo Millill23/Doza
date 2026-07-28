@@ -26,6 +26,11 @@ export default async function CashPage() {
     orderBy: [{ brand: { name: "asc" } }, { name: "asc" }],
   });
 
+  const atomizers = await prisma.atomizer.findMany({
+    where: { isActive: true },
+    orderBy: [{ volumeMl: "asc" }, { name: "asc" }],
+  });
+
   const now = new Date();
   const opts = products
     .filter((p) => p.volumes.length > 0)
@@ -64,7 +69,14 @@ export default async function CashPage() {
           Журнал продаж
         </Link>
       </div>
-      <CashRegister products={opts} />
+      <CashRegister
+        products={opts}
+        atomizers={atomizers.map((a) => ({
+          id: a.id,
+          name: a.name,
+          volumeMl: a.volumeMl,
+        }))}
+      />
     </div>
   );
 }

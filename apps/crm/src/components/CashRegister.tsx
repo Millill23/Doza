@@ -18,6 +18,11 @@ interface ProductOpt {
   discountPercent: number;
   volumes: VolumeOpt[];
 }
+interface AtomizerOpt {
+  id: number;
+  name: string;
+  volumeMl: number;
+}
 interface CartLine {
   productId: number;
   label: string;
@@ -25,6 +30,7 @@ interface CartLine {
   priceByn: number;
   qty: number;
   promoDiscount: number;
+  atomizerId: number | null;
 }
 
 function byn(n: number) {
@@ -39,7 +45,13 @@ function chipCls(active: boolean) {
   }`;
 }
 
-export default function CashRegister({ products }: { products: ProductOpt[] }) {
+export default function CashRegister({
+  products,
+  atomizers,
+}: {
+  products: ProductOpt[];
+  atomizers: AtomizerOpt[];
+}) {
   const [query, setQuery] = useState("");
   const [brandFilter, setBrandFilter] = useState<string | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -101,6 +113,7 @@ export default function CashRegister({ products }: { products: ProductOpt[] }) {
         next[i] = { ...next[i], qty: next[i].qty + 1 };
         return next;
       }
+      const match = atomizers.filter((a) => a.volumeMl === v.volumeMl);
       return [
         ...prev,
         {
@@ -110,6 +123,7 @@ export default function CashRegister({ products }: { products: ProductOpt[] }) {
           priceByn: v.priceByn,
           qty: 1,
           promoDiscount: p.discountPercent || 0,
+          atomizerId: match.length === 1 ? match[0].id : null,
         },
       ];
     });
@@ -120,6 +134,14 @@ export default function CashRegister({ products }: { products: ProductOpt[] }) {
       if (qty <= 0) return prev.filter((_, i) => i !== idx);
       const next = prev.slice();
       next[idx] = { ...next[idx], qty };
+      return next;
+    });
+  }
+
+  function setAtomizer(idx: number, atomizerId: number | null) {
+    setCart((prev) => {
+      const next = prev.slice();
+      next[idx] = { ...next[idx], atomizerId };
       return next;
     });
   }
@@ -176,6 +198,7 @@ export default function CashRegister({ products }: { products: ProductOpt[] }) {
             productId: l.productId,
             volumeMl: l.volumeMl,
             qty: l.qty,
+            atomizerId: l.atomizerId,
           })),
           phone: phone || undefined,
           name: name || undefined,
@@ -268,17 +291,37 @@ export default function CashRegister({ products }: { products: ProductOpt[] }) {
         ) : (
           <ul className="space-y-2">
             {cart.map((l, idx) => (
-              <li key={`${l.productId}-${l.volumeMl}`} className="flex items-center gap-2 text-sm">
-                <div className="flex-1">
-                  <div className="text-ivory">{l.label}</div>
-                  <div className="text-xs text-ivory-faint">{l.volumeMl} мл · {byn(l.priceByn)}</div>
+              <li key={`${l.productId}-${l.volumeMl}`} className="rounded-lg border border-ink-600/40 px-2 py-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <div className="flex-1">
+                    <div className="text-ivory">{l.label}</div>
+                    <div className="text-xs text-ivory-faint">{l.volumeMl} мл · {byn(l.priceByn)}</div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setQty(idx, l.qty - 1)} className="h-7 w-7 rounded border border-ink-600 text-ivory-muted hover:border-gold-500">−</button>
+                    <span className="w-6 text-center">{l.qty}</span>
+                    <button onClick={() => setQty(idx, l.qty + 1)} className="h-7 w-7 rounded border border-ink-600 text-ivory-muted hover:border-gold-500">+</button>
+                  </div>
+                  <span className="w-20 text-right text-gold-400">{byn(l.priceByn * l.qty)}</span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <button onClick={() => setQty(idx, l.qty - 1)} className="h-7 w-7 rounded border border-ink-600 text-ivory-muted hover:border-gold-500">−</button>
-                  <span className="w-6 text-center">{l.qty}</span>
-                  <button onClick={() => setQty(idx, l.qty + 1)} className="h-7 w-7 rounded border border-ink-600 text-ivory-muted hover:border-gold-500">+</button>
-                </div>
-                <span className="w-20 text-right text-gold-400">{byn(l.priceByn * l.qty)}</span>
+                {atomizers.some((a) => a.volumeMl === l.volumeMl) && (
+                  <select
+                    value={l.atomizerId ?? ""}
+                    onChange={(e) =>
+                      setAtomizer(idx, e.target.value ? Number(e.target.value) : null)
+                    }
+                    className="mt-2 h-8 w-full rounded-lg border border-ink-600 bg-ink-800 px-2 text-xs text-ivory focus:border-gold-500 focus:outline-none"
+                  >
+                    <option value="">Атомайзер {l.volumeMl} мл…</option>
+                    {atomizers
+                      .filter((a) => a.volumeMl === l.volumeMl)
+                      .map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name}
+                        </option>
+                      ))}
+                  </select>
+                )}
               </li>
             ))}
           </ul>

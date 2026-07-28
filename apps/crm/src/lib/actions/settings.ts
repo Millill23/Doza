@@ -43,3 +43,21 @@ export async function deleteBrand(id: number) {
   await prisma.brand.delete({ where: { id } });
   revalidatePath("/settings");
 }
+
+export async function addAtomizer(name: string, volumeMl: number) {
+  await requireRole(["admin"]);
+  const trimmed = name.trim();
+  const vol = Math.floor(Number(volumeMl));
+  if (!trimmed) throw new Error("Укажите название атомайзера");
+  if (!vol || vol <= 0) throw new Error("Укажите объём (мл)");
+  await prisma.atomizer.create({ data: { name: trimmed, volumeMl: vol } });
+  revalidatePath("/settings");
+  revalidatePath("/cash");
+}
+
+export async function deleteAtomizer(id: number) {
+  await requireRole(["admin"]);
+  await prisma.atomizer.delete({ where: { id } });
+  revalidatePath("/settings");
+  revalidatePath("/cash");
+}

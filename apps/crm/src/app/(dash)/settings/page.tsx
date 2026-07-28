@@ -2,6 +2,7 @@ import { prisma } from "@doza/db";
 import { requireRole } from "@/lib/session";
 import { saveSettings } from "@/lib/actions/settings";
 import BrandsManager from "@/components/BrandsManager";
+import AtomizersManager from "@/components/AtomizersManager";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ async function getSetting(key: string, fallback: string) {
 export default async function SettingsPage() {
   await requireRole(["admin"]);
 
-  const [percent, days, threshold, brands] = await Promise.all([
+  const [percent, days, threshold, brands, atomizers] = await Promise.all([
     getSetting("loyalty_percent", "5"),
     getSetting("loyalty_days", "180"),
     getSetting("low_stock_threshold", "50"),
@@ -21,6 +22,7 @@ export default async function SettingsPage() {
       orderBy: { name: "asc" },
       include: { _count: { select: { products: true } } },
     }),
+    prisma.atomizer.findMany({ orderBy: [{ volumeMl: "asc" }, { name: "asc" }] }),
   ]);
 
   const telegramConfigured = !!process.env.TELEGRAM_BOT_TOKEN && !!process.env.TELEGRAM_CHAT_ID;
@@ -81,6 +83,18 @@ export default async function SettingsPage() {
               id: b.id,
               name: b.name,
               productCount: b._count.products,
+            }))}
+          />
+        </div>
+
+        {/* Атомайзеры */}
+        <div className="rounded-2xl border border-ink-600/60 bg-ink-700 p-6">
+          <h2 className="mb-4 font-serif text-xl text-ivory">Атомайзеры</h2>
+          <AtomizersManager
+            atomizers={atomizers.map((a) => ({
+              id: a.id,
+              name: a.name,
+              volumeMl: a.volumeMl,
             }))}
           />
         </div>
