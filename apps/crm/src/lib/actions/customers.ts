@@ -73,6 +73,62 @@ export async function registerCustomerOffline(input: OfflineRegInput) {
   return { ok: true, customerId: customer.id };
 }
 
+/** Зарегистрировать VIP-клиента (админ, без подтверждения телефона). */
+export async function registerVip(
+  phoneRaw: string,
+  nameRaw: string,
+  cardRaw: string,
+) {
+  await requireRole(["admin"]);
+  const phone = normalizePhone(phoneRaw);
+  if (phone.length < 9) throw new Error("Некорректный телефон");
+  const name = (nameRaw ?? "").trim();
+  if (name.length < 2) throw new Error("Укажите имя");
+  const card = (cardRaw ?? "").trim();
+  if (!card) throw new Error("Укажите номер карты");
+
+  const taken = await prisma.customer.findUnique({
+    where: { vipCardNumber: card },
+  });
+  if (taken && taken.phone !== phone)
+    throw new Error(`Карта №${card} уже привязана к другому клиенту`);
+
+  const customer = await prisma.customer.upsert({
+    where: { phone },
+    update: { name, vipCardNumber: card },
+    create: { phone, name, vipCardNumber: card },
+  });
+  revalidatePath("/customers");
+  return { ok: true, customerId: customer.id };
+}
+
+/** Привязать VIP-карту существующему клиенту. */
+export async function attachVipCard(customerId: number, cardRaw: string) {
+  await requireRole(["admin"]);
+  const card = (cardRaw ?? "").trim();
+  if (!card) throw new Error("Укажите номер карты");
+  const taken = await prisma.customer.findUnique({
+    where: { vipCardNumber: card },
+  });
+  if (taken && taken.id !== customerId)
+    throw new Error(`Карта №${card} уже привязана к другому клиенту`);
+  await prisma.customer.update({
+    where: { id: customerId },
+    data: { vipCardNumber: card },
+  });
+  revalidatePath(`/customers/${customerId}`);
+}
+
+/** Снять VIP-карту с клиента. */
+export async function removeVipCard(customerId: number) {
+  await requireRole(["admin"]);
+  await prisma.customer.update({
+    where: { id: customerId },
+    data: { vipCardNumber: null },
+  });
+  revalidatePath(`/customers/${customerId}`);
+}
+
 export async function setBirthday(customerId: number, date: string) {
   await requireRole(["admin", "seller", "marketer"]);
   await prisma.customer.update({

@@ -4,6 +4,8 @@ import { prisma } from "@doza/db";
 import { getBalance } from "@doza/db/loyalty";
 import { formatByn, formatPhone } from "@doza/shared";
 import CustomerDates from "@/components/CustomerDates";
+import VipManager from "@/components/VipManager";
+import { getSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +32,8 @@ export default async function CustomerDetailPage({
   });
   if (!customer) notFound();
 
+  const session = await getSession();
+  const isAdmin = session?.user?.role === "admin";
   const now = new Date();
   const [balance, batches] = await Promise.all([
     getBalance(customer.id),
@@ -71,6 +75,11 @@ export default async function CustomerDetailPage({
         <span className="rounded-full border border-botanical-500/40 bg-botanical-700/20 px-3 py-1 text-sm text-botanical-300">
           Баланс: {formatByn(balance)}
         </span>
+        {customer.vipCardNumber && (
+          <span className="rounded-full bg-gold-gradient px-3 py-1 text-sm font-semibold text-ink-900">
+            ⭐ VIP №{customer.vipCardNumber}
+          </span>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
@@ -130,8 +139,14 @@ export default async function CustomerDetailPage({
           </div>
         </div>
 
-        {/* Даты */}
+        {/* Даты + VIP */}
         <div className="rounded-2xl border border-ink-600/60 bg-ink-700 p-6 lg:sticky lg:top-8 lg:self-start">
+          {isAdmin && (
+            <div className="mb-6">
+              <h2 className="mb-3 font-serif text-xl text-ivory">VIP-карта</h2>
+              <VipManager customerId={customer.id} card={customer.vipCardNumber} />
+            </div>
+          )}
           <h2 className="mb-4 font-serif text-xl text-ivory">Памятные даты</h2>
           <CustomerDates
             customerId={customer.id}

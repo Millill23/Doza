@@ -144,6 +144,7 @@ model Customer {
   name            String
   passwordHash    String?          @map("password_hash")
   phoneVerified   Boolean          @default(false) @map("phone_verified")
+  vipCardNumber   String?          @unique @map("vip_card_number")
   birthday        DateTime?        @db.Date
   registeredAt    DateTime         @default(now()) @map("registered_at")
   lastPurchaseAt  DateTime?        @map("last_purchase_at")
@@ -279,6 +280,7 @@ model OfflineSale {
   seller          CrmUser           @relation(fields: [sellerId], references: [id])
   status          OfflineSaleStatus @default(open)
   totalByn        Decimal           @default(0) @map("total_byn") @db.Decimal(10, 2)
+  discountByn     Decimal           @default(0) @map("discount_byn") @db.Decimal(10, 2)
   loyaltySpentByn Decimal           @default(0) @map("loyalty_spent_byn") @db.Decimal(10, 2)
   createdAt       DateTime          @default(now()) @map("created_at")
   closedAt        DateTime?         @map("closed_at")

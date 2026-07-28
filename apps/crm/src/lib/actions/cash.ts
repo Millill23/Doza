@@ -48,12 +48,22 @@ export async function lookupCustomer(phoneRaw: string) {
 
   const customer = await prisma.customer.findUnique({
     where: { phone },
-    select: { id: true, name: true },
+    select: { id: true, name: true, vipCardNumber: true },
   });
-  if (!customer) return { found: false, name: null, balance: 0 };
+  if (!customer)
+    return { found: false, name: null, balance: 0, vipCard: null, vipPercent: 0 };
 
   const balance = await getBalance(customer.id);
-  return { found: true, name: customer.name, balance };
+  const vipPercent = customer.vipCardNumber
+    ? await getSetting("vip_discount_percent", 20)
+    : 0;
+  return {
+    found: true,
+    name: customer.name,
+    balance,
+    vipCard: customer.vipCardNumber,
+    vipPercent,
+  };
 }
 
 interface CreateSaleInput {
@@ -95,6 +105,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
 
   // Клиент (опционально)
   let customerId: number | null = null;
+  let vipCard: string | null = null;
   if (input.phone) {
     const phone = normalizePhone(input.phone);
     if (phone.length >= 9) {
@@ -104,8 +115,17 @@ export async function createOfflineSale(input: CreateSaleInput) {
         create: { phone, name: input.name?.trim() || "Покупатель" },
       });
       customerId = customer.id;
+      vipCard = customer.vipCardNumber;
     }
   }
+
+  // VIP-скидка (действует на всё). Кешбек начисляется на сумму со скидкой.
+  let discount = 0;
+  if (vipCard) {
+    const vipPct = await getSetting("vip_discount_percent", 20);
+    discount = Math.round(total * (vipPct / 100) * 100) / 100;
+  }
+  const netTotal = Math.round((total - discount) * 100) / 100;
 
   // Списание баллов — требует подтверждения кодом из SMS
   let loyaltySpent = 0;
@@ -118,7 +138,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
       );
     }
     const balance = await getBalance(customerId);
-    loyaltySpent = Math.min(input.loyaltySpend, balance, total);
+    loyaltySpent = Math.min(input.loyaltySpend, balance, netTotal);
     loyaltySpent = Math.round(loyaltySpent * 100) / 100;
   }
 
@@ -128,7 +148,8 @@ export async function createOfflineSale(input: CreateSaleInput) {
       sellerId,
       customerId,
       status: "closed",
-      totalByn: total,
+      totalByn: netTotal,
+      discountByn: discount,
       loyaltySpentByn: loyaltySpent,
       closedAt: new Date(),
       items: {
@@ -172,7 +193,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
     }
     const percent = await getSetting("loyalty_percent", 5);
     const days = await getSetting("loyalty_days", 180);
-    const net = total - loyaltySpent;
+    const net = netTotal - loyaltySpent;
     const earn = Math.round(net * (percent / 100) * 100) / 100;
     if (earn > 0) {
       await earnPoints(customerId, earn, days, {
@@ -182,7 +203,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
     }
     await prisma.customer.update({
       where: { id: customerId },
-      data: { lastPurchaseAt: new Date(), lastPurchaseSum: total },
+      data: { lastPurchaseAt: new Date(), lastPurchaseSum: netTotal },
     });
   }
 
@@ -211,8 +232,11 @@ export async function createOfflineSale(input: CreateSaleInput) {
     await notifyTelegram(
       `🧾 <b>Оффлайн-продажа #${sale.id}</b>\n` +
         `Продавец: ${seller?.name ?? sellerId}\n` +
-        `Клиент: ${customerLine}\n${lines}\n` +
-        `Итого: <b>${total.toFixed(2)} BYN</b>` +
+        `Клиент: ${customerLine}${vipCard ? ` ⭐VIP №${vipCard}` : ""}\n${lines}\n` +
+        (discount > 0
+          ? `Сумма: ${total.toFixed(2)} BYN\nVIP-скидка: −${discount.toFixed(2)}\n`
+          : "") +
+        `Итого: <b>${netTotal.toFixed(2)} BYN</b>` +
         (loyaltySpent > 0 ? `\nСписано баллов: ${loyaltySpent.toFixed(2)}` : ""),
     );
   } catch (e) {
@@ -224,8 +248,9 @@ export async function createOfflineSale(input: CreateSaleInput) {
 
   return {
     saleId: sale.id,
-    total,
+    total: netTotal,
+    discount,
     loyaltySpent,
-    toPay: Math.round((total - loyaltySpent) * 100) / 100,
+    toPay: Math.round((netTotal - loyaltySpent) * 100) / 100,
   };
 }

@@ -45,6 +45,8 @@ export default function CashRegister({ products }: { products: ProductOpt[] }) {
   const [name, setName] = useState("");
   const [balance, setBalance] = useState(0);
   const [foundName, setFoundName] = useState<string | null>(null);
+  const [vipCard, setVipCard] = useState<string | null>(null);
+  const [vipPercent, setVipPercent] = useState(0);
   const [usePoints, setUsePoints] = useState(false);
   const [spend, setSpend] = useState(0);
   const [otp, setOtp] = useState("");
@@ -75,9 +77,11 @@ export default function CashRegister({ products }: { products: ProductOpt[] }) {
   }, [query, brandFilter, products]);
 
   const total = cart.reduce((s, l) => s + l.priceByn * l.qty, 0);
-  const maxSpend = Math.min(balance, total);
+  const discount = vipPercent > 0 ? Math.round(total * (vipPercent / 100) * 100) / 100 : 0;
+  const netTotal = Math.round((total - discount) * 100) / 100;
+  const maxSpend = Math.min(balance, netTotal);
   const effSpend = usePoints ? Math.min(spend || maxSpend, maxSpend) : 0;
-  const toPay = Math.max(0, Math.round((total - effSpend) * 100) / 100);
+  const toPay = Math.max(0, Math.round((netTotal - effSpend) * 100) / 100);
 
   function addLine(p: ProductOpt, v: VolumeOpt) {
     setCart((prev) => {
@@ -116,6 +120,8 @@ export default function CashRegister({ products }: { products: ProductOpt[] }) {
       const r = await lookupCustomer(phone);
       setBalance(r.balance);
       setFoundName(r.found ? r.name : null);
+      setVipCard(r.vipCard ?? null);
+      setVipPercent(r.vipPercent ?? 0);
       if (r.found && r.name && !name) setName(r.name);
     });
   }
@@ -140,6 +146,8 @@ export default function CashRegister({ products }: { products: ProductOpt[] }) {
     setName("");
     setBalance(0);
     setFoundName(null);
+    setVipCard(null);
+    setVipPercent(0);
     setUsePoints(false);
     setSpend(0);
     setOtp("");
@@ -290,6 +298,11 @@ export default function CashRegister({ products }: { products: ProductOpt[] }) {
           {foundName && (
             <p className="mt-1.5 text-xs text-botanical-300">
               {foundName}, баланс: {byn(balance)}
+              {vipCard && (
+                <span className="ml-1 rounded-full bg-gold-gradient px-2 py-0.5 text-[10px] font-semibold text-ink-900">
+                  ⭐ VIP №{vipCard} · −{vipPercent}%
+                </span>
+              )}
             </p>
           )}
           {phone && !foundName && (
@@ -363,6 +376,11 @@ export default function CashRegister({ products }: { products: ProductOpt[] }) {
           <div className="flex justify-between text-ivory-muted">
             <span>Сумма</span><span>{byn(total)}</span>
           </div>
+          {discount > 0 && (
+            <div className="flex justify-between text-gold-400">
+              <span>VIP-скидка {vipPercent}%</span><span>−{byn(discount)}</span>
+            </div>
+          )}
           {effSpend > 0 && (
             <div className="flex justify-between text-botanical-300">
               <span>Баллы</span><span>−{byn(effSpend)}</span>
