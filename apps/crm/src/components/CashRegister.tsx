@@ -29,8 +29,17 @@ function byn(n: number) {
   return `${n.toFixed(2)} BYN`;
 }
 
+function chipCls(active: boolean) {
+  return `rounded-full border px-3 py-1 text-xs transition-colors ${
+    active
+      ? "border-gold-500 bg-gold-500/15 text-gold-300"
+      : "border-ink-600 text-ivory-muted hover:border-gold-500 hover:text-gold-300"
+  }`;
+}
+
 export default function CashRegister({ products }: { products: ProductOpt[] }) {
   const [query, setQuery] = useState("");
+  const [brandFilter, setBrandFilter] = useState<string | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
@@ -44,16 +53,26 @@ export default function CashRegister({ products }: { products: ProductOpt[] }) {
   const [done, setDone] = useState<{ saleId: number; toPay: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const brands = useMemo(
+    () =>
+      [...new Set(products.map((p) => p.brand))].sort((a, b) =>
+        a.localeCompare(b, "ru"),
+      ),
+    [products],
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return products.slice(0, 8);
-    return products
-      .filter(
+    let list = products;
+    if (brandFilter) list = list.filter((p) => p.brand === brandFilter);
+    if (q)
+      list = list.filter(
         (p) =>
           p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q),
-      )
-      .slice(0, 12);
-  }, [query, products]);
+      );
+    if (!q && !brandFilter) return list.slice(0, 8);
+    return list.slice(0, 60);
+  }, [query, brandFilter, products]);
 
   const total = cart.reduce((s, l) => s + l.priceByn * l.qty, 0);
   const maxSpend = Math.min(balance, total);
@@ -178,8 +197,26 @@ export default function CashRegister({ products }: { products: ProductOpt[] }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Поиск товара по бренду или названию…"
-          className="mb-4 h-11 w-full rounded-lg border border-ink-600 bg-ink-800 px-4 text-sm text-ivory focus:border-gold-500 focus:outline-none"
+          className="mb-3 h-11 w-full rounded-lg border border-ink-600 bg-ink-800 px-4 text-sm text-ivory focus:border-gold-500 focus:outline-none"
         />
+        {/* Быстрые кнопки брендов */}
+        <div className="mb-4 flex max-h-28 flex-wrap gap-1.5 overflow-y-auto">
+          <button
+            onClick={() => setBrandFilter(null)}
+            className={chipCls(!brandFilter)}
+          >
+            Все
+          </button>
+          {brands.map((b) => (
+            <button
+              key={b}
+              onClick={() => setBrandFilter(brandFilter === b ? null : b)}
+              className={chipCls(brandFilter === b)}
+            >
+              {b}
+            </button>
+          ))}
+        </div>
         <div className="space-y-3">
           {filtered.map((p) => (
             <div key={p.id} className="rounded-xl border border-ink-600/60 bg-ink-700 p-4">

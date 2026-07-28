@@ -1,5 +1,7 @@
 import { prisma } from "@doza/db";
 import { formatByn } from "@doza/shared";
+import { getSession } from "@/lib/session";
+import { myMonthSales, monthSalesBySeller } from "@/lib/analytics-data";
 
 export const dynamic = "force-dynamic";
 
@@ -46,12 +48,64 @@ function Kpi({ label, value, accent }: { label: string; value: string; accent?: 
 }
 
 export default async function DashboardPage() {
-  const s = await getStats();
+  const session = await getSession();
+  const userId = Number(session?.user?.id);
+  const isAdmin = session?.user?.role === "admin";
+  const monthLabel = new Date().toLocaleDateString("ru-RU", {
+    month: "long",
+    year: "numeric",
+  });
+
+  const [s, mine, bySeller] = await Promise.all([
+    getStats(),
+    userId ? myMonthSales(userId) : Promise.resolve({ sum: 0, count: 0 }),
+    isAdmin ? monthSalesBySeller() : Promise.resolve([]),
+  ]);
 
   return (
     <div>
       <h1 className="mb-1 font-serif text-3xl text-ivory">Дашборд</h1>
       <p className="mb-8 text-sm text-ivory-faint">Сводка за последние 30 дней</p>
+
+      {/* Мои продажи за месяц (мотивация продавца) */}
+      <div className="mb-8 rounded-2xl border border-gold-600/30 bg-gradient-to-br from-ink-700 to-ink-800 p-6">
+        <p className="mb-1 text-xs uppercase tracking-wide text-gold-500">
+          Мои продажи · {monthLabel}
+        </p>
+        <div className="flex flex-wrap items-end gap-8">
+          <div>
+            <p className="font-serif text-4xl text-gold-gradient">
+              {formatByn(mine.sum)}
+            </p>
+            <p className="mt-1 text-sm text-ivory-faint">оборот за месяц</p>
+          </div>
+          <div>
+            <p className="font-serif text-4xl text-ivory">{mine.count}</p>
+            <p className="mt-1 text-sm text-ivory-faint">продаж</p>
+          </div>
+        </div>
+      </div>
+
+      {isAdmin && bySeller.length > 0 && (
+        <div className="mb-8 rounded-2xl border border-ink-600/60 bg-ink-700 p-6">
+          <h2 className="mb-4 font-serif text-xl text-ivory">
+            Продажи по продавцам · {monthLabel}
+          </h2>
+          <ul className="space-y-2">
+            {bySeller.map((r) => (
+              <li
+                key={r.sellerId}
+                className="flex items-center justify-between rounded-lg border border-ink-600/60 px-3 py-2 text-sm"
+              >
+                <span className="text-ivory">
+                  {r.name} <span className="text-ivory-faint">· {r.count} прод.</span>
+                </span>
+                <span className="font-medium text-gold-400">{formatByn(r.sum)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi label="Выручка (закрытые)" value={formatByn(s.revenue)} accent />

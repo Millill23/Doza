@@ -145,6 +145,45 @@ export async function upcomingDates(days = 7) {
   return events.sort((a, b) => a.inDays - b.inDays);
 }
 
+function monthStart(d = new Date()) {
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+
+/** Продажи продавца за текущий месяц (сумма + количество закрытых оффлайн-продаж). */
+export async function myMonthSales(sellerId: number) {
+  const sales = await prisma.offlineSale.findMany({
+    where: { sellerId, status: "closed", createdAt: { gte: monthStart() } },
+    select: { totalByn: true },
+  });
+  return {
+    sum: sales.reduce((s, x) => s + Number(x.totalByn), 0),
+    count: sales.length,
+  };
+}
+
+/** Продажи всех продавцов за текущий месяц (для админа). */
+export async function monthSalesBySeller() {
+  const grouped = await prisma.offlineSale.groupBy({
+    by: ["sellerId"],
+    where: { status: "closed", createdAt: { gte: monthStart() } },
+    _sum: { totalByn: true },
+    _count: true,
+  });
+  const users = await prisma.crmUser.findMany({
+    where: { id: { in: grouped.map((g) => g.sellerId) } },
+    select: { id: true, name: true },
+  });
+  const umap = new Map(users.map((u) => [u.id, u.name]));
+  return grouped
+    .map((g) => ({
+      sellerId: g.sellerId,
+      name: umap.get(g.sellerId) ?? `#${g.sellerId}`,
+      sum: Number(g._sum.totalByn ?? 0),
+      count: g._count,
+    }))
+    .sort((a, b) => b.sum - a.sum);
+}
+
 /** Статистика баллов за период: начислено / списано / сгорело. */
 export async function loyaltyStats(sinceDays = 30) {
   const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);

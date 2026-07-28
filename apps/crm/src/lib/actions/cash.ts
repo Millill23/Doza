@@ -7,6 +7,7 @@ import { normalizePhone } from "@doza/shared";
 import { sendSms } from "@doza/shared/sms";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/session";
+import { notifyTelegram } from "@/lib/telegram";
 
 /** Отправить покупателю SMS-код для подтверждения списания баллов. */
 export async function requestLoyaltySpendOtp(phoneRaw: string, amount: number) {
@@ -183,6 +184,39 @@ export async function createOfflineSale(input: CreateSaleInput) {
       where: { id: customerId },
       data: { lastPurchaseAt: new Date(), lastPurchaseSum: total },
     });
+  }
+
+  // TG-оповещение о продаже (не блокирует ответ при сбое)
+  try {
+    const prods = await prisma.product.findMany({
+      where: { id: { in: resolved.map((r) => r.productId) } },
+      select: { id: true, name: true, brand: { select: { name: true } } },
+    });
+    const nameMap = new Map(prods.map((p) => [p.id, `${p.brand.name} ${p.name}`]));
+    const seller = await prisma.crmUser.findUnique({
+      where: { id: sellerId },
+      select: { name: true },
+    });
+    const lines = resolved
+      .map(
+        (r) =>
+          `• ${nameMap.get(r.productId) ?? "?"} — ${r.volumeMl} мл ×${r.qty} = ${(
+            r.priceByn * r.qty
+          ).toFixed(2)} BYN`,
+      )
+      .join("\n");
+    const customerLine = customerId
+      ? `${input.name?.trim() || "Покупатель"}${input.phone ? ` (${normalizePhone(input.phone)})` : ""}`
+      : "без клиента";
+    await notifyTelegram(
+      `🧾 <b>Оффлайн-продажа #${sale.id}</b>\n` +
+        `Продавец: ${seller?.name ?? sellerId}\n` +
+        `Клиент: ${customerLine}\n${lines}\n` +
+        `Итого: <b>${total.toFixed(2)} BYN</b>` +
+        (loyaltySpent > 0 ? `\nСписано баллов: ${loyaltySpent.toFixed(2)}` : ""),
+    );
+  } catch (e) {
+    console.error("[cash] telegram notify failed:", e);
   }
 
   revalidatePath("/cash");
