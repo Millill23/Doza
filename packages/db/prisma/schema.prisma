@@ -35,8 +35,25 @@ model CrmUser {
   createdAt    DateTime      @default(now()) @map("created_at")
   offlineSales OfflineSale[]
   inventoryLog InventoryLog[]
+  preorders    Preorder[]
 
   @@map("crm_users")
+}
+
+// Предзаказ целого флакона (нет в каталоге). Продавец фиксирует пожелание, дальше вручную.
+model Preorder {
+  id           Int       @id @default(autoincrement())
+  customerName String    @map("customer_name")
+  phone        String
+  wish         String
+  note         String?
+  status       String    @default("new") // new | done | cancelled
+  sellerId     Int       @map("seller_id")
+  seller       CrmUser   @relation(fields: [sellerId], references: [id])
+  createdAt    DateTime  @default(now()) @map("created_at")
+  closedAt     DateTime? @map("closed_at")
+
+  @@map("preorders")
 }
 
 enum CrmRole {
