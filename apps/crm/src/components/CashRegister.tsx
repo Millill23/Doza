@@ -55,6 +55,7 @@ export default function CashRegister({
   const [query, setQuery] = useState("");
   const [brandFilter, setBrandFilter] = useState<string | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
+  const [certs, setCerts] = useState<{ denomination: number; qty: number }[]>([]);
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [balance, setBalance] = useState(0);
@@ -98,10 +99,16 @@ export default function CashRegister({
         return s + (Math.round(l.priceByn * (1 - eff / 100) * 100) / 100) * l.qty;
       }, 0) * 100,
     ) / 100;
-  const discount = Math.round((total - netTotal) * 100) / 100;
-  const maxSpend = Math.min(balance, netTotal);
+  // Сертификаты: VIP-скидка применяется, кешбек не начисляется
+  const certGross = certs.reduce((s, c) => s + c.denomination * c.qty, 0);
+  const certDiscount =
+    vipPercent > 0 ? Math.round(certGross * (vipPercent / 100) * 100) / 100 : 0;
+  const certNet = Math.round((certGross - certDiscount) * 100) / 100;
+  const netAll = Math.round((netTotal + certNet) * 100) / 100;
+  const discount = Math.round((total - netTotal + certDiscount) * 100) / 100;
+  const maxSpend = Math.min(balance, netAll);
   const effSpend = usePoints ? Math.min(spend || maxSpend, maxSpend) : 0;
-  const toPay = Math.max(0, Math.round((netTotal - effSpend) * 100) / 100);
+  const toPay = Math.max(0, Math.round((netAll - effSpend) * 100) / 100);
 
   function addLine(p: ProductOpt, v: VolumeOpt) {
     setCart((prev) => {
@@ -146,6 +153,27 @@ export default function CashRegister({
     });
   }
 
+  function addCert(denomination: number) {
+    setCerts((prev) => {
+      const i = prev.findIndex((c) => c.denomination === denomination);
+      if (i >= 0) {
+        const next = prev.slice();
+        next[i] = { ...next[i], qty: next[i].qty + 1 };
+        return next;
+      }
+      return [...prev, { denomination, qty: 1 }];
+    });
+  }
+
+  function setCertQty(idx: number, qty: number) {
+    setCerts((prev) => {
+      if (qty <= 0) return prev.filter((_, i) => i !== idx);
+      const next = prev.slice();
+      next[idx] = { ...next[idx], qty };
+      return next;
+    });
+  }
+
   function checkPhone() {
     startTransition(async () => {
       const r = await lookupCustomer(phone);
@@ -173,6 +201,7 @@ export default function CashRegister({
 
   function resetCart() {
     setCart([]);
+    setCerts([]);
     setPhone("");
     setName("");
     setBalance(0);
@@ -200,6 +229,7 @@ export default function CashRegister({
             qty: l.qty,
             atomizerId: l.atomizerId,
           })),
+          certificates: certs,
           phone: phone || undefined,
           name: name || undefined,
           loyaltySpend: effSpend,
@@ -327,6 +357,40 @@ export default function CashRegister({
           </ul>
         )}
 
+        {/* Подарочные сертификаты */}
+        <div className="border-t border-ink-600/60 pt-4">
+          <div className="mb-2 text-xs uppercase tracking-wide text-gold-500">
+            Подарочные сертификаты
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {[100, 150, 200, 300, 500].map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => addCert(d)}
+                className="rounded-lg border border-ink-600 px-3 py-1.5 text-sm text-ivory transition-colors hover:border-gold-500"
+              >
+                🎁 {d}
+              </button>
+            ))}
+          </div>
+          {certs.length > 0 && (
+            <ul className="mt-3 space-y-1.5">
+              {certs.map((c, idx) => (
+                <li key={c.denomination} className="flex items-center gap-2 text-sm">
+                  <div className="flex-1 text-ivory">Сертификат {byn(c.denomination)}</div>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setCertQty(idx, c.qty - 1)} className="h-7 w-7 rounded border border-ink-600 text-ivory-muted hover:border-gold-500">−</button>
+                    <span className="w-6 text-center">{c.qty}</span>
+                    <button onClick={() => setCertQty(idx, c.qty + 1)} className="h-7 w-7 rounded border border-ink-600 text-ivory-muted hover:border-gold-500">+</button>
+                  </div>
+                  <span className="w-20 text-right text-gold-400">{byn(c.denomination * c.qty)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
         {/* Клиент */}
         <div className="border-t border-ink-600/60 pt-4">
           <label className="mb-1.5 block text-xs uppercase tracking-wide text-gold-500">
@@ -426,7 +490,7 @@ export default function CashRegister({
         {/* Итого */}
         <div className="space-y-1 border-t border-ink-600/60 pt-3 text-sm">
           <div className="flex justify-between text-ivory-muted">
-            <span>Сумма</span><span>{byn(total)}</span>
+            <span>Сумма</span><span>{byn(total + certGross)}</span>
           </div>
           {discount > 0 && (
             <div className="flex justify-between text-gold-400">
@@ -447,7 +511,7 @@ export default function CashRegister({
 
         <button
           onClick={closeSale}
-          disabled={pending || cart.length === 0}
+          disabled={pending || (cart.length === 0 && certs.length === 0)}
           className="h-12 w-full rounded-full bg-gold-gradient text-base font-medium text-ink-900 transition-opacity hover:opacity-90 disabled:opacity-50"
         >
           {pending ? "Закрываем…" : "Закрыть продажу"}

@@ -26,6 +26,7 @@ export default async function SaleDetailPage({
     where: { id },
     include: {
       items: { include: { product: { include: { brand: true } } } },
+      certificates: true,
       seller: { select: { name: true } },
       customer: { select: { id: true, name: true } },
       edits: { orderBy: { editedAt: "desc" } },
@@ -67,6 +68,12 @@ export default async function SaleDetailPage({
                     {i.product.brand.name} — {i.product.name}, {i.volumeMl} мл × {i.qty}
                   </span>
                   <span className="text-gold-400">{formatByn(Number(i.priceByn) * i.qty)}</span>
+                </li>
+              ))}
+              {sale.certificates.map((c) => (
+                <li key={`c${c.id}`} className="flex justify-between py-3 text-sm">
+                  <span className="text-ivory">🎁 Подарочный сертификат {formatByn(Number(c.denomination))} × {c.qty}</span>
+                  <span className="text-gold-400">{formatByn(Number(c.denomination) * c.qty)}</span>
                 </li>
               ))}
             </ul>

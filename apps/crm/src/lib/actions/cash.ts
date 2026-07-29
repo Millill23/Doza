@@ -70,6 +70,7 @@ export async function lookupCustomer(phoneRaw: string) {
 
 interface CreateSaleInput {
   items: CashItemInput[];
+  certificates?: { denomination: number; qty: number }[];
   phone?: string;
   name?: string;
   loyaltySpend?: number;
@@ -82,7 +83,14 @@ export async function createOfflineSale(input: CreateSaleInput) {
   const sellerId = Number(session.user.id);
 
   const items = Array.isArray(input.items) ? input.items : [];
-  if (items.length === 0) throw new Error("Корзина пуста");
+  const certs = (Array.isArray(input.certificates) ? input.certificates : [])
+    .map((c) => ({
+      denomination: Math.round(Number(c.denomination) * 100) / 100,
+      qty: Math.max(1, Math.floor(c.qty || 1)),
+    }))
+    .filter((c) => c.denomination > 0);
+  if (items.length === 0 && certs.length === 0)
+    throw new Error("Корзина пуста");
 
   // Пересчёт цен на сервере
   const volumeRecords = await prisma.productVolume.findMany({
@@ -155,7 +163,16 @@ export async function createOfflineSale(input: CreateSaleInput) {
     netTotal += lineNet;
   }
   netTotal = Math.round(netTotal * 100) / 100;
-  const discount = Math.round((total - netTotal) * 100) / 100;
+
+  // Сертификаты: VIP-скидка применяется, кешбек НЕ начисляется.
+  const certGross = certs.reduce((s, c) => s + c.denomination * c.qty, 0);
+  const certDiscount =
+    vipPct > 0 ? Math.round(certGross * (vipPct / 100) * 100) / 100 : 0;
+  const certNet = Math.round((certGross - certDiscount) * 100) / 100;
+
+  const saleTotal = Math.round((netTotal + certNet) * 100) / 100;
+  const totalDiscount =
+    Math.round((total - netTotal + certDiscount) * 100) / 100;
 
   // Списание баллов — требует подтверждения кодом из SMS
   let loyaltySpent = 0;
@@ -168,7 +185,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
       );
     }
     const balance = await getBalance(customerId);
-    loyaltySpent = Math.min(input.loyaltySpend, balance, netTotal);
+    loyaltySpent = Math.min(input.loyaltySpend, balance, saleTotal);
     loyaltySpent = Math.round(loyaltySpent * 100) / 100;
   }
 
@@ -178,8 +195,8 @@ export async function createOfflineSale(input: CreateSaleInput) {
       sellerId,
       customerId,
       status: "closed",
-      totalByn: netTotal,
-      discountByn: discount,
+      totalByn: saleTotal,
+      discountByn: totalDiscount,
       loyaltySpentByn: loyaltySpent,
       closedAt: new Date(),
       items: {
@@ -191,6 +208,9 @@ export async function createOfflineSale(input: CreateSaleInput) {
           atomizerId: r.atomizerId ?? null,
         })),
       },
+      certificates: certs.length
+        ? { create: certs.map((c) => ({ denomination: c.denomination, qty: c.qty })) }
+        : undefined,
     },
   });
 
@@ -224,7 +244,8 @@ export async function createOfflineSale(input: CreateSaleInput) {
     }
     const percent = await getSetting("loyalty_percent", 5);
     const days = await getSetting("loyalty_days", 180);
-    const net = netTotal - loyaltySpent;
+    // Кешбек только с товаров (не с сертификатов). Списанные баллы уменьшают базу.
+    const net = Math.max(0, netTotal - loyaltySpent);
     const earn = Math.round(net * (percent / 100) * 100) / 100;
     if (earn > 0) {
       await earnPoints(customerId, earn, days, {
@@ -234,7 +255,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
     }
     await prisma.customer.update({
       where: { id: customerId },
-      data: { lastPurchaseAt: new Date(), lastPurchaseSum: netTotal },
+      data: { lastPurchaseAt: new Date(), lastPurchaseSum: saleTotal },
     });
   }
 
@@ -257,17 +278,22 @@ export async function createOfflineSale(input: CreateSaleInput) {
           ).toFixed(2)} BYN`,
       )
       .join("\n");
+    const certLines = certs
+      .map((c) => `• 🎁 Сертификат ${c.denomination.toFixed(0)} BYN ×${c.qty}`)
+      .join("\n");
+    const allLines = [lines, certLines].filter(Boolean).join("\n");
+    const grossAll = Math.round((total + certGross) * 100) / 100;
     const customerLine = customerId
       ? `${input.name?.trim() || "Покупатель"}${input.phone ? ` (${normalizePhone(input.phone)})` : ""}`
       : "без клиента";
     await notifyTelegram(
       `🧾 <b>Оффлайн-продажа #${sale.id}</b>\n` +
         `Продавец: ${seller?.name ?? sellerId}\n` +
-        `Клиент: ${customerLine}${vipCard ? ` ⭐VIP №${vipCard}` : ""}\n${lines}\n` +
-        (discount > 0
-          ? `Сумма: ${total.toFixed(2)} BYN\nVIP-скидка: −${discount.toFixed(2)}\n`
+        `Клиент: ${customerLine}${vipCard ? ` ⭐VIP №${vipCard}` : ""}\n${allLines}\n` +
+        (totalDiscount > 0
+          ? `Сумма: ${grossAll.toFixed(2)} BYN\nСкидка: −${totalDiscount.toFixed(2)}\n`
           : "") +
-        `Итого: <b>${netTotal.toFixed(2)} BYN</b>` +
+        `Итого: <b>${saleTotal.toFixed(2)} BYN</b>` +
         (loyaltySpent > 0 ? `\nСписано баллов: ${loyaltySpent.toFixed(2)}` : ""),
     );
   } catch (e) {
@@ -279,9 +305,9 @@ export async function createOfflineSale(input: CreateSaleInput) {
 
   return {
     saleId: sale.id,
-    total: netTotal,
-    discount,
+    total: saleTotal,
+    discount: totalDiscount,
     loyaltySpent,
-    toPay: Math.round((netTotal - loyaltySpent) * 100) / 100,
+    toPay: Math.round((saleTotal - loyaltySpent) * 100) / 100,
   };
 }

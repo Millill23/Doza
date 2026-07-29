@@ -304,8 +304,20 @@ model OfflineSale {
   closedAt        DateTime?         @map("closed_at")
   items           OfflineSaleItem[]
   edits           OfflineSaleEdit[]
+  certificates    OfflineSaleCertificate[]
 
   @@map("offline_sales")
+}
+
+// Подарочные сертификаты в оффлайн-продаже (номиналы, без кешбека)
+model OfflineSaleCertificate {
+  id           Int         @id @default(autoincrement())
+  saleId       Int         @map("sale_id")
+  sale         OfflineSale @relation(fields: [saleId], references: [id])
+  denomination Decimal     @db.Decimal(10, 2)
+  qty          Int         @default(1)
+
+  @@map("offline_sale_certificates")
 }
 
 enum OfflineSaleStatus {
