@@ -93,10 +93,12 @@ export async function registerVip(
   if (taken && taken.phone !== phone)
     throw new Error(`Карта №${card} уже привязана к другому клиенту`);
 
+  // phoneVerified: true — админ регистрирует лично, клиент сможет получить
+  // пароль на сайте через «восстановить пароль» и зайти в свой аккаунт.
   const customer = await prisma.customer.upsert({
     where: { phone },
-    update: { name, vipCardNumber: card },
-    create: { phone, name, vipCardNumber: card },
+    update: { name, vipCardNumber: card, phoneVerified: true },
+    create: { phone, name, vipCardNumber: card, phoneVerified: true },
   });
   revalidatePath("/customers");
   return { ok: true, customerId: customer.id };

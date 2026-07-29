@@ -21,8 +21,11 @@ export const POST: APIRoute = async ({ request }) => {
 
   const customer = await prisma.customer.findUnique({ where: { phone } });
 
-  // Не раскрываем, зарегистрирован ли номер — всегда ok
-  if (customer?.passwordHash) {
+  // Не раскрываем, зарегистрирован ли номер — всегда ok.
+  // Пароль выдаём тем, у кого он уже есть, ЛИБО кого админ подтвердил лично
+  // (phoneVerified: VIP/офлайн-регистрация) — так VIP получает первый вход.
+  // Случайные покупатели из кассы (phoneVerified=false) сюда не попадают.
+  if (customer && (customer.passwordHash || customer.phoneVerified)) {
     const newPass = genPassword();
     await prisma.customer.update({
       where: { id: customer.id },
