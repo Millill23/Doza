@@ -1,6 +1,7 @@
 ---
 // Люксовая hero-секция DOZA. Полностью статична (0 JS).
 // Дизайн на основе 21st.dev, адаптирован под дизайн-систему DOZA.
+import TropicalFrond from "./TropicalFrond.astro";
 ---
 
 <section class="relative w-full overflow-hidden bg-ink-900">
@@ -19,27 +20,19 @@
   >
   </div>
 
-  <!-- Botanical акцент справа -->
-  <div class="absolute right-0 top-0 opacity-20" aria-hidden="true">
-    <svg width="300" height="400" viewBox="0 0 300 400" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M150 50C150 50 180 80 200 120C220 160 230 200 220 240C210 280 180 300 150 320" stroke="#4F6F44" stroke-width="2" stroke-linecap="round" opacity="0.6"></path>
-      <ellipse cx="200" cy="120" rx="30" ry="15" fill="#4F6F44" opacity="0.4" transform="rotate(-30 200 120)"></ellipse>
-      <ellipse cx="220" cy="160" rx="35" ry="18" fill="#4F6F44" opacity="0.3" transform="rotate(-20 220 160)"></ellipse>
-      <ellipse cx="225" cy="200" rx="32" ry="16" fill="#4F6F44" opacity="0.35" transform="rotate(-15 225 200)"></ellipse>
-      <ellipse cx="215" cy="240" rx="30" ry="15" fill="#4F6F44" opacity="0.3" transform="rotate(-10 215 240)"></ellipse>
-    </svg>
-  </div>
-
-  <!-- Botanical акцент слева снизу -->
-  <div class="absolute bottom-0 left-0 opacity-[0.15]" aria-hidden="true">
-    <svg width="250" height="350" viewBox="0 0 250 350" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M100 300C100 300 80 270 70 230C60 190 55 150 65 110C75 70 100 50 120 30" stroke="#4F6F44" stroke-width="2" stroke-linecap="round" opacity="0.6"></path>
-      <ellipse cx="70" cy="230" rx="28" ry="14" fill="#4F6F44" opacity="0.4" transform="rotate(30 70 230)"></ellipse>
-      <ellipse cx="60" cy="190" rx="32" ry="16" fill="#4F6F44" opacity="0.35" transform="rotate(25 60 190)"></ellipse>
-      <ellipse cx="58" cy="150" rx="30" ry="15" fill="#4F6F44" opacity="0.3" transform="rotate(20 58 150)"></ellipse>
-      <ellipse cx="65" cy="110" rx="28" ry="14" fill="#4F6F44" opacity="0.35" transform="rotate(15 65 110)"></ellipse>
-    </svg>
-  </div>
+  <!-- Тропические пальмовые акценты (вайя) -->
+  <TropicalFrond
+    class="pointer-events-none absolute -right-16 -top-12 h-[440px] w-auto rotate-[152deg] opacity-[0.16]"
+    color="#4F6F44"
+  />
+  <TropicalFrond
+    class="pointer-events-none absolute -bottom-20 -left-16 h-[400px] w-auto rotate-[8deg] opacity-[0.14]"
+    color="#4F6F44"
+  />
+  <TropicalFrond
+    class="pointer-events-none absolute -bottom-10 left-28 hidden h-[240px] w-auto -rotate-[14deg] opacity-[0.07] sm:block"
+    color="#8FA67A"
+  />
 
   <!-- Контент -->
   <div class="container-luxe relative z-10 flex min-h-[88vh] flex-col items-center justify-center py-20 text-center">
@@ -47,7 +40,7 @@
     <div class="mb-6 flex items-center justify-center gap-3">
       <span class="h-px w-8 bg-gold-600/60"></span>
       <p class="text-xs font-light uppercase tracking-[0.25em] text-gold-500 sm:text-sm">
-        Оригинальная парфюмерия на розлив
+        Оригинальная парфюмерия на распив
       </p>
       <span class="h-px w-8 bg-gold-600/60"></span>
     </div>
@@ -59,8 +52,8 @@
 
     <!-- Подзаголовок -->
     <p class="mx-auto mb-10 max-w-2xl text-base font-light leading-relaxed text-ivory-muted sm:text-lg">
-      Оригинальные ароматы на розлив — закажите любой объём, от пробника 2 мл
-      до полного флакона. Платите только при получении.
+      Оригинальные ароматы на распив — объёмы 3, 5 и 10 мл каждого аромата.
+      Платите только при получении.
     </p>
 
     <!-- CTA -->

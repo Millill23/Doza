@@ -3,7 +3,7 @@ import { GENDER_LABELS } from "./types";
 import { COMPANY } from "./company";
 
 export const SITE_URL = "https://doza-parfum.by";
-export const SITE_NAME = "DOZA — парфюмерия на розлив";
+export const SITE_NAME = "DOZA — парфюмерия на распив";
 
 /**
  * Коды подтверждения прав в вебмастерах (вставьте после регистрации домена).
@@ -73,7 +73,7 @@ export function productFaq(p: ProductDetail): { q: string; a: string }[] {
   });
 
   faq.push({
-    q: `Как купить ${p.name} на розлив?`,
+    q: `Как купить ${p.name} на распив?`,
     a: `Выберите нужный объём (от 2 мл до полного флакона), добавьте в корзину и оформите заказ. Доставка по Беларуси почтой или самовывоз, оплата при получении.`,
   });
 
@@ -85,14 +85,14 @@ export function productSeoText(p: ProductDetail): string {
   if (p.description && p.description.length > 40) return p.description;
   const notes = [p.notesTop, p.notesMid, p.notesBase].filter(Boolean).join(", ");
   const g = GENDER_LABELS[p.gender].toLowerCase();
-  return `${p.brand} ${p.name} — ${g} аромат${notes ? ` с нотами: ${notes}` : ""}. Оригинальная парфюмерия на розлив от ${byn(p.priceFrom)} за любой объём — от пробника 2 мл до полного флакона.`;
+  return `${p.brand} ${p.name} — ${g} аромат${notes ? ` с нотами: ${notes}` : ""}. Оригинальная парфюмерия на распив от ${byn(p.priceFrom)} за любой объём — от пробника 2 мл до полного флакона.`;
 }
 
 export function productMeta(p: ProductDetail): SeoMeta {
-  const title = `${p.brand} ${p.name} — парфюм на розлив от ${byn(p.priceFrom)} | DOZA`;
+  const title = `${p.brand} ${p.name} — парфюм на распив от ${byn(p.priceFrom)} | DOZA`;
   const g = GENDER_LABELS[p.gender].toLowerCase();
   const notes = [p.notesTop, p.notesMid].filter(Boolean).join(", ");
-  const description = `Купить ${p.brand} ${p.name} (${g}) на розлив от ${byn(
+  const description = `Купить ${p.brand} ${p.name} (${g}) на распив от ${byn(
     p.priceFrom,
   )}. ${notes ? `Ноты: ${notes}. ` : ""}Оригинал, любой объём от 2 мл. Оплата при получении, доставка по Беларуси.`;
   const url = `${SITE_URL}/product/${p.slug}`;
