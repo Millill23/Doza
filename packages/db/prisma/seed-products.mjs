@@ -24,46 +24,6 @@ function slugify(s) {
     .replace(/(^-|-$)/g, "");
 }
 
-// Тематические плейсхолдеры (пока нет реального фото флакона)
-const IMG = {
-  fresh: "https://images.unsplash.com/photo-1541643600914-78b084683601?q=80&w=900&auto=format&fit=crop",
-  floral: "https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?q=80&w=900&auto=format&fit=crop",
-  sweet: "https://images.unsplash.com/photo-1615634260167-c8cdede054de?q=80&w=900&auto=format&fit=crop",
-  woody: "https://images.unsplash.com/photo-1610461888750-10bfc601b874?q=80&w=900&auto=format&fit=crop",
-  oriental: "https://images.unsplash.com/photo-1594035910387-fea47794261f?q=80&w=900&auto=format&fit=crop",
-  classic: "https://images.unsplash.com/photo-1587017539504-67cfbddac569?q=80&w=900&auto=format&fit=crop",
-};
-
-// Слаги, для которых уже готово реальное фото флакона (в apps/site/public/img/products/<slug>.webp).
-// Пополняется батчами — по мере обработки фото.
-const LOCAL = new Set([
-  // batch 1: designer
-  "versace-eros",
-  "chanel-coco-mademoiselle",
-  "paco-rabanne-lady-million",
-  "paco-rabanne-1-million",
-  "yves-saint-laurent-black-opium",
-  // batch 2: designer
-  "dolce-gabbana-k",
-  "dolce-gabbana-the-one",
-  "versace-bright-crystal",
-  "bvlgari-omnia-crystalline",
-  "giorgio-armani-si",
-  "givenchy-ange-ou-demon",
-  "gucci-flora-gorgeous-gardenia",
-  // batch 3: designer
-  "versace-eros-energy",
-  "burberry-weekend",
-  "trussardi-my-name",
-  "narciso-rodriguez-for-her-musc-nude",
-  "calvin-klein-ck-one-shock",
-  "trussardi-ruby-red",
-  "armand-basi-in-red",
-  "calvin-klein-in2u",
-  "chloe-chloe",
-  "gucci-flora-gorgeous-magnolia",
-]);
-
 // [brand, name, gender, bottleMl, usd, family, notesTop, notesMid, notesBase, description]
 const DATA = [
   ["Armand Basi","In Red","female",100,40,"floral","Имбирь, бергамот, мандарин, кардамон","Жасмин, лист фиалки, ландыш, роза","Древесные ноты, белый мускус","Яркий фруктово-цветочный аромат: сочное красное яблоко и вуаль белых цветов."],
@@ -170,7 +130,7 @@ async function main() {
   }
 
   const keepSlugs = [];
-  for (const [brand, name, gender, bottleMl, usd, family, top, mid, base, desc] of DATA) {
+  for (const [brand, name, gender, bottleMl, usd, , top, mid, base, desc] of DATA) {
     const slug = slugify(`${brand} ${name}`);
     keepSlugs.push(slug);
 
@@ -192,8 +152,8 @@ async function main() {
       data: volumes(slug).map((v) => ({ ...v, productId: product.id })),
     });
 
-    // фото: реальное локальное (если готово) либо тематический плейсхолдер
-    const url = LOCAL.has(slug) ? `/img/products/${slug}.webp` : (IMG[family] ?? IMG.classic);
+    // фото: реальный флакон на фирменном фоне DOZA
+    const url = `/img/products/${slug}.webp`;
     await prisma.productPhoto.deleteMany({ where: { productId: product.id } });
     await prisma.productPhoto.create({
       data: { productId: product.id, url, sortOrder: 0 },
