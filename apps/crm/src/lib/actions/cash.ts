@@ -2,7 +2,12 @@
 
 import { prisma } from "@doza/db";
 import { getBalance, earnPoints, spendPoints } from "@doza/db/loyalty";
-import { pickActivePromo } from "@doza/db/promos";
+import {
+  pickActivePromo,
+  getGlobalPromo,
+  getActiveSuperPromo,
+} from "@doza/db/promos";
+import { priceCart } from "@doza/db/pricing";
 import { createSmsCode, verifySmsCode } from "@doza/db/sms-codes";
 import { normalizePhone } from "@doza/shared";
 import { sendSms } from "@doza/shared/sms";
@@ -33,6 +38,20 @@ export async function requestLoyaltySpendOtp(phoneRaw: string, amount: number) {
 async function getSetting(key: string, fallback: number): Promise<number> {
   const s = await prisma.setting.findUnique({ where: { key } });
   return s ? Number(s.value) : fallback;
+}
+
+/** Человекочитаемое название сработавшей механики скидки. */
+const DISCOUNT_LABEL: Record<string, string> = {
+  vip: "VIP",
+  social: "за подписки",
+  promo: "акция",
+  super: "супер-акция",
+  none: "",
+};
+
+/** Баллы в SMS: без лишних нулей (12 вместо 12.00, но 12.5 — как есть). */
+function fmtPoints(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/, "");
 }
 
 export interface CashItemInput {
@@ -75,12 +94,35 @@ interface CreateSaleInput {
   name?: string;
   loyaltySpend?: number;
   loyaltyOtp?: string;
+  /** Скидка 5% за подписку в соцсетях. */
+  socialSubscribe?: boolean;
+  /** Скидка 5% за отметку в сторис. */
+  socialStory?: boolean;
+  /** Оформить продажу от лица другого продавца (только админ). */
+  sellerId?: number;
 }
 
 /** Создать и сразу закрыть оффлайн-продажу. */
 export async function createOfflineSale(input: CreateSaleInput) {
   const session = await requireRole(["admin", "seller"]);
-  const sellerId = Number(session.user.id);
+  const actorId = Number(session.user.id);
+
+  // Продажу можно записать на другого продавца — но только админу.
+  let sellerId = actorId;
+  let createdById: number | null = null;
+  if (input.sellerId && Number(input.sellerId) !== actorId) {
+    if (session.user.role !== "admin")
+      throw new Error("Недостаточно прав для продажи от лица сотрудника");
+    const target = await prisma.crmUser.findUnique({
+      where: { id: Number(input.sellerId) },
+      select: { id: true, isActive: true, role: true },
+    });
+    if (!target || !target.isActive) throw new Error("Сотрудник не найден");
+    if (target.role === "marketer")
+      throw new Error("Маркетолог не может быть продавцом");
+    sellerId = target.id;
+    createdById = actorId; // фиксируем, кто фактически пробил чек
+  }
 
   const items = Array.isArray(input.items) ? input.items : [];
   const certs = (Array.isArray(input.certificates) ? input.certificates : [])
@@ -129,26 +171,40 @@ export async function createOfflineSale(input: CreateSaleInput) {
     }
   }
 
-  // Скидки по позициям: максимум из VIP-скидки и активной акции на товар.
-  // Кешбек начисляется на сумму со скидкой.
+  // Скидки. Правило: акции НЕ складываются — движок сравнивает сценарии
+  // (VIP / за подписки / супер-акция) и берёт выгодный покупателю.
   const vipPct = vipCard ? await getSetting("vip_discount_percent", 20) : 0;
-  const promoRows = await prisma.promo.findMany({
-    where: { productId: { in: resolved.map((r) => r.productId) } },
-    select: {
-      productId: true,
-      discountPercent: true,
-      cashbackPercent: true,
-      startsAt: true,
-      endsAt: true,
-    },
-  });
+
+  const [subscribePct, storyPct] = await Promise.all([
+    input.socialSubscribe ? getSetting("social_subscribe_percent", 5) : 0,
+    input.socialStory ? getSetting("social_story_percent", 5) : 0,
+  ]);
+  // Подписка и сторис — одна механика, поэтому суммируются между собой.
+  const socialPct = subscribePct + storyPct;
+
+  const [globalPromo, superPromo, promoRows] = await Promise.all([
+    getGlobalPromo(),
+    getActiveSuperPromo(),
+    prisma.promo.findMany({
+      where: { productId: { in: resolved.map((r) => r.productId) } },
+      select: {
+        productId: true,
+        discountPercent: true,
+        cashbackPercent: true,
+        startsAt: true,
+        endsAt: true,
+      },
+    }),
+  ]);
+
   const promosByProduct = new Map<number, typeof promoRows>();
   for (const pr of promoRows) {
+    if (pr.productId == null) continue;
     const arr = promosByProduct.get(pr.productId) ?? [];
     arr.push(pr);
     promosByProduct.set(pr.productId, arr);
   }
-  let netTotal = 0;
+  const productPromoPercent: Record<number, number> = {};
   for (const r of resolved) {
     const promo = pickActivePromo(
       (promosByProduct.get(r.productId) ?? []).map((pr) => ({
@@ -158,13 +214,25 @@ export async function createOfflineSale(input: CreateSaleInput) {
         endsAt: pr.endsAt,
       })),
     );
-    const eff = Math.max(vipPct, promo.discountPercent);
-    const lineNet = (Math.round(r.priceByn * (1 - eff / 100) * 100) / 100) * r.qty;
-    netTotal += lineNet;
+    productPromoPercent[r.productId] = promo.discountPercent;
   }
-  netTotal = Math.round(netTotal * 100) / 100;
 
-  // Сертификаты: VIP-скидка применяется, кешбек НЕ начисляется.
+  const priced = priceCart({
+    lines: resolved.map((r) => ({
+      productId: r.productId,
+      qty: r.qty,
+      unitPrice: r.priceByn,
+    })),
+    vipPercent: vipPct,
+    socialPercent: socialPct,
+    productPromoPercent,
+    allProductsPromoPercent: globalPromo.discountPercent,
+    superPromo,
+  });
+  const netTotal = priced.net;
+
+  // Сертификаты: как и раньше, только VIP-скидка; кешбек НЕ начисляется.
+  // Акции (в т.ч. супер-акция) на номиналы сертификатов не распространяются.
   const certGross = certs.reduce((s, c) => s + c.denomination * c.qty, 0);
   const certDiscount =
     vipPct > 0 ? Math.round(certGross * (vipPct / 100) * 100) / 100 : 0;
@@ -193,6 +261,8 @@ export async function createOfflineSale(input: CreateSaleInput) {
   const sale = await prisma.offlineSale.create({
     data: {
       sellerId,
+      createdById,
+      discountKind: priced.discount > 0 ? priced.kind : null,
       customerId,
       status: "closed",
       totalByn: saleTotal,
@@ -229,12 +299,14 @@ export async function createOfflineSale(input: CreateSaleInput) {
         reason: "offline_sale",
         refType: "offline_sale",
         refId: sale.id,
-        userId: sellerId,
+        // В журнале остатков фиксируем того, кто фактически провёл операцию.
+        userId: actorId,
       },
     });
   }
 
   // Баллы: списание и начисление
+  let earned = 0;
   if (customerId) {
     if (loyaltySpent > 0) {
       await spendPoints(customerId, loyaltySpent, {
@@ -246,9 +318,9 @@ export async function createOfflineSale(input: CreateSaleInput) {
     const days = await getSetting("loyalty_days", 180);
     // Кешбек только с товаров (не с сертификатов). Списанные баллы уменьшают базу.
     const net = Math.max(0, netTotal - loyaltySpent);
-    const earn = Math.round(net * (percent / 100) * 100) / 100;
-    if (earn > 0) {
-      await earnPoints(customerId, earn, days, {
+    earned = Math.round(net * (percent / 100) * 100) / 100;
+    if (earned > 0) {
+      await earnPoints(customerId, earned, days, {
         type: "offline_sale",
         id: sale.id,
       });
@@ -259,6 +331,20 @@ export async function createOfflineSale(input: CreateSaleInput) {
     });
   }
 
+  // SMS покупателю о покупке и бонусах (сбой не должен ронять продажу).
+  if (customerId && input.phone) {
+    try {
+      const balance = await getBalance(customerId);
+      const text =
+        earned > 0
+          ? `Спасибо за покупку! Вам начислено ${fmtPoints(earned)} бонусов. Всего бонусов: ${fmtPoints(balance)}`
+          : `Спасибо за покупку! Всего бонусов: ${fmtPoints(balance)}`;
+      await sendSms(normalizePhone(input.phone), text);
+    } catch (e) {
+      console.error("[cash] sms о покупке не отправлена:", e);
+    }
+  }
+
   // TG-оповещение о продаже (не блокирует ответ при сбое)
   try {
     const prods = await prisma.product.findMany({
@@ -266,10 +352,12 @@ export async function createOfflineSale(input: CreateSaleInput) {
       select: { id: true, name: true, brand: { select: { name: true } } },
     });
     const nameMap = new Map(prods.map((p) => [p.id, `${p.brand.name} ${p.name}`]));
-    const seller = await prisma.crmUser.findUnique({
-      where: { id: sellerId },
-      select: { name: true },
-    });
+    const [seller, actor] = await Promise.all([
+      prisma.crmUser.findUnique({ where: { id: sellerId }, select: { name: true } }),
+      createdById
+        ? prisma.crmUser.findUnique({ where: { id: createdById }, select: { name: true } })
+        : Promise.resolve(null),
+    ]);
     const lines = resolved
       .map(
         (r) =>
@@ -288,10 +376,11 @@ export async function createOfflineSale(input: CreateSaleInput) {
       : "без клиента";
     await notifyTelegram(
       `🧾 <b>Оффлайн-продажа #${sale.id}</b>\n` +
-        `Продавец: ${seller?.name ?? sellerId}\n` +
-        `Клиент: ${customerLine}${vipCard ? ` ⭐VIP №${vipCard}` : ""}\n${allLines}\n` +
+        `Продавец: ${seller?.name ?? sellerId}` +
+        (actor ? ` (оформил ${actor.name})` : "") +
+        `\nКлиент: ${customerLine}${vipCard ? ` ⭐VIP №${vipCard}` : ""}\n${allLines}\n` +
         (totalDiscount > 0
-          ? `Сумма: ${grossAll.toFixed(2)} BYN\nСкидка: −${totalDiscount.toFixed(2)}\n`
+          ? `Сумма: ${grossAll.toFixed(2)} BYN\nСкидка: −${totalDiscount.toFixed(2)}${DISCOUNT_LABEL[priced.kind] ? ` (${DISCOUNT_LABEL[priced.kind]})` : ""}\n`
           : "") +
         `Итого: <b>${saleTotal.toFixed(2)} BYN</b>` +
         (loyaltySpent > 0 ? `\nСписано баллов: ${loyaltySpent.toFixed(2)}` : ""),
@@ -307,6 +396,11 @@ export async function createOfflineSale(input: CreateSaleInput) {
     saleId: sale.id,
     total: saleTotal,
     discount: totalDiscount,
+    /** Какая механика сработала — показываем продавцу в итогах чека. */
+    discountKind: priced.discount > 0 ? priced.kind : "none",
+    discountLabel: priced.discount > 0 ? (DISCOUNT_LABEL[priced.kind] ?? "") : "",
+    freeUnits: priced.freeUnits,
+    earned,
     loyaltySpent,
     toPay: Math.round((saleTotal - loyaltySpent) * 100) / 100,
   };

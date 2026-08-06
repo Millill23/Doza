@@ -5,7 +5,8 @@
     "generate": "prisma generate",
     "migrate": "prisma migrate dev",
     "studio": "prisma studio",
-    "seed": "node prisma/seed.mjs"
+    "seed": "node prisma/seed.mjs",
+    "test": "node --test src/*.test.ts"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs"
@@ -20,6 +21,7 @@
     ".": "./src/index.ts",
     "./loyalty": "./src/loyalty.ts",
     "./sms-codes": "./src/sms-codes.ts",
-    "./promos": "./src/promos.ts"
+    "./promos": "./src/promos.ts",
+    "./pricing": "./src/pricing.ts"
   }
 }

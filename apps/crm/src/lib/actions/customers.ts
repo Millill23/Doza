@@ -93,6 +93,13 @@ export async function registerVip(
   if (taken && taken.phone !== phone)
     throw new Error(`Карта №${card} уже привязана к другому клиенту`);
 
+  // Был ли клиент VIP до этого — чтобы не поздравлять повторно, когда админ
+  // просто исправляет имя или перевыпускает карту.
+  const before = await prisma.customer.findUnique({
+    where: { phone },
+    select: { vipCardNumber: true },
+  });
+
   // phoneVerified: true — админ регистрирует лично, клиент сможет получить
   // пароль на сайте через «восстановить пароль» и зайти в свой аккаунт.
   const customer = await prisma.customer.upsert({
@@ -100,8 +107,26 @@ export async function registerVip(
     update: { name, vipCardNumber: card, phoneVerified: true },
     create: { phone, name, vipCardNumber: card, phoneVerified: true },
   });
+
+  if (!before?.vipCardNumber) await sendVipWelcomeSms(phone, name);
+
   revalidatePath("/customers");
   return { ok: true, customerId: customer.id };
+}
+
+/**
+ * Поздравительная SMS новому VIP-клиенту.
+ * Сбой отправки не должен ломать регистрацию — только пишем в лог.
+ */
+async function sendVipWelcomeSms(phone: string, name: string) {
+  try {
+    await sendSms(
+      phone,
+      `Поздравляем, ${name} - вы стали VIP клиентом магазина оригинальной парфюмерии DOZA`,
+    );
+  } catch (e) {
+    console.error("[customers] VIP SMS не отправлена:", e);
+  }
 }
 
 /** Привязать VIP-карту существующему клиенту. */
@@ -114,10 +139,17 @@ export async function attachVipCard(customerId: number, cardRaw: string) {
   });
   if (taken && taken.id !== customerId)
     throw new Error(`Карта №${card} уже привязана к другому клиенту`);
+  const before = await prisma.customer.findUnique({
+    where: { id: customerId },
+    select: { vipCardNumber: true, phone: true, name: true },
+  });
   await prisma.customer.update({
     where: { id: customerId },
     data: { vipCardNumber: card },
   });
+  // Клиент стал VIP только что — поздравляем.
+  if (before && !before.vipCardNumber)
+    await sendVipWelcomeSms(before.phone, before.name);
   revalidatePath(`/customers/${customerId}`);
 }
 

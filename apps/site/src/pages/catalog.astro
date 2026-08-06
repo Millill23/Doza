@@ -19,7 +19,7 @@ const [products, brands] = await Promise.all([getProducts(), getBrands()]);
 
 <Layout
   title="Каталог парфюмерии на распив — DOZA"
-  description="Каталог оригинальной парфюмерии на распив: мужские, женские и унисекс ароматы известных брендов. Любой объём от 2 мл, цены в BYN, оплата при получении."
+  description="Каталог оригинальной парфюмерии на распив: мужские, женские и унисекс ароматы известных брендов. Объёмы 3, 5 и 10 мл, цены в BYN, оплата при получении."
   jsonLd={[catalogItemListLd(products)]}
 >
   <section class="container-luxe py-12">

@@ -13,6 +13,7 @@ export default function PromoForm({ products }: { products: ProductOpt[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [productId, setProductId] = useState(0);
+  const [allProducts, setAllProducts] = useState(false);
   const [discount, setDiscount] = useState("");
   const [cashback, setCashback] = useState("");
   const [startsAt, setStartsAt] = useState("");
@@ -30,10 +31,20 @@ export default function PromoForm({ products }: { products: ProductOpt[] }) {
           <label className="mb-1 block text-xs uppercase tracking-wide text-gold-500">
             Товар
           </label>
+          <label className="mb-2 flex cursor-pointer items-center gap-2 text-sm text-ivory">
+            <input
+              type="checkbox"
+              checked={allProducts}
+              onChange={(e) => setAllProducts(e.target.checked)}
+              className="h-4 w-4 accent-[#C9A24B]"
+            />
+            Применить ко всем товарам каталога
+          </label>
           <select
             value={productId}
             onChange={(e) => setProductId(Number(e.target.value))}
-            className={field}
+            disabled={allProducts}
+            className={`${field} disabled:opacity-40`}
           >
             <option value={0}>— выберите товар —</option>
             {products.map((p) => (
@@ -94,12 +105,14 @@ export default function PromoForm({ products }: { products: ProductOpt[] }) {
               setErr(null);
               await createPromo({
                 productId,
+                allProducts,
                 discountPercent: discount ? Number(discount) : null,
                 cashbackPercent: cashback ? Number(cashback) : null,
                 startsAt: startsAt || null,
                 endsAt: endsAt || null,
               });
               setProductId(0);
+              setAllProducts(false);
               setDiscount("");
               setCashback("");
               setStartsAt("");

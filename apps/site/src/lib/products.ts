@@ -1,5 +1,10 @@
 import { prisma } from "@doza/db";
-import { pickActivePromo } from "@doza/db/promos";
+import {
+  pickActivePromo,
+  getGlobalPromo,
+  mergePromos,
+  type EffectivePromo,
+} from "@doza/db/promos";
 import type { ProductCard, ProductDetail, Gender } from "./types";
 
 /**
@@ -36,19 +41,27 @@ async function getGlobalCashback(): Promise<number> {
   return s ? Number(s.value) : 5;
 }
 
-function toCard(p: ProductWithRels, globalPercent: number): ProductCard {
+function toCard(
+  p: ProductWithRels,
+  globalPercent: number,
+  globalPromo: EffectivePromo,
+): ProductCard {
   const prices = p.volumes
     .filter((v) => v.isActive)
     .map((v) => Number(v.priceByn));
   const override =
     p.loyaltyPercentOverride != null ? Number(p.loyaltyPercentOverride) : null;
-  const promo = pickActivePromo(
-    (p.promos ?? []).map((pr) => ({
-      discountPercent: pr.discountPercent != null ? Number(pr.discountPercent) : null,
-      cashbackPercent: pr.cashbackPercent != null ? Number(pr.cashbackPercent) : null,
-      startsAt: pr.startsAt,
-      endsAt: pr.endsAt,
-    })),
+  // Адресная акция товара + акция «на все товары» — берётся лучшая, не сумма.
+  const promo = mergePromos(
+    pickActivePromo(
+      (p.promos ?? []).map((pr) => ({
+        discountPercent: pr.discountPercent != null ? Number(pr.discountPercent) : null,
+        cashbackPercent: pr.cashbackPercent != null ? Number(pr.cashbackPercent) : null,
+        startsAt: pr.startsAt,
+        endsAt: pr.endsAt,
+      })),
+    ),
+    globalPromo,
   );
   const cashbackPercent = Math.max(
     globalPercent,
@@ -102,17 +115,18 @@ export async function getProducts(
     ];
   }
 
-  const [products, globalPercent] = await Promise.all([
+  const [products, globalPercent, globalPromo] = await Promise.all([
     prisma.product.findMany({
       where,
       include: cardInclude,
       orderBy: { id: "asc" },
     }),
     getGlobalCashback(),
+    getGlobalPromo(),
   ]);
 
   return (products as unknown as ProductWithRels[]).map((p) =>
-    toCard(p, globalPercent),
+    toCard(p, globalPercent, globalPromo),
   );
 }
 
@@ -129,8 +143,11 @@ export async function getProduct(slug: string): Promise<ProductDetail | null> {
 
   if (!p || p.isArchived) return null;
 
-  const globalPercent = await getGlobalCashback();
-  const base = toCard(p as unknown as ProductWithRels, globalPercent);
+  const [globalPercent, globalPromo] = await Promise.all([
+    getGlobalCashback(),
+    getGlobalPromo(),
+  ]);
+  const base = toCard(p as unknown as ProductWithRels, globalPercent, globalPromo);
 
   // Похожие: тот же бренд или гендер, не сам товар
   const similarRaw = await prisma.product.findMany({
@@ -154,7 +171,7 @@ export async function getProduct(slug: string): Promise<ProductDetail | null> {
       priceByn: Number(v.priceByn),
     })),
     similar: (similarRaw as unknown as ProductWithRels[]).map((sp) =>
-      toCard(sp, globalPercent),
+      toCard(sp, globalPercent, globalPromo),
     ),
   };
 }
@@ -175,13 +192,14 @@ export interface FinderProduct extends ProductCard {
 
 /** Товары для квиз-подборщика: карточка + строка нот. */
 export async function getFinderProducts(): Promise<FinderProduct[]> {
-  const [products, globalPercent] = await Promise.all([
+  const [products, globalPercent, globalPromo] = await Promise.all([
     prisma.product.findMany({
       where: { isArchived: false },
       include: cardInclude,
       orderBy: { id: "asc" },
     }),
     getGlobalCashback(),
+    getGlobalPromo(),
   ]);
 
   return (products as unknown as (ProductWithRels & {
@@ -189,7 +207,7 @@ export async function getFinderProducts(): Promise<FinderProduct[]> {
     notesMid: string | null;
     notesBase: string | null;
   })[]).map((p) => ({
-    ...toCard(p, globalPercent),
+    ...toCard(p, globalPercent, globalPromo),
     notes: [p.notesTop, p.notesMid, p.notesBase]
       .filter(Boolean)
       .join(", ")

@@ -6,6 +6,8 @@ import {
   lookupCustomer,
   requestLoyaltySpendOtp,
 } from "@/lib/actions/cash";
+// Тот же движок, что и на сервере — предпросмотр обязан совпадать с чеком.
+import { priceCart } from "@doza/db/pricing";
 
 interface VolumeOpt {
   volumeMl: number;
@@ -16,7 +18,13 @@ interface ProductOpt {
   name: string;
   brand: string;
   discountPercent: number;
+  /** Участвует ли товар в текущей супер-акции. */
+  inSuperPromo?: boolean;
   volumes: VolumeOpt[];
+}
+interface SellerOpt {
+  id: number;
+  name: string;
 }
 interface AtomizerOpt {
   id: number;
@@ -30,12 +38,22 @@ interface CartLine {
   priceByn: number;
   qty: number;
   promoDiscount: number;
+  inSuperPromo: boolean;
   atomizerId: number | null;
 }
 
 function byn(n: number) {
   return `${n.toFixed(2)} BYN`;
 }
+
+/** Название сработавшей механики скидки — для строки «Скидка (…)». */
+const DISCOUNT_LABEL: Record<string, string> = {
+  vip: "VIP",
+  social: "за подписки",
+  promo: "акция",
+  super: "супер-акция",
+  none: "",
+};
 
 function chipCls(active: boolean) {
   return `rounded-full border px-3 py-1 text-xs transition-colors ${
@@ -48,9 +66,20 @@ function chipCls(active: boolean) {
 export default function CashRegister({
   products,
   atomizers,
+  superPromo = null,
+  sellers = [],
+  currentUserId,
+  subscribePercent = 5,
+  storyPercent = 5,
 }: {
   products: ProductOpt[];
   atomizers: AtomizerOpt[];
+  superPromo?: { name: string; groupSize: number } | null;
+  /** Непустой список = текущий пользователь админ и может выбрать продавца. */
+  sellers?: SellerOpt[];
+  currentUserId: number;
+  subscribePercent?: number;
+  storyPercent?: number;
 }) {
   const [query, setQuery] = useState("");
   const [brandFilter, setBrandFilter] = useState<string | null>(null);
@@ -62,12 +91,20 @@ export default function CashRegister({
   const [foundName, setFoundName] = useState<string | null>(null);
   const [vipCard, setVipCard] = useState<string | null>(null);
   const [vipPercent, setVipPercent] = useState(0);
+  const [subscribe, setSubscribe] = useState(false);
+  const [story, setStory] = useState(false);
+  const [sellerId, setSellerId] = useState<number>(currentUserId);
   const [usePoints, setUsePoints] = useState(false);
   const [spend, setSpend] = useState(0);
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [pending, startTransition] = useTransition();
-  const [done, setDone] = useState<{ saleId: number; toPay: number } | null>(null);
+  const [done, setDone] = useState<{
+    saleId: number;
+    toPay: number;
+    discountLabel?: string;
+    earned?: number;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const brands = useMemo(
@@ -91,15 +128,42 @@ export default function CashRegister({
     return list.slice(0, 60);
   }, [query, brandFilter, products]);
 
-  const total = cart.reduce((s, l) => s + l.priceByn * l.qty, 0);
-  const netTotal =
-    Math.round(
-      cart.reduce((s, l) => {
-        const eff = Math.max(vipPercent, l.promoDiscount || 0);
-        return s + (Math.round(l.priceByn * (1 - eff / 100) * 100) / 100) * l.qty;
-      }, 0) * 100,
-    ) / 100;
-  // Сертификаты: VIP-скидка применяется, кешбек не начисляется
+  const socialPercent = (subscribe ? subscribePercent : 0) + (story ? storyPercent : 0);
+
+  // Расчёт тем же движком, что и на сервере: акции не складываются,
+  // выигрывает вариант, выгодный покупателю.
+  const priced = useMemo(() => {
+    const promoMap: Record<number, number> = {};
+    for (const l of cart) {
+      promoMap[l.productId] = Math.max(
+        promoMap[l.productId] ?? 0,
+        l.promoDiscount || 0,
+      );
+    }
+    const eligible = new Set(
+      cart.filter((l) => l.inSuperPromo).map((l) => l.productId),
+    );
+    return priceCart({
+      lines: cart.map((l) => ({
+        productId: l.productId,
+        qty: l.qty,
+        unitPrice: l.priceByn,
+      })),
+      vipPercent,
+      socialPercent,
+      productPromoPercent: promoMap,
+      superPromo: superPromo
+        ? {
+            groupSize: superPromo.groupSize,
+            isEligible: (id: number) => eligible.has(id),
+          }
+        : null,
+    });
+  }, [cart, vipPercent, socialPercent, superPromo]);
+
+  const total = priced.gross;
+  const netTotal = priced.net;
+  // Сертификаты: только VIP-скидка, кешбек не начисляется (акции их не касаются)
   const certGross = certs.reduce((s, c) => s + c.denomination * c.qty, 0);
   const certDiscount =
     vipPercent > 0 ? Math.round(certGross * (vipPercent / 100) * 100) / 100 : 0;
@@ -130,6 +194,7 @@ export default function CashRegister({
           priceByn: v.priceByn,
           qty: 1,
           promoDiscount: p.discountPercent || 0,
+          inSuperPromo: p.inSuperPromo === true,
           atomizerId: match.length === 1 ? match[0].id : null,
         },
       ];
@@ -208,6 +273,8 @@ export default function CashRegister({
     setFoundName(null);
     setVipCard(null);
     setVipPercent(0);
+    setSubscribe(false);
+    setStory(false);
     setUsePoints(false);
     setSpend(0);
     setOtp("");
@@ -234,8 +301,16 @@ export default function CashRegister({
           name: name || undefined,
           loyaltySpend: effSpend,
           loyaltyOtp: otp || undefined,
+          socialSubscribe: subscribe,
+          socialStory: story,
+          sellerId,
         });
-        setDone({ saleId: res.saleId, toPay: res.toPay });
+        setDone({
+          saleId: res.saleId,
+          toPay: res.toPay,
+          discountLabel: res.discountLabel,
+          earned: res.earned,
+        });
         resetCart();
       } catch (e) {
         setError((e as Error).message);
@@ -248,7 +323,19 @@ export default function CashRegister({
       <div className="mx-auto max-w-md rounded-2xl border border-green-500/40 bg-green-500/5 p-8 text-center">
         <h2 className="mb-2 font-serif text-2xl text-green-300">Продажа закрыта</h2>
         <p className="mb-1 text-ivory-muted">Продажа №{done.saleId}</p>
-        <p className="mb-6 text-ivory">Оплачено: {byn(done.toPay)}</p>
+        <p className="mb-1 text-ivory">Оплачено: {byn(done.toPay)}</p>
+        {done.discountLabel && (
+          <p className="mb-1 text-sm text-botanical-300">
+            Применена скидка: {done.discountLabel}
+          </p>
+        )}
+        {done.earned ? (
+          <p className="mb-6 text-sm text-gold-400">
+            Начислено баллов: {done.earned}
+          </p>
+        ) : (
+          <p className="mb-6" />
+        )}
         <button
           onClick={() => setDone(null)}
           className="rounded-full bg-gold-gradient px-6 py-2.5 text-sm font-medium text-ink-900"
@@ -431,6 +518,60 @@ export default function CashRegister({
           )}
         </div>
 
+        {/* Скидки за соцсети */}
+        <div className="border-t border-ink-600/60 pt-4">
+          <label className="mb-1.5 block text-xs uppercase tracking-wide text-gold-500">
+            Скидка за соцсети
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setSubscribe((v) => !v)}
+              className={chipCls(subscribe)}
+            >
+              −{subscribePercent}% подписка
+            </button>
+            <button
+              type="button"
+              onClick={() => setStory((v) => !v)}
+              className={chipCls(story)}
+            >
+              −{storyPercent}% сторис
+            </button>
+          </div>
+          {socialPercent > 0 && vipPercent > 0 && (
+            <p className="mt-1.5 text-xs text-ivory-faint">
+              Не суммируется с VIP — применится то, что выгоднее клиенту.
+            </p>
+          )}
+        </div>
+
+        {/* Продажа от лица сотрудника (только админ) */}
+        {sellers.length > 1 && (
+          <div className="border-t border-ink-600/60 pt-4">
+            <label className="mb-1.5 block text-xs uppercase tracking-wide text-gold-500">
+              Продавец
+            </label>
+            <select
+              value={sellerId}
+              onChange={(e) => setSellerId(Number(e.target.value))}
+              className="h-10 w-full rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory focus:border-gold-500 focus:outline-none"
+            >
+              {sellers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                  {s.id === currentUserId ? " (вы)" : ""}
+                </option>
+              ))}
+            </select>
+            {sellerId !== currentUserId && (
+              <p className="mt-1.5 text-xs text-botanical-300">
+                Продажа будет засчитана этому сотруднику.
+              </p>
+            )}
+          </div>
+        )}
+
         {balance > 0 && (
           <div className="rounded-lg border border-botanical-500/40 bg-botanical-700/20 p-3">
             <label className="flex items-center gap-2 text-sm text-ivory">
@@ -494,7 +635,20 @@ export default function CashRegister({
           </div>
           {discount > 0 && (
             <div className="flex justify-between text-gold-400">
-              <span>Скидка{vipCard ? " (VIP)" : ""}</span><span>−{byn(discount)}</span>
+              <span>
+                Скидка
+                {DISCOUNT_LABEL[priced.kind] ? ` (${DISCOUNT_LABEL[priced.kind]})` : ""}
+              </span>
+              <span>−{byn(discount)}</span>
+            </div>
+          )}
+          {priced.freeUnits > 0 && (
+            <div className="flex justify-between text-botanical-300">
+              <span>Бесплатно по акции</span>
+              <span>
+                {priced.freeUnits} шт.
+                {superPromo ? ` · ${superPromo.name}` : ""}
+              </span>
             </div>
           )}
           {effSpend > 0 && (

@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { prisma } from "@doza/db";
-import { pickActivePromo } from "@doza/db/promos";
+import { pickActivePromo, getGlobalPromo, getActiveSuperPromo } from "@doza/db/promos";
 import { requireRole } from "@/lib/session";
 import CashRegister from "@/components/CashRegister";
 
 export const dynamic = "force-dynamic";
 
 export default async function CashPage() {
-  await requireRole(["admin", "seller"]);
+  const session = await requireRole(["admin", "seller"]);
+  const isAdmin = session.user.role === "admin";
 
   const products = await prisma.product.findMany({
     where: { isArchived: false },
@@ -32,21 +33,48 @@ export default async function CashPage() {
   });
 
   const now = new Date();
+
+  // Акция «на все товары» и супер-акция + список продавцов (для админа).
+  const [globalPromo, superPromo, sellers, socialSettings] = await Promise.all([
+    getGlobalPromo(now),
+    getActiveSuperPromo(now),
+    isAdmin
+      ? prisma.crmUser.findMany({
+          where: { isActive: true, role: { in: ["admin", "seller"] } },
+          select: { id: true, name: true },
+          orderBy: { name: "asc" },
+        })
+      : Promise.resolve([]),
+    prisma.setting.findMany({
+      where: { key: { in: ["social_subscribe_percent", "social_story_percent"] } },
+    }),
+  ]);
+
+  const settingNum = (key: string, fallback: number) => {
+    const s = socialSettings.find((x) => x.key === key);
+    return s ? Number(s.value) : fallback;
+  };
+
   const opts = products
     .filter((p) => p.volumes.length > 0)
     .map((p) => ({
       id: p.id,
       name: p.name,
       brand: p.brand.name,
-      discountPercent: pickActivePromo(
-        p.promos.map((pr) => ({
-          discountPercent: pr.discountPercent != null ? Number(pr.discountPercent) : null,
-          cashbackPercent: pr.cashbackPercent != null ? Number(pr.cashbackPercent) : null,
-          startsAt: pr.startsAt,
-          endsAt: pr.endsAt,
-        })),
-        now,
-      ).discountPercent,
+      // Адресная акция товара или акция «на все товары» — что больше.
+      discountPercent: Math.max(
+        pickActivePromo(
+          p.promos.map((pr) => ({
+            discountPercent: pr.discountPercent != null ? Number(pr.discountPercent) : null,
+            cashbackPercent: pr.cashbackPercent != null ? Number(pr.cashbackPercent) : null,
+            startsAt: pr.startsAt,
+            endsAt: pr.endsAt,
+          })),
+          now,
+        ).discountPercent,
+        globalPromo.discountPercent,
+      ),
+      inSuperPromo: superPromo ? superPromo.isEligible(p.id) : false,
       volumes: p.volumes.map((v) => ({
         volumeMl: v.volumeMl,
         priceByn: Number(v.priceByn),
@@ -76,6 +104,15 @@ export default async function CashPage() {
           name: a.name,
           volumeMl: a.volumeMl,
         }))}
+        superPromo={
+          superPromo
+            ? { name: superPromo.name, groupSize: superPromo.groupSize }
+            : null
+        }
+        sellers={sellers}
+        currentUserId={Number(session.user.id)}
+        subscribePercent={settingNum("social_subscribe_percent", 5)}
+        storyPercent={settingNum("social_story_percent", 5)}
       />
     </div>
   );

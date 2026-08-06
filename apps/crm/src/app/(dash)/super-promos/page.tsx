@@ -1,7 +1,7 @@
 import { prisma } from "@doza/db";
 import { requireRole } from "@/lib/session";
-import PromoForm from "@/components/PromoForm";
-import PromoDelete from "@/components/PromoDelete";
+import SuperPromoForm from "@/components/SuperPromoForm";
+import SuperPromoActions from "@/components/SuperPromoActions";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ function fmt(d: Date | null): string {
   });
 }
 
-export default async function PromosPage() {
+export default async function SuperPromosPage() {
   await requireRole(["admin"]);
 
   const [products, promos] = await Promise.all([
@@ -24,8 +24,12 @@ export default async function PromosPage() {
       include: { brand: { select: { name: true } } },
       orderBy: [{ brand: { name: "asc" } }, { name: "asc" }],
     }),
-    prisma.promo.findMany({
-      include: { product: { include: { brand: { select: { name: true } } } } },
+    prisma.superPromo.findMany({
+      include: {
+        products: {
+          include: { product: { include: { brand: { select: { name: true } } } } },
+        },
+      },
       orderBy: { createdAt: "desc" },
     }),
   ]);
@@ -37,6 +41,7 @@ export default async function PromosPage() {
 
   const now = new Date();
   const status = (p: (typeof promos)[number]) => {
+    if (!p.isActive) return { label: "Выключена", cls: "text-ivory-faint" };
     if (p.endsAt && p.endsAt < now)
       return { label: "Завершена", cls: "text-ivory-faint" };
     if (p.startsAt && p.startsAt > now)
@@ -46,28 +51,29 @@ export default async function PromosPage() {
 
   return (
     <div>
-      <h1 className="mb-1 font-serif text-3xl text-ivory">Акции</h1>
-      <p className="mb-8 text-sm text-ivory-faint">
-        Скидки и повышенный кешбек на товары с периодом действия. За день до
-        окончания продавцам придёт напоминание в Telegram.
+      <h1 className="mb-1 font-serif text-3xl text-ivory">Супер акции</h1>
+      <p className="mb-8 max-w-3xl text-sm text-ivory-faint">
+        Сложные механики на весь чек. Скидки не складываются: касса сама
+        сравнит супер-акцию с VIP-скидкой и скидкой за подписки и применит то,
+        что выгоднее покупателю.
       </p>
 
       <div className="mb-8">
-        <PromoForm products={opts} />
+        <SuperPromoForm products={opts} />
       </div>
 
       {promos.length === 0 ? (
         <p className="rounded-xl border border-ink-600/60 bg-ink-700 p-10 text-center text-ivory-muted">
-          Акций пока нет.
+          Супер-акций пока нет.
         </p>
       ) : (
         <div className="overflow-hidden rounded-xl border border-ink-600/60">
           <table className="w-full text-sm">
             <thead className="bg-ink-800 text-left text-xs uppercase tracking-wide text-ivory-faint">
               <tr>
-                <th className="px-4 py-3">Товар</th>
-                <th className="px-4 py-3">Скидка</th>
-                <th className="px-4 py-3">Кешбек</th>
+                <th className="px-4 py-3">Название</th>
+                <th className="px-4 py-3">Механика</th>
+                <th className="px-4 py-3">Товары</th>
                 <th className="px-4 py-3">Период</th>
                 <th className="px-4 py-3">Статус</th>
                 <th className="px-4 py-3"></th>
@@ -77,29 +83,26 @@ export default async function PromosPage() {
               {promos.map((p) => {
                 const st = status(p);
                 return (
-                  <tr
-                    key={p.id}
-                    className="border-t border-ink-600/40 bg-ink-700"
-                  >
-                    <td className="px-4 py-3 text-ivory">
-                      {p.product ? (
-                        `${p.product.brand.name} — ${p.product.name}`
-                      ) : (
-                        <span className="text-gold-400">Все товары</span>
-                      )}
-                    </td>
+                  <tr key={p.id} className="border-t border-ink-600/40 bg-ink-700">
+                    <td className="px-4 py-3 text-ivory">{p.name}</td>
                     <td className="px-4 py-3 text-botanical-300">
-                      {p.discountPercent ? `−${Number(p.discountPercent)}%` : "—"}
+                      каждый {p.groupSize}-й бесплатно
                     </td>
-                    <td className="px-4 py-3 text-gold-400">
-                      {p.cashbackPercent ? `${Number(p.cashbackPercent)}%` : "—"}
+                    <td className="px-4 py-3 text-xs text-ivory-muted">
+                      {p.allProducts ? (
+                        <span className="text-gold-400">Все товары</span>
+                      ) : (
+                        <span title={p.products.map((x) => `${x.product.brand.name} ${x.product.name}`).join(", ")}>
+                          {p.products.length} шт.
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-xs text-ivory-faint">
                       {fmt(p.startsAt)} → {fmt(p.endsAt)}
                     </td>
                     <td className={`px-4 py-3 text-xs ${st.cls}`}>{st.label}</td>
                     <td className="px-4 py-3 text-right">
-                      <PromoDelete id={p.id} />
+                      <SuperPromoActions id={p.id} isActive={p.isActive} />
                     </td>
                   </tr>
                 );
