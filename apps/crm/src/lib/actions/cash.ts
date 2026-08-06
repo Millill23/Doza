@@ -6,6 +6,7 @@ import {
   pickActivePromo,
   getGlobalPromo,
   getActiveSuperPromo,
+  getCashbackRates,
 } from "@doza/db/promos";
 import { priceCart } from "@doza/db/pricing";
 import { createSmsCode, verifySmsCode } from "@doza/db/sms-codes";
@@ -314,11 +315,20 @@ export async function createOfflineSale(input: CreateSaleInput) {
         id: sale.id,
       });
     }
-    const percent = await getSetting("loyalty_percent", 5);
     const days = await getSetting("loyalty_days", 180);
-    // Кешбек только с товаров (не с сертификатов). Списанные баллы уменьшают базу.
-    const net = Math.max(0, netTotal - loyaltySpent);
-    earned = Math.round(net * (percent / 100) * 100) / 100;
+    // Кешбек только с товаров (не с сертификатов). Процент берётся по каждому
+    // товару отдельно — включая повышенный кешбек акции, как обещает витрина.
+    const rates = await getCashbackRates(resolved.map((r) => r.productId));
+    // Списанные баллы уменьшают базу начисления — распределяем пропорционально.
+    const base = Math.max(0, netTotal - loyaltySpent);
+    const ratio = netTotal > 0 ? base / netTotal : 0;
+    earned =
+      Math.round(
+        priced.lineNet.reduce((sum, lineNet, i) => {
+          const pct = rates[resolved[i].productId] ?? 0;
+          return sum + lineNet * ratio * (pct / 100);
+        }, 0) * 100,
+      ) / 100;
     if (earned > 0) {
       await earnPoints(customerId, earned, days, {
         type: "offline_sale",

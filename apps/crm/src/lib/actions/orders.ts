@@ -2,6 +2,7 @@
 
 import { prisma } from "@doza/db";
 import { earnPoints } from "@doza/db/loyalty";
+import { getCashbackRates } from "@doza/db/promos";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/session";
 
@@ -56,12 +57,26 @@ async function applyClose(orderId: number, userId: number) {
     });
   }
 
-  // Начисление баллов на чистую оплаченную сумму
+  // Начисление баллов на чистую оплаченную сумму.
+  // Процент — по каждому товару отдельно (повышенный кешбек акции), как на витрине.
   if (order.customerId) {
-    const percent = await getSetting("loyalty_percent", 5);
     const days = await getSetting("loyalty_days", 180);
+    const rates = await getCashbackRates(order.items.map((i) => i.productId));
+    const itemsGross = order.items.reduce(
+      (s, i) => s + Number(i.priceByn) * i.qty,
+      0,
+    );
+    // Списанные баллы уменьшают базу — распределяем пропорционально позициям.
     const net = Number(order.totalByn) - Number(order.loyaltySpentByn);
-    const earn = Math.round(net * (percent / 100) * 100) / 100;
+    const ratio = itemsGross > 0 ? Math.max(0, net) / itemsGross : 0;
+    const earn =
+      Math.round(
+        order.items.reduce((sum, i) => {
+          const line = Number(i.priceByn) * i.qty;
+          const pct = rates[i.productId] ?? 0;
+          return sum + line * ratio * (pct / 100);
+        }, 0) * 100,
+      ) / 100;
     if (earn > 0) {
       await earnPoints(order.customerId, earn, days, {
         type: "order",

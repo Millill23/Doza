@@ -61,6 +61,28 @@ function r2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+/**
+ * Эффективный процент кешбека на товар.
+ *
+ * Единый источник правды для витрины и касс: сколько сайт обещает в карточке
+ * товара, столько же должно начислиться при продаже. Берётся максимум —
+ * повышенный кешбек акции не складывается с базовым, а заменяет его.
+ */
+export function effectiveCashbackPercent(opts: {
+  /** Базовый процент из настроек (loyalty_percent). */
+  globalPercent: number;
+  /** Персональный процент товара (loyaltyPercentOverride). */
+  productOverride?: number | null;
+  /** Повышенный кешбек активной акции. */
+  promoCashbackPercent?: number | null;
+}): number {
+  return Math.max(
+    opts.globalPercent || 0,
+    opts.productOverride ?? 0,
+    opts.promoCashbackPercent ?? 0,
+  );
+}
+
 function clampPercent(p: number | undefined): number {
   if (!Number.isFinite(p as number) || (p as number) <= 0) return 0;
   return Math.min(100, p as number);

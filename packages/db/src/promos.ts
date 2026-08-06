@@ -6,6 +6,7 @@
  */
 
 import { prisma } from "./index";
+import { effectiveCashbackPercent } from "./pricing";
 
 export interface PromoInput {
   discountPercent: number | null;
@@ -102,6 +103,68 @@ export async function getActiveSuperPromo(now: Date = new Date()): Promise<
     groupSize: promo.groupSize,
     isEligible: (productId: number) => promo.allProducts || ids.has(productId),
   };
+}
+
+/**
+ * Эффективный процент кешбека по каждому товару из списка.
+ *
+ * Учитывает базовую настройку, персональный процент товара и повышенный
+ * кешбек активных акций (адресных и «на все товары») — ровно так же, как это
+ * показывает витрина, чтобы обещание на сайте совпадало с начислением в кассе.
+ */
+export async function getCashbackRates(
+  productIds: number[],
+  now: Date = new Date(),
+): Promise<Record<number, number>> {
+  const ids = [...new Set(productIds)].filter(Boolean);
+  const rates: Record<number, number> = {};
+  if (ids.length === 0) return rates;
+
+  const [setting, products, globalPromo] = await Promise.all([
+    prisma.setting.findUnique({ where: { key: "loyalty_percent" } }),
+    prisma.product.findMany({
+      where: { id: { in: ids } },
+      select: {
+        id: true,
+        loyaltyPercentOverride: true,
+        promos: {
+          select: {
+            discountPercent: true,
+            cashbackPercent: true,
+            startsAt: true,
+            endsAt: true,
+          },
+        },
+      },
+    }),
+    getGlobalPromo(now),
+  ]);
+
+  const globalPercent = setting ? Number(setting.value) : 5;
+
+  for (const p of products) {
+    const own = pickActivePromo(
+      p.promos.map((pr) => ({
+        discountPercent: pr.discountPercent != null ? Number(pr.discountPercent) : null,
+        cashbackPercent: pr.cashbackPercent != null ? Number(pr.cashbackPercent) : null,
+        startsAt: pr.startsAt,
+        endsAt: pr.endsAt,
+      })),
+      now,
+    );
+    const promo = mergePromos(own, globalPromo);
+    rates[p.id] = effectiveCashbackPercent({
+      globalPercent,
+      productOverride:
+        p.loyaltyPercentOverride != null ? Number(p.loyaltyPercentOverride) : null,
+      promoCashbackPercent: promo.cashbackPercent,
+    });
+  }
+
+  // Товар мог не найтись (архив/удалён) — начисляем хотя бы базовый процент.
+  for (const id of ids) if (rates[id] == null) rates[id] = globalPercent;
+
+  return rates;
 }
 
 /** Объединить адресную акцию товара с глобальной: берётся лучшее, не сумма. */

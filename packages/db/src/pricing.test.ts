@@ -6,7 +6,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 // Расширение .ts обязательно: файл исполняет node напрямую (ESM).
 // Приложениями он не импортируется, поэтому сборке не мешает.
-import { priceCart, type SuperPromoRule } from "./pricing.ts";
+import {
+  priceCart,
+  effectiveCashbackPercent,
+  type SuperPromoRule,
+} from "./pricing.ts";
 
 const all: SuperPromoRule = { groupSize: 3, isEligible: () => true };
 
@@ -153,6 +157,91 @@ test("соцскидка не складывается с 1+1=3", () => {
   assert.equal(r.kind, "super");
 });
 
+// ── Проверка правила «не суммировать и не накладывать» на конкретных цифрах ──
+// Везде товар за 100, чтобы проценты читались напрямую.
+
+test("акция 10% + подписки 10% = 10%, а НЕ 20%", () => {
+  const r = priceCart({
+    lines: [{ productId: 1, qty: 1, unitPrice: 100 }],
+    productPromoPercent: { 1: 10 },
+    socialPercent: 10,
+  });
+  assert.equal(r.net, 90);
+  assert.equal(r.discount, 10);
+});
+
+test("акция 5% + подписки 10% = 10% (выгоднее), а НЕ 15%", () => {
+  const r = priceCart({
+    lines: [{ productId: 1, qty: 1, unitPrice: 100 }],
+    productPromoPercent: { 1: 5 },
+    socialPercent: 10,
+  });
+  assert.equal(r.net, 90);
+  assert.equal(r.kind, "social");
+});
+
+test("акция 15% + VIP 20% = 20% (выгоднее), а НЕ 35%", () => {
+  const r = priceCart({
+    lines: [{ productId: 1, qty: 1, unitPrice: 100 }],
+    productPromoPercent: { 1: 15 },
+    vipPercent: 20,
+  });
+  assert.equal(r.net, 80);
+  assert.equal(r.kind, "vip");
+});
+
+test("акция 25% сильнее VIP 20% — берётся акция, а НЕ 45%", () => {
+  const r = priceCart({
+    lines: [{ productId: 1, qty: 1, unitPrice: 100 }],
+    productPromoPercent: { 1: 25 },
+    vipPercent: 20,
+  });
+  assert.equal(r.net, 75);
+  assert.equal(r.kind, "promo");
+});
+
+test("все три сразу (акция 15% + подписки 10% + VIP 20%) = 20%, а НЕ 45%", () => {
+  const r = priceCart({
+    lines: [{ productId: 1, qty: 1, unitPrice: 100 }],
+    productPromoPercent: { 1: 15 },
+    socialPercent: 10,
+    vipPercent: 20,
+  });
+  assert.equal(r.net, 80);
+  assert.equal(r.kind, "vip");
+});
+
+test("«на все товары» 10% + адресная 15% = 15%, а НЕ 25%", () => {
+  const r = priceCart({
+    lines: [{ productId: 1, qty: 1, unitPrice: 100 }],
+    allProductsPromoPercent: 10,
+    productPromoPercent: { 1: 15 },
+  });
+  assert.equal(r.net, 85);
+});
+
+test("итоговая скидка никогда не превышает лучшую отдельную механику", () => {
+  // перебор комбинаций: результат обязан совпасть с максимальным одиночным %
+  for (const promo of [0, 5, 10, 15, 25]) {
+    for (const social of [0, 5, 10]) {
+      for (const vip of [0, 20]) {
+        const r = priceCart({
+          lines: [{ productId: 1, qty: 1, unitPrice: 100 }],
+          productPromoPercent: { 1: promo },
+          socialPercent: social,
+          vipPercent: vip,
+        });
+        const best = Math.max(promo, social, vip);
+        assert.equal(
+          r.net,
+          100 - best,
+          `promo=${promo} social=${social} vip=${vip}`,
+        );
+      }
+    }
+  }
+});
+
 test("скидка никогда не делает сумму отрицательной", () => {
   const r = priceCart({
     lines: [{ productId: 1, qty: 3, unitPrice: 0 }],
@@ -176,6 +265,44 @@ test("копейки округляются корректно", () => {
   });
   // 33.33*0.8 = 26.664 → 26.66 за штуку
   assert.equal(r.net, 79.98);
+});
+
+// ── Кешбек: что обещано на витрине, то и начисляется ────────────────────────
+
+test("кешбек: без акций — базовый процент", () => {
+  assert.equal(effectiveCashbackPercent({ globalPercent: 5 }), 5);
+});
+
+test("кешбек: повышенный по акции заменяет базовый, а не складывается", () => {
+  assert.equal(
+    effectiveCashbackPercent({ globalPercent: 5, promoCashbackPercent: 15 }),
+    15,
+  );
+});
+
+test("кешбек: слабая акция не понижает базовый процент", () => {
+  assert.equal(
+    effectiveCashbackPercent({ globalPercent: 5, promoCashbackPercent: 3 }),
+    5,
+  );
+});
+
+test("кешбек: персональный процент товара учитывается", () => {
+  assert.equal(
+    effectiveCashbackPercent({ globalPercent: 5, productOverride: 10 }),
+    10,
+  );
+});
+
+test("кешбек: из трёх источников берётся максимум, а не сумма", () => {
+  assert.equal(
+    effectiveCashbackPercent({
+      globalPercent: 5,
+      productOverride: 10,
+      promoCashbackPercent: 15,
+    }),
+    15,
+  );
 });
 
 test("сумма позиций совпадает с итогом", () => {

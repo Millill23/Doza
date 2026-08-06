@@ -5,6 +5,7 @@ import {
   mergePromos,
   type EffectivePromo,
 } from "@doza/db/promos";
+import { effectiveCashbackPercent } from "@doza/db/pricing";
 import type { ProductCard, ProductDetail, Gender } from "./types";
 
 /**
@@ -63,11 +64,12 @@ function toCard(
     ),
     globalPromo,
   );
-  const cashbackPercent = Math.max(
+  // Общее правило с кассой: что обещано в карточке — то и начислится.
+  const cashbackPercent = effectiveCashbackPercent({
     globalPercent,
-    override ?? 0,
-    promo.cashbackPercent ?? 0,
-  );
+    productOverride: override,
+    promoCashbackPercent: promo.cashbackPercent,
+  });
   return {
     id: p.id,
     slug: p.slug,
