@@ -44,42 +44,70 @@ export async function getNextExpiry(customerId: number): Promise<Date | null> {
   return batch?.expiresAt ?? null;
 }
 
+/** Клиент Prisma внутри транзакции — чтобы начислять из чужой транзакции. */
+export type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+/** Начисление внутри уже открытой транзакции. */
+async function earnPointsTx(
+  tx: TxClient,
+  customerId: number,
+  amountByn: number,
+  loyaltyDays: number,
+  ref: { type: string; id: number },
+  reason?: string,
+): Promise<void> {
+  const expiresAt =
+    loyaltyDays > 0
+      ? new Date(Date.now() + loyaltyDays * 24 * 60 * 60 * 1000)
+      : null;
+
+  const batch = await tx.loyaltyBatch.create({
+    data: {
+      customerId,
+      amountByn,
+      expiresAt,
+      refType: ref.type,
+      refId: ref.id,
+    },
+  });
+  await tx.loyaltyLog.create({
+    data: {
+      customerId,
+      batchId: batch.id,
+      deltaByn: amountByn,
+      opType: "earned",
+      refType: ref.type,
+      refId: ref.id,
+      reason: reason ?? null,
+    },
+  });
+}
+
 /**
  * Начислить баллы: создаёт партию с датой сгорания и пишет в журнал.
  * loyaltyDays = 0 → бессрочно.
+ *
+ * `opts.tx` начисляет внутри чужой транзакции — нужно там, где начисление
+ * обязано быть неразрывно с другой записью (активация сертификата: либо и
+ * статус меняется, и баллы начислены, либо не происходит ничего).
+ * `opts.reason` — причина (для ручного начисления админом).
  */
 export async function earnPoints(
   customerId: number,
   amountByn: number,
   loyaltyDays: number,
   ref: { type: string; id: number },
+  opts?: { reason?: string; tx?: TxClient },
 ): Promise<void> {
   if (amountByn <= 0) return;
-  const expiresAt =
-    loyaltyDays > 0
-      ? new Date(Date.now() + loyaltyDays * 24 * 60 * 60 * 1000)
-      : null;
+
+  if (opts?.tx) {
+    await earnPointsTx(opts.tx, customerId, amountByn, loyaltyDays, ref, opts.reason);
+    return;
+  }
 
   await prisma.$transaction(async (tx) => {
-    const batch = await tx.loyaltyBatch.create({
-      data: {
-        customerId,
-        amountByn,
-        expiresAt,
-        refType: ref.type,
-        refId: ref.id,
-      },
-    });
-    await tx.loyaltyLog.create({
-      data: {
-        customerId,
-        batchId: batch.id,
-        deltaByn: amountByn,
-        opType: "earned",
-        refType: ref.type,
-        refId: ref.id,
-      },
-    });
+    await earnPointsTx(tx, customerId, amountByn, loyaltyDays, ref, opts?.reason);
   });
 }
 

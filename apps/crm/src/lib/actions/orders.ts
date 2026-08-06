@@ -57,24 +57,18 @@ async function applyClose(orderId: number, userId: number) {
     });
   }
 
-  // Начисление баллов на чистую оплаченную сумму.
+  // Начисление баллов за заказ.
   // Процент — по каждому товару отдельно (повышенный кешбек акции), как на витрине.
+  // Кешбек не зависит от способа оплаты: оплата баллами даёт такой же кешбек.
   if (order.customerId) {
     const days = await getSetting("loyalty_days", 180);
     const rates = await getCashbackRates(order.items.map((i) => i.productId));
-    const itemsGross = order.items.reduce(
-      (s, i) => s + Number(i.priceByn) * i.qty,
-      0,
-    );
-    // Списанные баллы уменьшают базу — распределяем пропорционально позициям.
-    const net = Number(order.totalByn) - Number(order.loyaltySpentByn);
-    const ratio = itemsGross > 0 ? Math.max(0, net) / itemsGross : 0;
     const earn =
       Math.round(
         order.items.reduce((sum, i) => {
           const line = Number(i.priceByn) * i.qty;
           const pct = rates[i.productId] ?? 0;
-          return sum + line * ratio * (pct / 100);
+          return sum + line * (pct / 100);
         }, 0) * 100,
       ) / 100;
     if (earn > 0) {

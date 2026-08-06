@@ -22,6 +22,8 @@
     "./loyalty": "./src/loyalty.ts",
     "./sms-codes": "./src/sms-codes.ts",
     "./promos": "./src/promos.ts",
-    "./pricing": "./src/pricing.ts"
+    "./pricing": "./src/pricing.ts",
+    "./certificates": "./src/certificates.ts",
+    "./certificate-rules": "./src/certificate-rules.ts"
   }
 }

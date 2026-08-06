@@ -48,6 +48,40 @@ export default function AccountPanel({ name, phone, balance, batches, orders, bi
   const [newDesc, setNewDesc] = useState("");
   const [dErr, setDErr] = useState<string | null>(null);
 
+  // Активация подарочного сертификата
+  const [certCode, setCertCode] = useState("");
+  const [certBusy, setCertBusy] = useState(false);
+  const [certErr, setCertErr] = useState<string | null>(null);
+  const [certDone, setCertDone] = useState<{
+    awarded: number;
+    balance: number;
+  } | null>(null);
+  // Баланс приходит с сервера, но после активации обновляем его на месте,
+  // чтобы клиент сразу видел зачисление без перезагрузки страницы.
+  const shownBalance = certDone ? certDone.balance : balance;
+
+  async function activateCert() {
+    setCertErr(null);
+    setCertBusy(true);
+    try {
+      const r = await fetch("/api/account/certificate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: certCode }),
+      });
+      const data = await r.json();
+      if (!r.ok || !data.ok) {
+        setCertErr(data.error || "Не удалось активировать сертификат");
+        return;
+      }
+      setCertDone({ awarded: data.awarded, balance: data.balance });
+    } catch {
+      setCertErr("Ошибка сети");
+    } finally {
+      setCertBusy(false);
+    }
+  }
+
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
     window.location.href = "/";
@@ -127,7 +161,55 @@ export default function AccountPanel({ name, phone, balance, batches, orders, bi
       {/* Баланс */}
       <div className="rounded-2xl border border-gold-500/40 bg-ink-700 p-6 text-center shadow-gold">
         <p className="text-sm text-ivory-muted">Баланс баллов</p>
-        <p className="my-2 font-serif text-5xl text-gold-gradient">{byn(balance)}</p>
+        <p className="my-2 font-serif text-5xl text-gold-gradient">{byn(shownBalance)}</p>
+      </div>
+
+      {/* Подарочный сертификат */}
+      <div className="rounded-2xl border border-ink-600/60 bg-ink-700 p-6">
+        <h2 className="mb-1 font-serif text-xl text-ivory">Подарочный сертификат</h2>
+        <p className="mb-4 text-sm text-ivory-faint">
+          Введите код с сертификата — баллы зачислятся на ваш счёт.
+        </p>
+
+        {certDone ? (
+          <div className="rounded-xl border border-green-500/40 bg-green-500/5 p-4 text-center">
+            <p className="mb-1 text-2xl text-gold-gradient">
+              +{byn(certDone.awarded)}
+            </p>
+            <p className="text-sm text-ivory-muted">
+              Сертификат активирован. Баланс: {byn(certDone.balance)}
+            </p>
+            <button
+              onClick={() => {
+                setCertDone(null);
+                setCertCode("");
+              }}
+              className="mt-3 text-xs text-gold-400 hover:text-gold-300"
+            >
+              Активировать ещё один
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                value={certCode}
+                onChange={(e) => setCertCode(e.target.value.toUpperCase())}
+                placeholder="ABCD2345"
+                maxLength={12}
+                className="h-11 flex-1 rounded-lg border border-ink-600 bg-ink-800 px-3 font-mono text-lg tracking-[0.25em] text-ivory focus:border-gold-500 focus:outline-none"
+              />
+              <button
+                onClick={activateCert}
+                disabled={certBusy || !certCode.trim()}
+                className="h-11 shrink-0 rounded-full bg-gold-gradient px-6 text-sm font-medium text-ink-900 disabled:opacity-50"
+              >
+                {certBusy ? "Активируем…" : "Активировать сертификат"}
+              </button>
+            </div>
+            {certErr && <p className="mt-2 text-sm text-red-300">{certErr}</p>}
+          </>
+        )}
       </div>
 
       {/* Партии */}

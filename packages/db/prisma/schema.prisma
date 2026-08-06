@@ -37,6 +37,8 @@ model CrmUser {
   offlineSalesCreated OfflineSale[] @relation("OfflineSaleCreatedBy")
   inventoryLog InventoryLog[]
   preorders    Preorder[]
+  certificatesIssued    GiftCertificate[] @relation("CertificateIssuedBy")
+  certificatesActivated GiftCertificate[] @relation("CertificateActivatedBy")
 
   @@map("crm_users")
 }
@@ -227,8 +229,53 @@ model Customer {
   offlineSales    OfflineSale[]
   loyaltyBatches  LoyaltyBatch[]
   loyaltyLog      LoyaltyLog[]
+  certificatesBought    GiftCertificate[] @relation("CertificateBuyer")
+  certificatesActivated GiftCertificate[] @relation("CertificateActivatedFor")
 
   @@map("customers")
+}
+
+enum GiftCertificateStatus {
+  /// Выпущен и оплачен, но ещё не активирован.
+  new
+  /// Активирован — баллы начислены, повторно использовать нельзя.
+  activated
+  /// Аннулирован вручную (ошибка выпуска и т.п.).
+  cancelled
+}
+
+/// Подарочный сертификат: выпускается в CRM с уникальным кодом, активируется
+/// продавцом или самим клиентом в личном кабинете — баллы начисляются один раз.
+model GiftCertificate {
+  id            Int                   @id @default(autoincrement())
+  /// 8 символов, латиница в верхнем регистре + цифры.
+  code          String                @unique
+  /// Номинал сертификата.
+  denomination  Decimal               @db.Decimal(10, 2)
+  /// Сколько реально заплатили при покупке (с учётом VIP-скидки покупателя).
+  /// Именно эта сумма начисляется, если активирует VIP-клиент.
+  paidByn       Decimal               @map("paid_byn") @db.Decimal(10, 2)
+  status        GiftCertificateStatus @default(new)
+
+  /// Покупатель (если известен) — нужен для VIP-скидки при покупке.
+  buyerId       Int?                  @map("buyer_id")
+  buyer         Customer?             @relation("CertificateBuyer", fields: [buyerId], references: [id])
+  issuedById    Int                   @map("issued_by_id")
+  issuedBy      CrmUser               @relation("CertificateIssuedBy", fields: [issuedById], references: [id])
+  issuedAt      DateTime              @default(now()) @map("issued_at")
+
+  /// Кому начислены баллы при активации.
+  customerId    Int?                  @map("customer_id")
+  customer      Customer?             @relation("CertificateActivatedFor", fields: [customerId], references: [id])
+  /// Сотрудник, активировавший сертификат. null → клиент активировал сам на сайте.
+  activatedById Int?                  @map("activated_by_id")
+  activatedBy   CrmUser?              @relation("CertificateActivatedBy", fields: [activatedById], references: [id])
+  activatedAt   DateTime?             @map("activated_at")
+  /// Сколько баллов фактически начислено (номинал или уплаченная сумма для VIP).
+  awardedByn    Decimal?              @map("awarded_byn") @db.Decimal(10, 2)
+
+  @@index([status])
+  @@map("gift_certificates")
 }
 
 /// Одноразовые SMS-коды (регистрация, сброс пароля, списание баллов и т.д.)
@@ -283,6 +330,8 @@ model LoyaltyLog {
   opType     LoyaltyOp    @map("op_type")
   refType    String?      @map("ref_type")
   refId      Int?         @map("ref_id")
+  /// Причина начисления вручную (обязательна при ручном начислении админом).
+  reason     String?
   createdAt  DateTime     @default(now()) @map("created_at")
 
   @@map("loyalty_log")

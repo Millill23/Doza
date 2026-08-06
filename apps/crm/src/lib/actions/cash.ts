@@ -90,7 +90,6 @@ export async function lookupCustomer(phoneRaw: string) {
 
 interface CreateSaleInput {
   items: CashItemInput[];
-  certificates?: { denomination: number; qty: number }[];
   phone?: string;
   name?: string;
   loyaltySpend?: number;
@@ -125,15 +124,10 @@ export async function createOfflineSale(input: CreateSaleInput) {
     createdById = actorId; // фиксируем, кто фактически пробил чек
   }
 
+  // Сертификаты продаются в отдельном разделе «Сертификаты», не через кассу —
+  // поэтому и списать баллы на их покупку здесь невозможно.
   const items = Array.isArray(input.items) ? input.items : [];
-  const certs = (Array.isArray(input.certificates) ? input.certificates : [])
-    .map((c) => ({
-      denomination: Math.round(Number(c.denomination) * 100) / 100,
-      qty: Math.max(1, Math.floor(c.qty || 1)),
-    }))
-    .filter((c) => c.denomination > 0);
-  if (items.length === 0 && certs.length === 0)
-    throw new Error("Корзина пуста");
+  if (items.length === 0) throw new Error("Корзина пуста");
 
   // Пересчёт цен на сервере
   const volumeRecords = await prisma.productVolume.findMany({
@@ -232,16 +226,8 @@ export async function createOfflineSale(input: CreateSaleInput) {
   });
   const netTotal = priced.net;
 
-  // Сертификаты: как и раньше, только VIP-скидка; кешбек НЕ начисляется.
-  // Акции (в т.ч. супер-акция) на номиналы сертификатов не распространяются.
-  const certGross = certs.reduce((s, c) => s + c.denomination * c.qty, 0);
-  const certDiscount =
-    vipPct > 0 ? Math.round(certGross * (vipPct / 100) * 100) / 100 : 0;
-  const certNet = Math.round((certGross - certDiscount) * 100) / 100;
-
-  const saleTotal = Math.round((netTotal + certNet) * 100) / 100;
-  const totalDiscount =
-    Math.round((total - netTotal + certDiscount) * 100) / 100;
+  const saleTotal = netTotal;
+  const totalDiscount = Math.round((total - netTotal) * 100) / 100;
 
   // Списание баллов — требует подтверждения кодом из SMS
   let loyaltySpent = 0;
@@ -279,9 +265,6 @@ export async function createOfflineSale(input: CreateSaleInput) {
           atomizerId: r.atomizerId ?? null,
         })),
       },
-      certificates: certs.length
-        ? { create: certs.map((c) => ({ denomination: c.denomination, qty: c.qty })) }
-        : undefined,
     },
   });
 
@@ -316,17 +299,16 @@ export async function createOfflineSale(input: CreateSaleInput) {
       });
     }
     const days = await getSetting("loyalty_days", 180);
-    // Кешбек только с товаров (не с сертификатов). Процент берётся по каждому
-    // товару отдельно — включая повышенный кешбек акции, как обещает витрина.
+    // Процент берётся по каждому товару отдельно — включая повышенный кешбек
+    // акции, как обещает витрина.
     const rates = await getCashbackRates(resolved.map((r) => r.productId));
-    // Списанные баллы уменьшают базу начисления — распределяем пропорционально.
-    const base = Math.max(0, netTotal - loyaltySpent);
-    const ratio = netTotal > 0 ? base / netTotal : 0;
+    // Кешбек считается со всей суммы покупки и не зависит от способа оплаты:
+    // оплата баллами даёт такой же кешбек, как наличные или карта.
     earned =
       Math.round(
         priced.lineNet.reduce((sum, lineNet, i) => {
           const pct = rates[resolved[i].productId] ?? 0;
-          return sum + lineNet * ratio * (pct / 100);
+          return sum + lineNet * (pct / 100);
         }, 0) * 100,
       ) / 100;
     if (earned > 0) {
@@ -376,11 +358,8 @@ export async function createOfflineSale(input: CreateSaleInput) {
           ).toFixed(2)} BYN`,
       )
       .join("\n");
-    const certLines = certs
-      .map((c) => `• 🎁 Сертификат ${c.denomination.toFixed(0)} BYN ×${c.qty}`)
-      .join("\n");
-    const allLines = [lines, certLines].filter(Boolean).join("\n");
-    const grossAll = Math.round((total + certGross) * 100) / 100;
+    const allLines = lines;
+    const grossAll = total;
     const customerLine = customerId
       ? `${input.name?.trim() || "Покупатель"}${input.phone ? ` (${normalizePhone(input.phone)})` : ""}`
       : "без клиента";

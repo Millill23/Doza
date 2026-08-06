@@ -2,11 +2,14 @@ import { prisma } from "@doza/db";
 import { formatByn, formatPhone } from "@doza/shared";
 import { loyaltyStats } from "@/lib/analytics-data";
 import { requireRole } from "@/lib/session";
+import GrantPoints from "@/components/GrantPoints";
 
 export const dynamic = "force-dynamic";
 
 export default async function LoyaltyPage() {
-  await requireRole(["admin", "marketer"]);
+  const session = await requireRole(["admin", "marketer"]);
+  // Начислять баллы вручную может только админ.
+  const isAdmin = session.user.role === "admin";
   const now = new Date();
   const soon = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
@@ -24,6 +27,12 @@ export default async function LoyaltyPage() {
     <div>
       <h1 className="mb-1 font-serif text-3xl text-ivory">Лояльность</h1>
       <p className="mb-6 text-sm text-ivory-faint">Статистика баллов за 30 дней</p>
+
+      {isAdmin && (
+        <div className="mb-8 max-w-3xl">
+          <GrantPoints />
+        </div>
+      )}
 
       <div className="mb-8 grid gap-4 sm:grid-cols-3">
         <div className="rounded-2xl border border-ink-600/60 bg-ink-700 p-6">

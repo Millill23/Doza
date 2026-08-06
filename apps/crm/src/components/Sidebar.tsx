@@ -11,6 +11,7 @@ const NAV: { href: string; label: string; roles: Role[] }[] = [
   { href: "/orders", label: "Заказы", roles: ["admin", "seller"] },
   { href: "/cash", label: "Оффлайн-касса", roles: ["admin", "seller"] },
   { href: "/preorders", label: "Предзаказы", roles: ["admin", "seller"] },
+  { href: "/certificates", label: "Сертификаты", roles: ["admin", "seller"] },
   { href: "/products", label: "Товары", roles: ["admin"] },
   { href: "/promos", label: "Акции", roles: ["admin"] },
   { href: "/super-promos", label: "Супер акции", roles: ["admin"] },
