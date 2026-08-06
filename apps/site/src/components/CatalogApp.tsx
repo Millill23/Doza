@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Fuse from "fuse.js";
 import type { ProductCard, Gender } from "../lib/types";
 import { GENDER_LABELS } from "../lib/types";
@@ -36,6 +36,27 @@ export default function CatalogApp({
   const [selectedBrands, setSelectedBrands] = useState<string[]>(initialBrands);
   const [onlyBoosted, setOnlyBoosted] = useState(initialBoosted);
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Кнопка «наверх»: появляется, когда витрина ушла под шапку
+  const gridTopRef = useRef<HTMLDivElement | null>(null);
+  const [showToTop, setShowToTop] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const top = gridTopRef.current?.getBoundingClientRect().top ?? 0;
+      // 200px запаса — чтобы кнопка не мигала у самой границы
+      setShowToTop(top < -200);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  function scrollToGridTop() {
+    // Отступ под липкие шапку и панель фильтров задан у якоря через
+    // scroll-mt-* — браузер сам учтёт его при прокрутке.
+    gridTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   // Синхронизация фильтров в URL — чтобы «назад» возвращал к отфильтрованному каталогу
   useEffect(() => {
@@ -266,8 +287,11 @@ export default function CatalogApp({
 
   return (
     <div className="grid gap-8 lg:grid-cols-[260px_1fr]">
-      {/* ── Десктоп: сайдбар ── */}
-      <aside className="hidden space-y-8 lg:sticky lg:top-24 lg:block lg:self-start">
+      {/* ── Десктоп: сайдбар ──
+          Собственная прокрутка: колёсико над фильтром листает фильтр, над
+          витриной — страницу. overscroll-contain не даёт прокрутке
+          «перескочить» на страницу, когда список брендов закончился. */}
+      <aside className="hidden space-y-8 lg:sticky lg:top-24 lg:block lg:max-h-[calc(100vh-8rem)] lg:self-start lg:overflow-y-auto lg:overscroll-contain lg:pr-3">
         <div>
           <h3 className="mb-2 text-xs font-medium uppercase tracking-luxe text-gold-500">
             Поиск
@@ -279,8 +303,11 @@ export default function CatalogApp({
 
       {/* ── Контент ── */}
       <div>
-        {/* Мобильная панель: поиск + кнопка «Фильтры» */}
-        <div className="mb-4 lg:hidden">
+        {/* Мобильная панель: поиск + кнопка «Фильтры».
+            Липнет под шапкой (top-16 = высота header), чтобы фильтр оставался
+            под рукой при прокрутке витрины. Отрицательные отступы + padding —
+            чтобы фон перекрывал карточки на всю ширину контейнера. */}
+        <div className="sticky top-16 z-20 -mx-4 mb-4 border-b border-ink-600/40 bg-ink-900/95 px-4 py-3 backdrop-blur-md lg:hidden">
           <div className="flex gap-2">
             <div className="flex-1">{searchField}</div>
             <button
@@ -302,6 +329,10 @@ export default function CatalogApp({
           </div>
         </div>
 
+        {/* Якорь начала витрины — сюда возвращает кнопка «наверх».
+            scroll-mt-* — запас под липкие шапку и панель фильтров. */}
+        <div ref={gridTopRef} className="scroll-mt-[9.5rem] lg:scroll-mt-24" />
+
         <p className="mb-5 text-sm font-light text-ivory-faint">
           Найдено: {filtered.length}
         </p>
@@ -316,6 +347,33 @@ export default function CatalogApp({
           </div>
         )}
       </div>
+
+      {/* ── Кнопка «наверх» ── */}
+      <button
+        type="button"
+        onClick={scrollToGridTop}
+        aria-label="Наверх"
+        className={`fixed bottom-6 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full border border-gold-500/60 bg-ink-800/90 text-gold-400 shadow-gold backdrop-blur-md transition-all duration-300 hover:border-gold-400 hover:text-gold-300 sm:bottom-8 sm:right-8 ${
+          showToTop
+            ? "translate-y-0 opacity-100"
+            : "pointer-events-none translate-y-3 opacity-0"
+        }`}
+      >
+        <svg
+          width="22"
+          height="22"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <line x1="12" y1="19" x2="12" y2="5" />
+          <polyline points="5 12 12 5 19 12" />
+        </svg>
+      </button>
 
       {/* ── Мобильный drawer фильтров ── */}
       {drawerOpen && (
