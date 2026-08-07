@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { prisma } from "@doza/db";
 import { verifySmsCode } from "@doza/db/sms-codes";
 import { normalizePhone } from "@doza/shared";
+import { assertCustomerName } from "@doza/shared/customer-name";
 import { hashPassword, setSession } from "../../../../lib/customer-auth";
 
 export const prerender = false;
@@ -9,9 +10,16 @@ export const prerender = false;
 export const POST: APIRoute = async ({ request, cookies }) => {
   const body = await request.json().catch(() => ({}));
   const phone = normalizePhone(body.phone ?? "");
-  const name = (body.name ?? "").trim();
   const password = String(body.password ?? "");
   const code = String(body.code ?? "");
+
+  // Имя уходит в SMS и Telegram, поэтому проверяем состав символов.
+  let name: string;
+  try {
+    name = assertCustomerName(body.name ?? "");
+  } catch (e) {
+    return json({ ok: false, error: (e as Error).message }, 400);
+  }
 
   if (password.length < 6)
     return json({ ok: false, error: "Пароль минимум 6 символов" }, 400);

@@ -3,7 +3,8 @@ import { prisma } from "@doza/db";
 import { getBalance, spendPoints } from "@doza/db/loyalty";
 import { pickActivePromo, getGlobalPromo, mergePromos } from "@doza/db/promos";
 import { normalizePhone, formatByn } from "@doza/shared";
-import { notifyTelegram } from "../../lib/telegram";
+import { assertCustomerName } from "@doza/shared/customer-name";
+import { notifyTelegram, tgEscape } from "../../lib/telegram";
 
 export const prerender = false;
 
@@ -38,12 +39,17 @@ export const POST: APIRoute = async ({ request }) => {
     return bad("Некорректный запрос");
   }
 
-  const name = (body.name ?? "").trim();
   const phone = normalizePhone(body.phone ?? "");
   const deliveryType = body.deliveryType;
   const items = Array.isArray(body.items) ? body.items : [];
 
-  if (name.length < 2) return bad("Укажите имя");
+  // Имя уходит в SMS и Telegram, поэтому проверяем состав символов.
+  let name: string;
+  try {
+    name = assertCustomerName(body.name ?? "");
+  } catch (e) {
+    return bad((e as Error).message);
+  }
   if (phone.length < 9) return bad("Укажите корректный номер телефона");
   if (deliveryType !== "pickup" && deliveryType !== "post")
     return bad("Выберите способ получения");
@@ -177,18 +183,20 @@ export const POST: APIRoute = async ({ request }) => {
   const lines = [
     `🆕 <b>Новый заказ #${order.id}</b>`,
     ``,
-    `👤 ${name}`,
+    // Всё, что ввёл покупатель, экранируем: символ «<» ломает parse_mode=HTML
+    // и Telegram отклоняет сообщение целиком.
+    `👤 ${tgEscape(name)}`,
     `📞 +${phone}`,
     `🚚 ${deliveryType === "pickup" ? "Самовывоз" : "Доставка почтой"}`,
-    deliveryType === "post" && body.address ? `📍 ${body.address}` : "",
+    deliveryType === "post" && body.address ? `📍 ${tgEscape(body.address)}` : "",
     ``,
     `<b>Состав:</b>`,
-    ...orderItems.map((i) => `• ${i.label} — ${formatByn(i.priceByn * i.qty)}`),
+    ...orderItems.map((i) => `• ${tgEscape(i.label)} — ${formatByn(i.priceByn * i.qty)}`),
     ``,
     `Сумма: <b>${formatByn(total)}</b>`,
     loyaltySpent > 0 ? `Списано баллов: ${formatByn(loyaltySpent)}` : "",
     `К оплате при получении: <b>${formatByn(toPay)}</b>`,
-    body.comment ? `\n💬 ${body.comment}` : "",
+    body.comment ? `\n💬 ${tgEscape(body.comment)}` : "",
   ].filter(Boolean);
 
   await notifyTelegram(lines.join("\n"));

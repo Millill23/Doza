@@ -5,6 +5,7 @@ import { getBalance } from "@doza/db/loyalty";
 import { formatByn, formatPhone } from "@doza/shared";
 import CustomerDates from "@/components/CustomerDates";
 import VipManager from "@/components/VipManager";
+import CustomerEdit from "@/components/CustomerEdit";
 import { getSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -81,6 +82,16 @@ export default async function CustomerDetailPage({
           </span>
         )}
       </div>
+
+      {isAdmin && (
+        <div className="mb-6">
+          <CustomerEdit
+            customerId={customer.id}
+            name={customer.name}
+            phone={customer.phone}
+          />
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <div className="space-y-6">

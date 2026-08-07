@@ -6,7 +6,7 @@ import { normalizePhone } from "@doza/shared";
 import { sendSms } from "@doza/shared/sms";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/session";
-import { notifyTelegram } from "@/lib/telegram";
+import { notifyTelegram, tgEscape } from "@/lib/telegram";
 
 async function getSetting(key: string, fallback: number): Promise<number> {
   const s = await prisma.setting.findUnique({ where: { key } });
@@ -86,11 +86,11 @@ export async function grantPoints(input: {
   try {
     await notifyTelegram(
       `🎯 <b>Начислены баллы вручную</b>\n` +
-        `Клиент: ${customer.name} (${phone})${customer.vipCardNumber ? " ⭐VIP" : ""}\n` +
+        `Клиент: ${tgEscape(customer.name)} (${phone})${customer.vipCardNumber ? " ⭐VIP" : ""}\n` +
         `Начислено: <b>${fmt(amount)}</b> баллов\n` +
-        `Причина: ${reason}\n` +
+        `Причина: ${tgEscape(reason)}\n` +
         `Баланс: ${fmt(balance)}\n` +
-        `Начислил: ${session.user.name ?? session.user.id}`,
+        `Начислил: ${tgEscape(session.user.name ?? session.user.id)}`,
     );
   } catch (e) {
     console.error("[loyalty] TG о начислении не отправлено:", e);

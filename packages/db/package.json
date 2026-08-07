@@ -24,6 +24,7 @@
     "./promos": "./src/promos.ts",
     "./pricing": "./src/pricing.ts",
     "./certificates": "./src/certificates.ts",
-    "./certificate-rules": "./src/certificate-rules.ts"
+    "./certificate-rules": "./src/certificate-rules.ts",
+    "./sales-split": "./src/sales-split.ts"
   }
 }

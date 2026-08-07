@@ -39,6 +39,9 @@ model CrmUser {
   preorders    Preorder[]
   certificatesIssued    GiftCertificate[] @relation("CertificateIssuedBy")
   certificatesActivated GiftCertificate[] @relation("CertificateActivatedBy")
+  salesSplitsAsSource   SalesSplit[]      @relation("SalesSplitSource")
+  salesSplitsCreated    SalesSplit[]      @relation("SalesSplitCreatedBy")
+  salesSplitShares      SalesSplitShare[]
 
   @@map("crm_users")
 }
@@ -233,6 +236,41 @@ model Customer {
   certificatesActivated GiftCertificate[] @relation("CertificateActivatedFor")
 
   @@map("customers")
+}
+
+/// Разделение выручки одного дня между продавцами.
+///
+/// Нужно, когда на смене работали двое под одним аккаунтом: чеки записаны на
+/// один `sourceSeller`, а по-честному выручку надо разнести. Влияет только на
+/// трекер продаж продавцов — сами чеки, остатки и баллы не трогаются.
+model SalesSplit {
+  id             Int               @id @default(autoincrement())
+  /// День, за который делится выручка.
+  date           DateTime          @db.Date
+  /// Аккаунт, под которым оформлялись продажи в этот день.
+  sourceSellerId Int               @map("source_seller_id")
+  sourceSeller   CrmUser           @relation("SalesSplitSource", fields: [sourceSellerId], references: [id])
+  createdById    Int               @map("created_by_id")
+  createdBy      CrmUser           @relation("SalesSplitCreatedBy", fields: [createdById], references: [id])
+  createdAt      DateTime          @default(now()) @map("created_at")
+  shares         SalesSplitShare[]
+
+  /// На день+аккаунт может быть только одно разделение.
+  @@unique([date, sourceSellerId])
+  @@map("sales_splits")
+}
+
+model SalesSplitShare {
+  id       Int        @id @default(autoincrement())
+  splitId  Int        @map("split_id")
+  split    SalesSplit @relation(fields: [splitId], references: [id], onDelete: Cascade)
+  sellerId Int        @map("seller_id")
+  seller   CrmUser    @relation(fields: [sellerId], references: [id])
+  /// Доля продавца в процентах. Сумма долей одного разделения = 100.
+  percent  Decimal    @db.Decimal(5, 2)
+
+  @@unique([splitId, sellerId])
+  @@map("sales_split_shares")
 }
 
 enum GiftCertificateStatus {

@@ -3,7 +3,7 @@
 import { prisma } from "@doza/db";
 import { normalizePhone } from "@doza/shared";
 import { requireRole } from "@/lib/session";
-import { notifyTelegram } from "@/lib/telegram";
+import { notifyTelegram, tgEscape } from "@/lib/telegram";
 import { revalidatePath } from "next/cache";
 
 interface CreatePreorderInput {
@@ -39,10 +39,10 @@ export async function createPreorder(input: CreatePreorderInput) {
     });
     await notifyTelegram(
       `📦 <b>Новый предзаказ #${preorder.id}</b>\n` +
-        `Клиент: ${customerName} (${phone})\n` +
-        `Хочет: ${wish}` +
-        (note ? `\nКомментарий: ${note}` : "") +
-        `\nПродавец: ${seller?.name ?? sellerId}`,
+        `Клиент: ${tgEscape(customerName)} (${phone})\n` +
+        `Хочет: ${tgEscape(wish)}` +
+        (note ? `\nКомментарий: ${tgEscape(note)}` : "") +
+        `\nПродавец: ${tgEscape(seller?.name ?? sellerId)}`,
     );
   } catch (e) {
     console.error("[preorder] telegram notify failed:", e);

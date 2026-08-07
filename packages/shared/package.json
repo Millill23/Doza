@@ -5,6 +5,8 @@
     ".": "./src/index.ts",
     "./uploads": "./src/uploads.ts",
     "./sms": "./src/sms.ts",
-    "./indexnow": "./src/indexnow.ts"
+    "./indexnow": "./src/indexnow.ts",
+    "./telegram": "./src/telegram.ts",
+    "./customer-name": "./src/customer-name.ts"
   }
 }

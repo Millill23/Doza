@@ -11,10 +11,11 @@ import {
 import { priceCart } from "@doza/db/pricing";
 import { createSmsCode, verifySmsCode } from "@doza/db/sms-codes";
 import { normalizePhone } from "@doza/shared";
+import { assertCustomerName } from "@doza/shared/customer-name";
 import { sendSms } from "@doza/shared/sms";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/session";
-import { notifyTelegram } from "@/lib/telegram";
+import { notifyTelegram, tgEscape } from "@/lib/telegram";
 
 /** Отправить покупателю SMS-код для подтверждения списания баллов. */
 export async function requestLoyaltySpendOtp(phoneRaw: string, amount: number) {
@@ -156,10 +157,13 @@ export async function createOfflineSale(input: CreateSaleInput) {
   if (input.phone) {
     const phone = normalizePhone(input.phone);
     if (phone.length >= 9) {
+      // Имя необязательно, но если введено — проверяем: оно уходит в SMS и TG.
+      const typedName = (input.name ?? "").trim();
+      const safeName = typedName ? assertCustomerName(typedName) : "";
       const customer = await prisma.customer.upsert({
         where: { phone },
-        update: input.name ? { name: input.name } : {},
-        create: { phone, name: input.name?.trim() || "Покупатель" },
+        update: safeName ? { name: safeName } : {},
+        create: { phone, name: safeName || "Покупатель" },
       });
       customerId = customer.id;
       vipCard = customer.vipCardNumber;
@@ -343,7 +347,11 @@ export async function createOfflineSale(input: CreateSaleInput) {
       where: { id: { in: resolved.map((r) => r.productId) } },
       select: { id: true, name: true, brand: { select: { name: true } } },
     });
-    const nameMap = new Map(prods.map((p) => [p.id, `${p.brand.name} ${p.name}`]));
+    // Всё, что пришло от людей (названия, имена), экранируем — иначе символ
+    // «<» в данных ломает разметку и Telegram отклоняет сообщение целиком.
+    const nameMap = new Map(
+      prods.map((p) => [p.id, tgEscape(`${p.brand.name} ${p.name}`)]),
+    );
     const [seller, actor] = await Promise.all([
       prisma.crmUser.findUnique({ where: { id: sellerId }, select: { name: true } }),
       createdById
@@ -361,13 +369,13 @@ export async function createOfflineSale(input: CreateSaleInput) {
     const allLines = lines;
     const grossAll = total;
     const customerLine = customerId
-      ? `${input.name?.trim() || "Покупатель"}${input.phone ? ` (${normalizePhone(input.phone)})` : ""}`
+      ? `${tgEscape(input.name?.trim() || "Покупатель")}${input.phone ? ` (${normalizePhone(input.phone)})` : ""}`
       : "без клиента";
     await notifyTelegram(
       `🧾 <b>Оффлайн-продажа #${sale.id}</b>\n` +
-        `Продавец: ${seller?.name ?? sellerId}` +
-        (actor ? ` (оформил ${actor.name})` : "") +
-        `\nКлиент: ${customerLine}${vipCard ? ` ⭐VIP №${vipCard}` : ""}\n${allLines}\n` +
+        `Продавец: ${tgEscape(seller?.name ?? sellerId)}` +
+        (actor ? ` (оформил ${tgEscape(actor.name)})` : "") +
+        `\nКлиент: ${customerLine}${vipCard ? ` ⭐VIP №${tgEscape(vipCard)}` : ""}\n${allLines}\n` +
         (totalDiscount > 0
           ? `Сумма: ${grossAll.toFixed(2)} BYN\nСкидка: −${totalDiscount.toFixed(2)}${DISCOUNT_LABEL[priced.kind] ? ` (${DISCOUNT_LABEL[priced.kind]})` : ""}\n`
           : "") +

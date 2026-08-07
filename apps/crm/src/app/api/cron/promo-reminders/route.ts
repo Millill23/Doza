@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@doza/db";
-import { notifyTelegram } from "@/lib/telegram";
+import { notifyTelegram, tgEscape } from "@/lib/telegram";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     if (p.cashbackPercent) parts.push(`кешбек ${Number(p.cashbackPercent)}%`);
     await notifyTelegram(
       `⏰ <b>Акция заканчивается завтра</b>\n` +
-        `${p.product ? `${p.product.brand.name} ${p.product.name}` : "Все товары"}\n` +
+        `${p.product ? tgEscape(`${p.product.brand.name} ${p.product.name}`) : "Все товары"}\n` +
         `${parts.join(" · ")}\n` +
         `Окончание: ${p.endsAt?.toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}`,
     );

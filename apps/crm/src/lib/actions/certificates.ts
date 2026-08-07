@@ -8,10 +8,11 @@ import {
   CERTIFICATE_DENOMINATIONS,
 } from "@doza/db/certificates";
 import { normalizePhone } from "@doza/shared";
+import { assertCustomerName } from "@doza/shared/customer-name";
 import { sendSms } from "@doza/shared/sms";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/session";
-import { notifyTelegram } from "@/lib/telegram";
+import { notifyTelegram, tgEscape } from "@/lib/telegram";
 
 async function getSetting(key: string, fallback: number): Promise<number> {
   const s = await prisma.setting.findUnique({ where: { key } });
@@ -116,7 +117,7 @@ export async function issueCertificate(input: {
         (paid !== nominal
           ? `Оплачено: ${fmt(paid)} BYN (VIP −${vipPercent}%)\n`
           : `Оплачено: ${fmt(paid)} BYN\n`) +
-        `Продавец: ${seller?.name ?? issuedById}`,
+        `Продавец: ${tgEscape(seller?.name ?? issuedById)}`,
     );
   } catch (e) {
     console.error("[certificates] TG о выпуске не отправлено:", e);
@@ -138,7 +139,9 @@ export async function activateCertificateInCrm(input: {
   const phone = normalizePhone(input.phone ?? "");
   if (phone.length < 9) throw new Error("Укажите корректный телефон клиента");
 
-  const name = (input.name ?? "").trim();
+  // Имя необязательно, но если введено — проверяем: оно уходит в SMS и TG.
+  const typed = (input.name ?? "").trim();
+  const name = typed ? assertCustomerName(typed) : "";
   // Клиента заводим до активации: сертификат должен начислиться на кого-то.
   const customer = await prisma.customer.upsert({
     where: { phone },
@@ -178,12 +181,12 @@ export async function activateCertificateInCrm(input: {
     await notifyTelegram(
       `✅ <b>Сертификат активирован</b>\n` +
         `Код: <code>${result.code}</code> · номинал ${fmt(result.denomination)} BYN\n` +
-        `Клиент: ${result.customerName} (${result.customerPhone})${result.isVip ? " ⭐VIP" : ""}\n` +
+        `Клиент: ${tgEscape(result.customerName)} (${result.customerPhone})${result.isVip ? " ⭐VIP" : ""}\n` +
         `Начислено: <b>${fmt(result.awarded)}</b> баллов` +
         (result.isVip && result.awarded !== result.denomination
           ? " (по цене покупки — VIP)"
           : "") +
-        `\nПродавец: ${seller?.name ?? activatedById}`,
+        `\nПродавец: ${tgEscape(seller?.name ?? activatedById)}`,
     );
   } catch (e) {
     console.error("[certificates] TG об активации не отправлено:", e);

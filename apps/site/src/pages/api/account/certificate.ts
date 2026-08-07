@@ -3,7 +3,7 @@ import { prisma } from "@doza/db";
 import { activateCertificate, CertificateError } from "@doza/db/certificates";
 import { sendSms } from "@doza/shared/sms";
 import { getCustomerId } from "../../../lib/customer-auth";
-import { notifyTelegram } from "../../../lib/telegram";
+import { notifyTelegram, tgEscape } from "../../../lib/telegram";
 
 export const prerender = false;
 
@@ -64,7 +64,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     await notifyTelegram(
       `✅ <b>Сертификат активирован</b> (личный кабинет)\n` +
         `Код: <code>${result.code}</code> · номинал ${fmt(result.denomination)} BYN\n` +
-        `Клиент: ${result.customerName} (${result.customerPhone})${result.isVip ? " ⭐VIP" : ""}\n` +
+        `Клиент: ${tgEscape(result.customerName)} (${result.customerPhone})${result.isVip ? " ⭐VIP" : ""}\n` +
         `Начислено: <b>${fmt(result.awarded)}</b> баллов` +
         (result.isVip && result.awarded !== result.denomination
           ? " (по цене покупки — VIP)"

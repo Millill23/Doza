@@ -1,6 +1,32 @@
 import { prisma } from "@doza/db";
+import { applySalesSplits, type SplitRule } from "@doza/db/sales-split";
 
 const SOLD_REASONS = ["order_closed", "offline_sale"];
+
+/** Календарный день продажи (YYYY-MM-DD) — по нему заданы разделения выручки. */
+function dayKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Правила разделения выручки начиная с даты. */
+async function splitRules(since: Date): Promise<SplitRule[]> {
+  const splits = await prisma.salesSplit.findMany({
+    where: { date: { gte: since } },
+    include: { shares: { select: { sellerId: true, percent: true } } },
+  });
+  return splits.map((s) => ({
+    // date хранится как DATE (без времени) — берём календарный день как есть
+    day: s.date.toISOString().slice(0, 10),
+    sourceSellerId: s.sourceSellerId,
+    shares: s.shares.map((x) => ({
+      sellerId: x.sellerId,
+      percent: Number(x.percent),
+    })),
+  }));
+}
 
 /** Топ товаров по проданным мл (из журнала остатков). */
 export async function topByMl(limit = 10) {
@@ -149,39 +175,51 @@ function monthStart(d = new Date()) {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 
+/**
+ * Продажи всех продавцов за текущий месяц с учётом разделения выручки.
+ * Если на день задано разделение, сумма аккаунта расходится по долям.
+ */
+async function monthTotalsBySeller() {
+  const since = monthStart();
+  const [sales, rules] = await Promise.all([
+    prisma.offlineSale.findMany({
+      where: { status: "closed", createdAt: { gte: since } },
+      select: { sellerId: true, createdAt: true, totalByn: true },
+    }),
+    splitRules(since),
+  ]);
+
+  return applySalesSplits(
+    sales.map((s) => ({
+      sellerId: s.sellerId,
+      day: dayKey(s.createdAt),
+      totalByn: Number(s.totalByn),
+    })),
+    rules,
+  );
+}
+
 /** Продажи продавца за текущий месяц (сумма + количество закрытых оффлайн-продаж). */
 export async function myMonthSales(sellerId: number) {
-  const sales = await prisma.offlineSale.findMany({
-    where: { sellerId, status: "closed", createdAt: { gte: monthStart() } },
-    select: { totalByn: true },
-  });
-  return {
-    sum: sales.reduce((s, x) => s + Number(x.totalByn), 0),
-    count: sales.length,
-  };
+  const totals = await monthTotalsBySeller();
+  const mine = totals.find((t) => t.sellerId === sellerId);
+  return { sum: mine?.sum ?? 0, count: mine?.count ?? 0 };
 }
 
 /** Продажи всех продавцов за текущий месяц (для админа). */
 export async function monthSalesBySeller() {
-  const grouped = await prisma.offlineSale.groupBy({
-    by: ["sellerId"],
-    where: { status: "closed", createdAt: { gte: monthStart() } },
-    _sum: { totalByn: true },
-    _count: true,
-  });
+  const totals = await monthTotalsBySeller();
   const users = await prisma.crmUser.findMany({
-    where: { id: { in: grouped.map((g) => g.sellerId) } },
+    where: { id: { in: totals.map((t) => t.sellerId) } },
     select: { id: true, name: true },
   });
   const umap = new Map(users.map((u) => [u.id, u.name]));
-  return grouped
-    .map((g) => ({
-      sellerId: g.sellerId,
-      name: umap.get(g.sellerId) ?? `#${g.sellerId}`,
-      sum: Number(g._sum.totalByn ?? 0),
-      count: g._count,
-    }))
-    .sort((a, b) => b.sum - a.sum);
+  return totals.map((t) => ({
+    sellerId: t.sellerId,
+    name: umap.get(t.sellerId) ?? `#${t.sellerId}`,
+    sum: t.sum,
+    count: t.count,
+  }));
 }
 
 /** Статистика баллов за период: начислено / списано / сгорело. */

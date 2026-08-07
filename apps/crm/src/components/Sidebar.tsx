@@ -18,6 +18,7 @@ const NAV: { href: string; label: string; roles: Role[] }[] = [
   { href: "/customers", label: "Клиенты", roles: ["admin", "seller", "marketer"] },
   { href: "/loyalty", label: "Лояльность", roles: ["admin", "marketer"] },
   { href: "/analytics", label: "Аналитика", roles: ["admin", "marketer"] },
+  { href: "/sales-splits", label: "Разделение выручки", roles: ["admin"] },
   { href: "/settings", label: "Настройки", roles: ["admin"] },
   { href: "/users", label: "Пользователи", roles: ["admin"] },
 ];

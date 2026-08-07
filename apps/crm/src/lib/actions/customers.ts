@@ -3,6 +3,7 @@
 import { prisma } from "@doza/db";
 import { createSmsCode, verifySmsCode } from "@doza/db/sms-codes";
 import { normalizePhone } from "@doza/shared";
+import { assertCustomerName } from "@doza/shared/customer-name";
 import { sendSms } from "@doza/shared/sms";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/session";
@@ -35,8 +36,7 @@ export interface OfflineRegInput {
 export async function registerCustomerOffline(input: OfflineRegInput) {
   await requireRole(["admin", "seller", "marketer"]);
   const phone = normalizePhone(input.phone);
-  const name = (input.name ?? "").trim();
-  if (name.length < 2) throw new Error("Укажите имя");
+  const name = assertCustomerName(input.name ?? "");
 
   const otp = await verifySmsCode(phone, "offline_register", input.otp ?? "");
   if (!otp.ok) throw new Error(otp.error ?? "Неверный код подтверждения");
@@ -82,8 +82,7 @@ export async function registerVip(
   await requireRole(["admin"]);
   const phone = normalizePhone(phoneRaw);
   if (phone.length < 9) throw new Error("Некорректный телефон");
-  const name = (nameRaw ?? "").trim();
-  if (name.length < 2) throw new Error("Укажите имя");
+  const name = assertCustomerName(nameRaw ?? "");
   const card = (cardRaw ?? "").trim();
   if (!card) throw new Error("Укажите номер карты");
 
@@ -151,6 +150,40 @@ export async function attachVipCard(customerId: number, cardRaw: string) {
   if (before && !before.vipCardNumber)
     await sendVipWelcomeSms(before.phone, before.name);
   revalidatePath(`/customers/${customerId}`);
+}
+
+/**
+ * Изменить имя и/или телефон клиента. Только админ.
+ * Телефон — это идентификатор клиента (баллы, заказы, вход в кабинет),
+ * поэтому проверяем, что он не занят другим.
+ */
+export async function updateCustomer(
+  customerId: number,
+  input: { name: string; phone: string },
+) {
+  await requireRole(["admin"]);
+
+  const name = assertCustomerName(input.name ?? "");
+  const phone = normalizePhone(input.phone ?? "");
+  if (phone.length < 9) throw new Error("Укажите корректный телефон");
+
+  const taken = await prisma.customer.findUnique({
+    where: { phone },
+    select: { id: true, name: true },
+  });
+  if (taken && taken.id !== customerId)
+    throw new Error(
+      `Телефон уже привязан к другому клиенту (${taken.name}). Объединение клиентов не поддерживается.`,
+    );
+
+  await prisma.customer.update({
+    where: { id: customerId },
+    data: { name, phone },
+  });
+
+  revalidatePath(`/customers/${customerId}`);
+  revalidatePath("/customers");
+  return { ok: true, name, phone };
 }
 
 /** Снять VIP-карту с клиента. */
