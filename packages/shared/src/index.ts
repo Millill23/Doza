@@ -2,9 +2,14 @@ export function formatByn(amount: number | string): string {
   return `${Number(amount).toFixed(2)} BYN`;
 }
 
+/**
+ * Телефон в читаемом виде: +375 (29) 123-45-67.
+ * Белорусский номер — 12 цифр: 375 + двузначный код оператора + 7 цифр.
+ * Всё остальное возвращаем как есть.
+ */
 export function formatPhone(phone: string): string {
   const digits = phone.replace(/\D/g, "");
-  if (digits.length === 11 && digits.startsWith("375")) {
+  if (digits.length === 12 && digits.startsWith("375")) {
     return `+375 (${digits.slice(3, 5)}) ${digits.slice(5, 8)}-${digits.slice(8, 10)}-${digits.slice(10)}`;
   }
   return phone;

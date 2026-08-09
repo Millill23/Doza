@@ -1,7 +1,6 @@
 import { prisma } from "@doza/db";
 import { applySalesSplits, type SplitRule } from "@doza/db/sales-split";
 
-const SOLD_REASONS = ["order_closed", "offline_sale"];
 
 /** Календарный день продажи (YYYY-MM-DD) — по нему заданы разделения выручки. */
 function dayKey(d: Date): string {
@@ -41,15 +40,40 @@ function dateFilter(p: Period) {
   return { ...(p.from ? { gte: p.from } : {}), ...(p.to ? { lte: p.to } : {}) };
 }
 
-export async function topByMl(limit = 10, period: Period = {}) {
+/**
+ * Проданные мл по товарам за период.
+ *
+ * Считаем по позициям ЗАКРЫТЫХ заказов и продаж, а не по журналу остатков.
+ * Журнал для этого не годится: при отмене продажи компенсирующая запись имеет
+ * причину `offline_sale_cancel`, которая в выборку не попадала, — отменённый
+ * чек продолжал считаться проданным. А заказ, закрытый и затем возвращённый,
+ * вообще не откатывает остатки. В обоих случаях объём расходился с выручкой,
+ * которая берётся именно из позиций. Теперь у обеих метрик один источник.
+ */
+async function soldMlByProduct(period: Period): Promise<Map<number, number>> {
   const createdAt = dateFilter(period);
-  const grouped = await prisma.inventoryLog.groupBy({
-    by: ["productId"],
-    where: { reason: { in: SOLD_REASONS }, ...(createdAt ? { createdAt } : {}) },
-    _sum: { deltaMl: true },
-  });
-  const rows = grouped
-    .map((g) => ({ productId: g.productId, ml: -(g._sum.deltaMl ?? 0) }))
+  const [orderItems, saleItems] = await Promise.all([
+    prisma.orderItem.findMany({
+      where: { order: { status: "closed", ...(createdAt ? { createdAt } : {}) } },
+      select: { productId: true, volumeMl: true, qty: true },
+    }),
+    prisma.offlineSaleItem.findMany({
+      where: { sale: { status: "closed", ...(createdAt ? { createdAt } : {}) } },
+      select: { productId: true, volumeMl: true, qty: true },
+    }),
+  ]);
+
+  const ml = new Map<number, number>();
+  for (const i of [...orderItems, ...saleItems]) {
+    ml.set(i.productId, (ml.get(i.productId) ?? 0) + i.volumeMl * i.qty);
+  }
+  return ml;
+}
+
+export async function topByMl(limit = 10, period: Period = {}) {
+  const ml = await soldMlByProduct(period);
+  const rows = [...ml.entries()]
+    .map(([productId, value]) => ({ productId, ml: value }))
     .filter((r) => r.ml > 0)
     .sort((a, b) => b.ml - a.ml)
     .slice(0, limit);
@@ -74,22 +98,13 @@ export async function topByMl(limit = 10, period: Period = {}) {
  * скидку. Архивные не показываем: их и так сняли с витрины.
  */
 export async function bottomByMl(limit = 10, period: Period = {}) {
-  const createdAt = dateFilter(period);
-  const [products, grouped] = await Promise.all([
+  const [products, sold] = await Promise.all([
     prisma.product.findMany({
       where: { isArchived: false },
       select: { id: true, name: true, brand: { select: { name: true } } },
     }),
-    prisma.inventoryLog.groupBy({
-      by: ["productId"],
-      where: { reason: { in: SOLD_REASONS }, ...(createdAt ? { createdAt } : {}) },
-      _sum: { deltaMl: true },
-    }),
+    soldMlByProduct(period),
   ]);
-
-  const sold = new Map(
-    grouped.map((g) => [g.productId, Math.max(0, -(g._sum.deltaMl ?? 0))]),
-  );
 
   return products
     .map((p) => ({
