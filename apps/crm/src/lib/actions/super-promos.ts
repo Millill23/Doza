@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@doza/db";
+import { startOfDay, endOfDay, isDayString } from "@doza/shared/day-range";
 import { requireRole } from "@/lib/session";
 import { revalidatePath } from "next/cache";
 
@@ -34,8 +35,10 @@ export async function createSuperPromo(input: CreateSuperPromoInput) {
   if (!allProducts && productIds.length === 0)
     throw new Error("Выберите товары или отметьте «все товары»");
 
-  const startsAt = input.startsAt ? new Date(input.startsAt) : null;
-  const endsAt = input.endsAt ? new Date(input.endsAt) : null;
+  // Выбирается только дата: начало — с 00:00 указанного дня, окончание —
+  // до конца указанного дня включительно.
+  const startsAt = isDayString(input.startsAt) ? startOfDay(input.startsAt) : null;
+  const endsAt = isDayString(input.endsAt) ? endOfDay(input.endsAt) : null;
   if (startsAt && endsAt && endsAt < startsAt)
     throw new Error("Дата окончания раньше начала");
 

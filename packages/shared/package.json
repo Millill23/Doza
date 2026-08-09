@@ -7,6 +7,7 @@
     "./sms": "./src/sms.ts",
     "./indexnow": "./src/indexnow.ts",
     "./telegram": "./src/telegram.ts",
-    "./customer-name": "./src/customer-name.ts"
+    "./customer-name": "./src/customer-name.ts",
+    "./day-range": "./src/day-range.ts"
   }
 }

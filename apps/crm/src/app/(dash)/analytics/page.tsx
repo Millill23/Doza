@@ -1,8 +1,16 @@
 import Link from "next/link";
 import { prisma } from "@doza/db";
 import { formatByn, formatPhone } from "@doza/shared";
-import { topByMl, topByRevenue, topCustomers, upcomingDates } from "@/lib/analytics-data";
+import {
+  topByMl,
+  bottomByMl,
+  topByRevenue,
+  topCustomers,
+  upcomingDates,
+} from "@/lib/analytics-data";
+import { startOfDay, endOfDay, isDayString } from "@doza/shared/day-range";
 import { requireRole } from "@/lib/session";
+import PeriodPicker from "@/components/PeriodPicker";
 
 export const dynamic = "force-dynamic";
 
@@ -15,12 +23,26 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-export default async function AnalyticsPage() {
+export default async function AnalyticsPage({
+  searchParams,
+}: {
+  searchParams: { from?: string; to?: string };
+}) {
   await requireRole(["admin", "marketer"]);
-  const [byMl, byRev, customers, dates, lowStock] = await Promise.all([
-    topByMl(8),
-    topByRevenue(8),
-    topCustomers(8),
+
+  // Период задаётся днями; пустой = за всё время.
+  const fromDay = isDayString(searchParams.from) ? searchParams.from : "";
+  const toDay = isDayString(searchParams.to) ? searchParams.to : "";
+  const period = {
+    ...(fromDay ? { from: startOfDay(fromDay) } : {}),
+    ...(toDay ? { to: endOfDay(toDay) } : {}),
+  };
+
+  const [byMl, worstByMl, byRev, customers, dates, lowStock] = await Promise.all([
+    topByMl(8, period),
+    bottomByMl(8, period),
+    topByRevenue(8, period),
+    topCustomers(8, period),
     upcomingDates(7),
     prisma.inventory.findMany({
       where: { quantityMl: { lt: 50 } },
@@ -32,6 +54,8 @@ export default async function AnalyticsPage() {
   return (
     <div>
       <h1 className="mb-6 font-serif text-3xl text-ivory">Аналитика</h1>
+
+      <PeriodPicker from={fromDay} to={toDay} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card title="Топ по объёму продаж (мл)">
@@ -48,6 +72,31 @@ export default async function AnalyticsPage() {
                 </li>
               ))}
             </ul>
+          )}
+        </Card>
+
+        <Card title="Аутсайдеры — кандидаты на скидку">
+          {worstByMl.length === 0 ? (
+            <p className="text-sm text-ivory-faint">Нет данных.</p>
+          ) : (
+            <>
+              <p className="mb-3 text-xs text-ivory-faint">
+                Меньше всего продаж за период. Товары с нулём не продавались ни
+                разу — на них и стоит делать упор.
+              </p>
+              <ul className="space-y-2">
+                {worstByMl.map((r, i) => (
+                  <li key={i} className="flex justify-between text-sm">
+                    <span className="text-ivory">
+                      <span className="text-ivory-faint">{r.brand}</span> {r.name}
+                    </span>
+                    <span className={r.ml === 0 ? "text-red-300" : "text-ivory-muted"}>
+                      {r.ml} мл
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </Card>
 

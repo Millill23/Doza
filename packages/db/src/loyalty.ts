@@ -119,6 +119,7 @@ export async function spendPoints(
   customerId: number,
   amountByn: number,
   ref: { type: string; id: number },
+  opts?: { reason?: string },
 ): Promise<number> {
   if (amountByn <= 0) return 0;
 
@@ -153,6 +154,7 @@ export async function spendPoints(
           opType: "spent",
           refType: ref.type,
           refId: ref.id,
+          reason: opts?.reason ?? null,
         },
       });
 

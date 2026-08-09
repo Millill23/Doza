@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@doza/db";
-import { earnPoints, getBalance } from "@doza/db/loyalty";
+import { earnPoints, getBalance, spendPoints } from "@doza/db/loyalty";
 import { normalizePhone } from "@doza/shared";
 import { sendSms } from "@doza/shared/sms";
 import { revalidatePath } from "next/cache";
@@ -100,4 +100,68 @@ export async function grantPoints(input: {
   revalidatePath(`/customers/${customer.id}`);
 
   return { customerId: customer.id, name: customer.name, amount, balance };
+}
+
+/**
+ * Списать баллы у клиента вручную. Только админ.
+ *
+ * Списание идёт по тем же правилам, что и оплата баллами (FIFO — сначала
+ * сгорающие партии), поэтому баланс остаётся консистентным. Причина
+ * обязательна: операция уменьшает деньги клиента и должна быть объяснима.
+ * SMS клиенту НЕ отправляется — это корректирующее действие магазина; в
+ * Telegram уходит запись для аудита.
+ */
+export async function deductPoints(input: {
+  phone: string;
+  amount: number;
+  reason: string;
+}) {
+  const session = await requireRole(["admin"]);
+
+  const phone = normalizePhone(input.phone ?? "");
+  if (phone.length < 9) throw new Error("Укажите корректный телефон клиента");
+
+  const amount = Math.round(Number(input.amount) * 100) / 100;
+  if (!Number.isFinite(amount) || amount <= 0)
+    throw new Error("Количество баллов должно быть больше нуля");
+
+  const reason = (input.reason ?? "").trim();
+  if (reason.length < 3) throw new Error("Укажите причину списания");
+
+  const customer = await prisma.customer.findUnique({ where: { phone } });
+  if (!customer) throw new Error("Клиент с таким телефоном не найден");
+
+  const before = await getBalance(customer.id);
+  if (before <= 0) throw new Error("У клиента нет баллов");
+  if (amount > before)
+    throw new Error(
+      `Нельзя списать больше, чем есть на балансе (${fmt(before)})`,
+    );
+
+  const spent = await spendPoints(
+    customer.id,
+    amount,
+    { type: "manual", id: Number(session.user.id) },
+    { reason },
+  );
+
+  const balance = await getBalance(customer.id);
+
+  try {
+    await notifyTelegram(
+      `➖ <b>Списаны баллы вручную</b>\n` +
+        `Клиент: ${tgEscape(customer.name)} (${phone})${customer.vipCardNumber ? " ⭐VIP" : ""}\n` +
+        `Списано: <b>${fmt(spent)}</b> баллов\n` +
+        `Причина: ${tgEscape(reason)}\n` +
+        `Баланс: ${fmt(balance)}\n` +
+        `Списал: ${tgEscape(session.user.name ?? session.user.id)}`,
+    );
+  } catch (e) {
+    console.error("[loyalty] TG о списании не отправлено:", e);
+  }
+
+  revalidatePath("/loyalty");
+  revalidatePath(`/customers/${customer.id}`);
+
+  return { customerId: customer.id, name: customer.name, amount: spent, balance };
 }

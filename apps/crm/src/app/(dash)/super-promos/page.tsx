@@ -7,11 +7,11 @@ export const dynamic = "force-dynamic";
 
 function fmt(d: Date | null): string {
   if (!d) return "—";
-  return d.toLocaleString("ru-RU", {
+  // Акции задаются по дням, часы не показываем.
+  return d.toLocaleDateString("ru-RU", {
     day: "2-digit",
     month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
+    year: "2-digit",
   });
 }
 

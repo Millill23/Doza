@@ -29,10 +29,23 @@ async function splitRules(since: Date): Promise<SplitRule[]> {
 }
 
 /** Топ товаров по проданным мл (из журнала остатков). */
-export async function topByMl(limit = 10) {
+/** Период выборки. Пустой объект = за всё время. */
+export interface Period {
+  from?: Date;
+  to?: Date;
+}
+
+/** Условие по дате для Prisma (undefined, если период не ограничен). */
+function dateFilter(p: Period) {
+  if (!p.from && !p.to) return undefined;
+  return { ...(p.from ? { gte: p.from } : {}), ...(p.to ? { lte: p.to } : {}) };
+}
+
+export async function topByMl(limit = 10, period: Period = {}) {
+  const createdAt = dateFilter(period);
   const grouped = await prisma.inventoryLog.groupBy({
     by: ["productId"],
-    where: { reason: { in: SOLD_REASONS } },
+    where: { reason: { in: SOLD_REASONS }, ...(createdAt ? { createdAt } : {}) },
     _sum: { deltaMl: true },
   });
   const rows = grouped
@@ -53,15 +66,55 @@ export async function topByMl(limit = 10) {
   }));
 }
 
+/**
+ * Аутсайдеры: товары с наименьшими продажами за период.
+ *
+ * Считаем от полного каталога, а не от журнала продаж: товары, которые вообще
+ * не продавались, в журнале отсутствуют — а именно они главные кандидаты на
+ * скидку. Архивные не показываем: их и так сняли с витрины.
+ */
+export async function bottomByMl(limit = 10, period: Period = {}) {
+  const createdAt = dateFilter(period);
+  const [products, grouped] = await Promise.all([
+    prisma.product.findMany({
+      where: { isArchived: false },
+      select: { id: true, name: true, brand: { select: { name: true } } },
+    }),
+    prisma.inventoryLog.groupBy({
+      by: ["productId"],
+      where: { reason: { in: SOLD_REASONS }, ...(createdAt ? { createdAt } : {}) },
+      _sum: { deltaMl: true },
+    }),
+  ]);
+
+  const sold = new Map(
+    grouped.map((g) => [g.productId, Math.max(0, -(g._sum.deltaMl ?? 0))]),
+  );
+
+  return products
+    .map((p) => ({
+      ml: sold.get(p.id) ?? 0,
+      name: p.name,
+      brand: p.brand.name,
+    }))
+    .sort((a, b) => a.ml - b.ml || a.brand.localeCompare(b.brand, "ru"))
+    .slice(0, limit);
+}
+
 /** Топ товаров по выручке (закрытые заказы + закрытые оффлайн-продажи). */
-export async function topByRevenue(limit = 10) {
+export async function topByRevenue(limit = 10, period: Period = {}) {
+  const createdAt = dateFilter(period);
   const [orderItems, saleItems] = await Promise.all([
     prisma.orderItem.findMany({
-      where: { order: { status: "closed" } },
+      where: {
+        order: { status: "closed", ...(createdAt ? { createdAt } : {}) },
+      },
       include: { product: { include: { brand: true } } },
     }),
     prisma.offlineSaleItem.findMany({
-      where: { sale: { status: "closed" } },
+      where: {
+        sale: { status: "closed", ...(createdAt ? { createdAt } : {}) },
+      },
       include: { product: { include: { brand: true } } },
     }),
   ]);
@@ -88,16 +141,25 @@ export async function topByRevenue(limit = 10) {
 }
 
 /** Топ клиентов по сумме покупок. */
-export async function topCustomers(limit = 10) {
+export async function topCustomers(limit = 10, period: Period = {}) {
+  const createdAt = dateFilter(period);
   const [orders, sales] = await Promise.all([
     prisma.order.groupBy({
       by: ["customerId"],
-      where: { status: "closed", customerId: { not: null } },
+      where: {
+        status: "closed",
+        customerId: { not: null },
+        ...(createdAt ? { createdAt } : {}),
+      },
       _sum: { totalByn: true },
     }),
     prisma.offlineSale.groupBy({
       by: ["customerId"],
-      where: { status: "closed", customerId: { not: null } },
+      where: {
+        status: "closed",
+        customerId: { not: null },
+        ...(createdAt ? { createdAt } : {}),
+      },
       _sum: { totalByn: true },
     }),
   ]);

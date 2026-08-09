@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@doza/db";
+import { startOfDay, endOfDay, isDayString } from "@doza/shared/day-range";
 import { requireRole } from "@/lib/session";
 import { revalidatePath } from "next/cache";
 
@@ -39,8 +40,10 @@ export async function createPromo(input: CreatePromoInput) {
   if (cashback != null && (cashback <= 0 || cashback > 90))
     throw new Error("Кешбек должен быть 1–90%");
 
-  const startsAt = input.startsAt ? new Date(input.startsAt) : null;
-  const endsAt = input.endsAt ? new Date(input.endsAt) : null;
+  // Выбирается только дата: начало — с 00:00 указанного дня, окончание —
+  // до конца указанного дня включительно.
+  const startsAt = isDayString(input.startsAt) ? startOfDay(input.startsAt) : null;
+  const endsAt = isDayString(input.endsAt) ? endOfDay(input.endsAt) : null;
   if (startsAt && endsAt && endsAt < startsAt)
     throw new Error("Дата окончания раньше начала");
 

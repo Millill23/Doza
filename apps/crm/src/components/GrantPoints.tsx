@@ -2,7 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { findCustomerForPoints, grantPoints } from "@/lib/actions/loyalty-manual";
+import {
+  findCustomerForPoints,
+  grantPoints,
+  deductPoints,
+} from "@/lib/actions/loyalty-manual";
 
 function byn(n: number) {
   return `${n.toFixed(2)} BYN`;
@@ -21,9 +25,13 @@ export default function GrantPoints() {
   } | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [done, setDone] = useState<{ name: string; amount: number; balance: number } | null>(
-    null,
-  );
+  const [mode, setMode] = useState<"grant" | "deduct">("grant");
+  const [done, setDone] = useState<{
+    name: string;
+    amount: number;
+    balance: number;
+    mode: "grant" | "deduct";
+  } | null>(null);
 
   const field =
     "h-10 w-full rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory focus:border-gold-500 focus:outline-none";
@@ -39,28 +47,77 @@ export default function GrantPoints() {
   }
 
   if (done) {
+    const isGrant = done.mode === "grant";
     return (
-      <div className="rounded-2xl border border-green-500/40 bg-green-500/5 p-6 text-center">
+      <div
+        className={`rounded-2xl border p-6 text-center ${
+          isGrant
+            ? "border-green-500/40 bg-green-500/5"
+            : "border-red-400/40 bg-red-500/5"
+        }`}
+      >
         <p className="mb-1 text-ivory">{done.name}</p>
-        <p className="mb-1 text-2xl text-gold-gradient">+{byn(done.amount)}</p>
+        <p
+          className={`mb-1 text-2xl ${isGrant ? "text-gold-gradient" : "text-red-300"}`}
+        >
+          {isGrant ? "+" : "−"}
+          {byn(done.amount)}
+        </p>
         <p className="mb-4 text-sm text-ivory-muted">
-          Баланс: {byn(done.balance)} · клиенту отправлена SMS
+          Баланс: {byn(done.balance)}
+          {isGrant ? " · клиенту отправлена SMS" : ""}
         </p>
         <button
           onClick={reset}
           className="rounded-full bg-gold-gradient px-6 py-2.5 text-sm font-medium text-ink-900"
         >
-          Начислить ещё
+          {isGrant ? "Начислить ещё" : "Списать ещё"}
         </button>
       </div>
     );
   }
 
+  const isGrant = mode === "grant";
+
   return (
     <div className="rounded-2xl border border-ink-600/60 bg-ink-700 p-6">
-      <h2 className="mb-1 font-serif text-xl text-ivory">Начислить баллы</h2>
+      <h2 className="mb-3 font-serif text-xl text-ivory">Баллы вручную</h2>
+
+      <div className="mb-3 flex gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            setMode("grant");
+            setErr(null);
+          }}
+          className={`rounded-full border px-4 py-1.5 text-xs transition-colors ${
+            isGrant
+              ? "border-gold-500 bg-gold-500/15 text-gold-300"
+              : "border-ink-600 text-ivory-muted hover:border-gold-500"
+          }`}
+        >
+          Начислить
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setMode("deduct");
+            setErr(null);
+          }}
+          className={`rounded-full border px-4 py-1.5 text-xs transition-colors ${
+            !isGrant
+              ? "border-red-400 bg-red-500/15 text-red-300"
+              : "border-ink-600 text-ivory-muted hover:border-red-400"
+          }`}
+        >
+          Списать
+        </button>
+      </div>
+
       <p className="mb-4 text-xs text-ivory-faint">
-        Клиенту придёт SMS, в Telegram уйдёт оповещение с причиной.
+        {isGrant
+          ? "Клиенту придёт SMS, в Telegram уйдёт оповещение с причиной."
+          : "Списание идёт по тем же правилам, что и оплата баллами (сначала сгорающие). Клиенту SMS не отправляется, в Telegram уйдёт запись."}
       </p>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -111,7 +168,7 @@ export default function GrantPoints() {
           )}
           {notFound && (
             <p className="mt-1.5 text-xs text-red-300">
-              Клиент не найден — начислить можно только существующему.
+              Клиент не найден — операция возможна только с существующим.
             </p>
           )}
         </div>
@@ -133,12 +190,16 @@ export default function GrantPoints() {
 
         <div className="sm:col-span-2">
           <label className="mb-1 block text-xs uppercase tracking-wide text-gold-500">
-            Причина начисления (обязательно)
+            {isGrant ? "Причина начисления" : "Причина списания"} (обязательно)
           </label>
           <input
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="напр. компенсация за задержку заказа"
+            placeholder={
+              isGrant
+                ? "напр. компенсация за задержку заказа"
+                : "напр. ошибочное начисление, отмена покупки"
+            }
             className={field}
           />
         </div>
@@ -151,12 +212,16 @@ export default function GrantPoints() {
           start(async () => {
             try {
               setErr(null);
-              const res = await grantPoints({
-                phone,
-                amount: Number(amount),
-                reason,
+              const payload = { phone, amount: Number(amount), reason };
+              const res = isGrant
+                ? await grantPoints(payload)
+                : await deductPoints(payload);
+              setDone({
+                name: res.name,
+                amount: res.amount,
+                balance: res.balance,
+                mode,
               });
-              setDone({ name: res.name, amount: res.amount, balance: res.balance });
               router.refresh();
             } catch (e) {
               setErr((e as Error).message);
@@ -164,9 +229,19 @@ export default function GrantPoints() {
           })
         }
         disabled={pending || !phone.trim() || !amount.trim() || reason.trim().length < 3}
-        className="mt-4 rounded-full bg-gold-gradient px-6 py-2.5 text-sm font-medium text-ink-900 disabled:opacity-50"
+        className={`mt-4 rounded-full px-6 py-2.5 text-sm font-medium disabled:opacity-50 ${
+          isGrant
+            ? "bg-gold-gradient text-ink-900"
+            : "border border-red-400/60 text-red-300 hover:bg-red-500/10"
+        }`}
       >
-        {pending ? "Начисляем…" : "Начислить баллы"}
+        {pending
+          ? isGrant
+            ? "Начисляем…"
+            : "Списываем…"
+          : isGrant
+            ? "Начислить баллы"
+            : "Списать баллы"}
       </button>
     </div>
   );

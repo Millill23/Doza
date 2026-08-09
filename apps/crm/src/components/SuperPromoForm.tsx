@@ -81,7 +81,7 @@ export default function SuperPromoForm({ products }: { products: ProductOpt[] })
             Начало (необязательно)
           </label>
           <input
-            type="datetime-local"
+            type="date"
             value={startsAt}
             onChange={(e) => setStartsAt(e.target.value)}
             className={field}
@@ -92,7 +92,7 @@ export default function SuperPromoForm({ products }: { products: ProductOpt[] })
             Окончание (необязательно)
           </label>
           <input
-            type="datetime-local"
+            type="date"
             value={endsAt}
             onChange={(e) => setEndsAt(e.target.value)}
             className={field}

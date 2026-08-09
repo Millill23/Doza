@@ -14,7 +14,7 @@ const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 export const CODE_LENGTH = 8;
 
 /** Номиналы, которые можно выпустить. */
-export const CERTIFICATE_DENOMINATIONS = [100, 150, 200, 300, 500] as const;
+export const CERTIFICATE_DENOMINATIONS = [50, 100, 150, 200, 300, 500] as const;
 
 /** Сгенерировать код сертификата (8 символов). Уникальность проверяет вызывающий. */
 export function generateCertificateCode(
