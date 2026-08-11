@@ -6,6 +6,8 @@ import { formatByn, formatPhone } from "@doza/shared";
 import CustomerDates from "@/components/CustomerDates";
 import VipManager from "@/components/VipManager";
 import CustomerEdit from "@/components/CustomerEdit";
+import ConsentPanel from "@/components/ConsentPanel";
+import { isConsentOverdue, CONSENT_TTL_DAYS } from "@doza/db/consent-rules";
 import { getSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -150,8 +152,23 @@ export default async function CustomerDetailPage({
           </div>
         </div>
 
-        {/* Даты + VIP */}
+        {/* Согласие + даты + VIP */}
         <div className="rounded-2xl border border-ink-600/60 bg-ink-700 p-6 lg:sticky lg:top-8 lg:self-start">
+          <div className="mb-6">
+            <h2 className="mb-3 font-serif text-xl text-ivory">
+              Персональные данные
+            </h2>
+            <ConsentPanel
+              customerId={customer.id}
+              name={customer.name}
+              status={customer.consentStatus}
+              requestedAt={customer.consentRequestedAt?.toISOString() ?? null}
+              confirmedAt={customer.consentConfirmedAt?.toISOString() ?? null}
+              overdue={isConsentOverdue(customer)}
+              ttlDays={CONSENT_TTL_DAYS}
+              canDelete={isAdmin}
+            />
+          </div>
           {isAdmin && (
             <div className="mb-6">
               <h2 className="mb-3 font-serif text-xl text-ivory">VIP-карта</h2>

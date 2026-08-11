@@ -2,8 +2,10 @@ import type { APIRoute } from "astro";
 import { prisma } from "@doza/db";
 import { getBalance, spendPoints } from "@doza/db/loyalty";
 import { pickActivePromo, getGlobalPromo, mergePromos } from "@doza/db/promos";
+import { requestConsent } from "@doza/db/consent";
 import { normalizePhone, formatByn } from "@doza/shared";
 import { assertCustomerName } from "@doza/shared/customer-name";
+import { sendSms } from "@doza/shared/sms";
 import { notifyTelegram, tgEscape } from "../../lib/telegram";
 
 export const prerender = false;
@@ -129,11 +131,24 @@ export const POST: APIRoute = async ({ request }) => {
   total = Math.round(total * 100) / 100;
 
   // Клиент (upsert по телефону)
+  const existing = await prisma.customer.findUnique({
+    where: { phone },
+    select: { id: true },
+  });
   const customer = await prisma.customer.upsert({
     where: { phone },
     update: { name },
     create: { phone, name },
   });
+
+  // Новичку сразу предлагаем вступить в программу лояльности. Постоянным с
+  // неподтверждённым согласием тут ничего не шлём: иначе каждый их заказ
+  // превращался бы в напоминание. Для них есть ручная отправка из CRM.
+  if (!existing) {
+    await requestConsent(customer.id, sendSms).catch((e) =>
+      console.error("[orders] не удалось запросить согласие:", e),
+    );
+  }
 
   // Списание баллов (FIFO), не больше баланса и суммы заказа
   let loyaltySpent = 0;

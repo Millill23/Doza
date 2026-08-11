@@ -103,6 +103,7 @@ export default function CashRegister({
     toPay: number;
     discountLabel?: string;
     earned?: number;
+    cashbackBlocked?: boolean;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -283,6 +284,7 @@ export default function CashRegister({
           toPay: res.toPay,
           discountLabel: res.discountLabel,
           earned: res.earned,
+          cashbackBlocked: res.cashbackBlocked,
         });
         resetCart();
       } catch (e) {
@@ -302,7 +304,12 @@ export default function CashRegister({
             Применена скидка: {done.discountLabel}
           </p>
         )}
-        {done.earned ? (
+        {done.cashbackBlocked ? (
+          <p className="mx-auto mb-6 max-w-sm rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm leading-relaxed text-amber-300">
+            Баллы не начислены: клиент не подтвердил согласие на обработку
+            персональных данных. Попросите открыть ссылку из SMS.
+          </p>
+        ) : done.earned ? (
           <p className="mb-6 text-sm text-gold-400">
             Начислено баллов: {done.earned}
           </p>

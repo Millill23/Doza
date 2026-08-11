@@ -10,6 +10,7 @@ import {
 } from "@doza/db/promos";
 import { priceCart } from "@doza/db/pricing";
 import { createSmsCode, verifySmsCode } from "@doza/db/sms-codes";
+import { requestConsent } from "@doza/db/consent";
 import { normalizePhone } from "@doza/shared";
 import { assertCustomerName } from "@doza/shared/customer-name";
 import { sendSms } from "@doza/shared/sms";
@@ -160,6 +161,10 @@ export async function createOfflineSale(input: CreateSaleInput) {
       // Имя необязательно, но если введено — проверяем: оно уходит в SMS и TG.
       const typedName = (input.name ?? "").trim();
       const safeName = typedName ? assertCustomerName(typedName) : "";
+      const existing = await prisma.customer.findUnique({
+        where: { phone },
+        select: { id: true },
+      });
       const customer = await prisma.customer.upsert({
         where: { phone },
         update: safeName ? { name: safeName } : {},
@@ -167,6 +172,15 @@ export async function createOfflineSale(input: CreateSaleInput) {
       });
       customerId = customer.id;
       vipCard = customer.vipCardNumber;
+
+      // Новому покупателю сразу отправляем ссылку на согласие — иначе баллы за
+      // эту же покупку не начислятся. Постоянным ничего не шлём: напоминание на
+      // каждый чек раздражает, для них есть кнопка в карточке клиента.
+      if (!existing) {
+        await requestConsent(customer.id, sendSms).catch((e) =>
+          console.error("[cash] запрос согласия не ушёл:", e),
+        );
+      }
     }
   }
 
@@ -295,6 +309,8 @@ export async function createOfflineSale(input: CreateSaleInput) {
 
   // Баллы: списание и начисление
   let earned = 0;
+  // Кешбек посчитан, но не начислен из-за отсутствия согласия на обработку ПД.
+  let cashbackBlocked = false;
   if (customerId) {
     if (loyaltySpent > 0) {
       await spendPoints(customerId, loyaltySpent, {
@@ -308,18 +324,23 @@ export async function createOfflineSale(input: CreateSaleInput) {
     const rates = await getCashbackRates(resolved.map((r) => r.productId));
     // Кешбек считается со всей суммы покупки и не зависит от способа оплаты:
     // оплата баллами даёт такой же кешбек, как наличные или карта.
-    earned =
+    const cashback =
       Math.round(
         priced.lineNet.reduce((sum, lineNet, i) => {
           const pct = rates[resolved[i].productId] ?? 0;
           return sum + lineNet * (pct / 100);
         }, 0) * 100,
       ) / 100;
-    if (earned > 0) {
-      await earnPoints(customerId, earned, days, {
+    if (cashback > 0) {
+      // Смотрим на фактический результат, а не на посчитанную сумму: без
+      // согласия клиента начисления не будет, и обещать его нельзя ни продавцу
+      // в итогах чека, ни покупателю в SMS.
+      const accrued = await earnPoints(customerId, cashback, days, {
         type: "offline_sale",
         id: sale.id,
       });
+      if (accrued) earned = cashback;
+      else cashbackBlocked = true;
     }
     await prisma.customer.update({
       where: { id: customerId },
@@ -331,8 +352,9 @@ export async function createOfflineSale(input: CreateSaleInput) {
   if (customerId && input.phone) {
     try {
       const balance = await getBalance(customerId);
-      const text =
-        earned > 0
+      const text = cashbackBlocked
+        ? `Спасибо за покупку! Баллы не начислены: подтвердите согласие на обработку данных по ссылке из SMS.`
+        : earned > 0
           ? `Спасибо за покупку! Вам начислено ${fmtPoints(earned)} бонусов. Всего бонусов: ${fmtPoints(balance)}`
           : `Спасибо за покупку! Всего бонусов: ${fmtPoints(balance)}`;
       await sendSms(normalizePhone(input.phone), text);
@@ -398,6 +420,8 @@ export async function createOfflineSale(input: CreateSaleInput) {
     discountLabel: priced.discount > 0 ? (DISCOUNT_LABEL[priced.kind] ?? "") : "",
     freeUnits: priced.freeUnits,
     earned,
+    /** Кешбек не начислен — клиент не подтвердил согласие на обработку ПД. */
+    cashbackBlocked,
     loyaltySpent,
     toPay: Math.round((saleTotal - loyaltySpent) * 100) / 100,
   };

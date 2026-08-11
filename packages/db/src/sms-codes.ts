@@ -3,7 +3,7 @@ import { prisma } from "./index";
 
 /**
  * Одноразовые SMS-коды подтверждения.
- * purpose: register | reset | loyalty_spend | offline_register
+ * purpose: register | reset | loyalty_spend | offline_register | consent
  */
 
 const TTL_MS = 10 * 60 * 1000; // 10 минут
@@ -15,13 +15,20 @@ function gen(length = 6): string {
   return s;
 }
 
-/** Создать код (инвалидируя предыдущие для этого телефона+назначения). Возвращает код. */
+/**
+ * Создать код (инвалидируя предыдущие для этого телефона+назначения). Возвращает код.
+ *
+ * `opts.code` / `opts.ttlMs` нужны для ссылок-токенов (согласие на обработку ПД):
+ * там вместо шестизначного кода — длинная случайная строка из URL, и живёт она
+ * не 10 минут, а недели.
+ */
 export async function createSmsCode(
   phone: string,
   purpose: string,
   meta?: Record<string, unknown>,
+  opts?: { code?: string; ttlMs?: number },
 ): Promise<string> {
-  const code = gen();
+  const code = opts?.code ?? gen();
   await prisma.smsCode.updateMany({
     where: { phone, purpose, consumed: false },
     data: { consumed: true },
@@ -32,10 +39,25 @@ export async function createSmsCode(
       purpose,
       code,
       meta: (meta ?? Prisma.JsonNull) as Prisma.InputJsonValue,
-      expiresAt: new Date(Date.now() + TTL_MS),
+      expiresAt: new Date(Date.now() + (opts?.ttlMs ?? TTL_MS)),
     },
   });
   return code;
+}
+
+/**
+ * Найти запись по одному лишь коду — для ссылок, где телефона в URL нет.
+ *
+ * Отдельно от `verifySmsCode`: та рассчитана на «телефон известен, код вводят
+ * руками» и ограничивает число попыток от подбора шести цифр. Здесь подбирать
+ * нечего — токен длинный и случайный, а телефон мы как раз из записи и узнаём.
+ */
+export async function findSmsCodeByToken(purpose: string, code: string) {
+  if (!code) return null;
+  return prisma.smsCode.findFirst({
+    where: { purpose, code, consumed: false },
+    orderBy: { createdAt: "desc" },
+  });
 }
 
 export interface VerifyResult {

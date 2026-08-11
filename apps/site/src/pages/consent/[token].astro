@@ -1,0 +1,116 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { COMPANY } from "../../lib/company";
+import { getConsentByToken } from "@doza/db/consent";
+import { CONSENT_TTL_DAYS } from "@doza/db/consent-rules";
+import ConsentForm from "../../components/ConsentForm";
+
+export const prerender = false;
+
+const { token } = Astro.params;
+const data = await getConsentByToken(token ?? "");
+
+// Ссылка личная, поэтому вместо 404 объясняем, что случилось и куда звонить.
+const expired = data !== null && "expired" in data;
+const customer = data !== null && !("expired" in data) ? data : null;
+---
+
+<Layout title="Согласие на обработку персональных данных — DOZA">
+  <section class="container-luxe max-w-2xl py-12">
+    {
+      customer && customer.alreadyConfirmed ? (
+        <div class="rounded-2xl border border-botanical-500/30 bg-botanical-500/5 p-8 text-center">
+          <p class="mb-2 text-4xl">✓</p>
+          <h1 class="mb-3 font-serif text-2xl text-ivory">Согласие уже получено</h1>
+          <p class="text-sm text-ivory-muted">
+            Спасибо, {customer.name}! Баллы начисляются как обычно — ничего делать
+            не нужно.
+          </p>
+          <a
+            href="/catalog"
+            class="mt-6 inline-flex h-11 items-center justify-center rounded-full bg-gold-gradient px-8 text-sm font-medium text-ink-900"
+          >
+            В каталог
+          </a>
+        </div>
+      ) : customer ? (
+        <>
+          <h1 class="mb-2 font-serif text-3xl font-semibold text-gold-gradient">
+            Согласие на обработку персональных данных
+          </h1>
+          {/* Имя без предлога: склонять его мы не умеем, «Для Пётр» режет глаз. */}
+          <p class="mb-8 text-sm text-ivory-faint">
+            {customer.name} · программа лояльности DOZA
+          </p>
+
+          <div class="space-y-5 text-sm leading-relaxed text-ivory-muted">
+            <p>
+              Чтобы копить и тратить баллы, нам нужно хранить ваше имя и номер
+              телефона. Закон Республики Беларусь «О защите персональных данных»
+              требует для этого вашего согласия — его вы и подтверждаете на этой
+              странице.
+            </p>
+
+            <div class="rounded-xl border border-ink-600/60 bg-ink-700 p-5">
+              <h2 class="mb-3 font-serif text-lg text-ivory">Коротко о главном</h2>
+              <dl class="space-y-3">
+                <div>
+                  <dt class="text-xs uppercase tracking-wide text-gold-500">
+                    Какие данные
+                  </dt>
+                  <dd>Имя и номер телефона, а также история ваших покупок и баллов.</dd>
+                </div>
+                <div>
+                  <dt class="text-xs uppercase tracking-wide text-gold-500">Зачем</dt>
+                  <dd>
+                    Начисление и списание баллов, VIP-статус, поздравления и
+                    персональные предложения по SMS.
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-xs uppercase tracking-wide text-gold-500">Кто хранит</dt>
+                  <dd>
+                    {COMPANY.legalName}, УНП {COMPANY.unp}, {COMPANY.legalAddress}.
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-xs uppercase tracking-wide text-gold-500">Как долго</dt>
+                  <dd>
+                    Пока вы участвуете в программе лояльности. Отозвать согласие
+                    можно в любой момент — напишите на {COMPANY.email} или скажите
+                    продавцу, и мы удалим ваши данные.
+                  </dd>
+                </div>
+              </dl>
+            </div>
+
+            <p class="text-xs text-ivory-faint">
+              Покупать можно и без согласия — на цены и обслуживание это не влияет.
+              Без него мы просто не сможем начислять вам баллы. Подробности — в
+              <a href="/privacy" target="_blank" class="text-gold-400 underline-offset-2 hover:underline">
+                Политике обработки персональных данных
+              </a>.
+            </p>
+          </div>
+
+          <ConsentForm token={token ?? ""} client:load />
+        </>
+      ) : (
+        <div class="rounded-2xl border border-ink-600/60 bg-ink-700 p-8 text-center">
+          <p class="mb-2 text-4xl">{expired ? "⏳" : "🔗"}</p>
+          <h1 class="mb-3 font-serif text-2xl text-ivory">
+            {expired ? "Срок действия ссылки истёк" : "Ссылка недействительна"}
+          </h1>
+          <p class="text-sm text-ivory-muted">
+            {
+              expired
+                ? `Ссылка действует ${CONSENT_TTL_DAYS} дней. Попросите новую у продавца или позвоните нам — отправим повторно.`
+                : "Возможно, ссылка скопирована не полностью. Попросите новую у продавца или позвоните нам."
+            }
+          </p>
+          <p class="mt-4 text-sm text-gold-400">{COMPANY.phones.join(", ")}</p>
+        </div>
+      )
+    }
+  </section>
+</Layout>

@@ -87,6 +87,15 @@ async function earnPointsTx(
  * Начислить баллы: создаёт партию с датой сгорания и пишет в журнал.
  * loyaltyDays = 0 → бессрочно.
  *
+ * Баллы копятся только у клиентов, подтвердивших согласие на обработку
+ * персональных данных (99-З): накопительная программа — цель обработки сверх
+ * разовой покупки. Без согласия продажа проходит как обычно, просто без
+ * начисления — блокировать чек из-за этого нельзя.
+ *
+ * Возвращает `true`, если баллы действительно начислены. Вызывающий код обязан
+ * смотреть на результат, а не на запрошенную сумму: иначе касса скажет «начислено
+ * 2.25», SMS пообещает бонусы, а в базе не появится ничего.
+ *
  * `opts.tx` начисляет внутри чужой транзакции — нужно там, где начисление
  * обязано быть неразрывно с другой записью (активация сертификата: либо и
  * статус меняется, и баллы начислены, либо не происходит ничего).
@@ -98,17 +107,29 @@ export async function earnPoints(
   loyaltyDays: number,
   ref: { type: string; id: number },
   opts?: { reason?: string; tx?: TxClient },
-): Promise<void> {
-  if (amountByn <= 0) return;
+): Promise<boolean> {
+  if (amountByn <= 0) return false;
+  if (!(await hasConsent(customerId, opts?.tx))) return false;
 
   if (opts?.tx) {
     await earnPointsTx(opts.tx, customerId, amountByn, loyaltyDays, ref, opts.reason);
-    return;
+    return true;
   }
 
   await prisma.$transaction(async (tx) => {
     await earnPointsTx(tx, customerId, amountByn, loyaltyDays, ref, opts?.reason);
   });
+  return true;
+}
+
+/** Подтвердил ли клиент согласие на обработку ПД. */
+async function hasConsent(customerId: number, tx?: TxClient): Promise<boolean> {
+  const db = tx ?? prisma;
+  const customer = await db.customer.findUnique({
+    where: { id: customerId },
+    select: { consentStatus: true },
+  });
+  return customer?.consentStatus === "confirmed";
 }
 
 /**

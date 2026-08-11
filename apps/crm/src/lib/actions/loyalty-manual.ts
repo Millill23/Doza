@@ -64,13 +64,20 @@ export async function grantPoints(input: {
     throw new Error("Клиент с таким телефоном не найден");
 
   const days = await getSetting("loyalty_days", 180);
-  await earnPoints(
+  const accrued = await earnPoints(
     customer.id,
     amount,
     days,
     { type: "manual", id: Number(session.user.id) },
     { reason },
   );
+  // Начисление — осознанное действие админа, поэтому молча проглотить отказ
+  // нельзя: иначе он увидит «готово», клиент получит SMS про бонусы, а баллов
+  // не будет.
+  if (!accrued)
+    throw new Error(
+      `${customer.name} не подтвердил согласие на обработку персональных данных — начислить баллы нельзя. Отправьте запрос согласия в карточке клиента.`,
+    );
 
   const balance = await getBalance(customer.id);
 

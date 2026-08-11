@@ -360,7 +360,13 @@ export default function CartApp() {
           </div>
         </div>
 
-        {/* Согласие на обработку персональных данных */}
+        {/*
+          Акцепт оферты — это согласие с условиями сделки, им блокировать заказ
+          можно. Согласие на обработку персональных данных сюда не входит: по
+          99-З данные для приёма и доставки заказа обрабатываются по основанию
+          «исполнение договора». Отдельное согласие нужно только для программы
+          лояльности, и его мы спрашиваем ссылкой в SMS — покупку оно не держит.
+        */}
         <label className="flex cursor-pointer items-start gap-2.5 text-xs leading-relaxed text-ivory-muted">
           <input
             type="checkbox"
@@ -369,13 +375,13 @@ export default function CartApp() {
             className="mt-0.5 h-4 w-4 shrink-0 accent-gold-500"
           />
           <span>
-            Я согласен(а) на обработку персональных данных в соответствии с{" "}
-            <a href="/privacy" target="_blank" className="text-gold-400 underline-offset-2 hover:underline">
-              Политикой обработки персональных данных
-            </a>{" "}
-            и принимаю условия{" "}
+            Принимаю условия{" "}
             <a href="/offer" target="_blank" className="text-gold-400 underline-offset-2 hover:underline">
               публичной оферты
+            </a>{" "}
+            и ознакомлен(а) с{" "}
+            <a href="/privacy" target="_blank" className="text-gold-400 underline-offset-2 hover:underline">
+              Политикой обработки персональных данных
             </a>
             .
           </span>

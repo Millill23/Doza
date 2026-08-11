@@ -227,6 +227,16 @@ model Customer {
   registeredAt    DateTime         @default(now()) @map("registered_at")
   lastPurchaseAt  DateTime?        @map("last_purchase_at")
   lastPurchaseSum Decimal?         @map("last_purchase_sum") @db.Decimal(10, 2)
+
+  /// Согласие на обработку персональных данных для программы лояльности
+  /// (закон РБ №99-З). Сама покупка согласия не требует — данные для заказа
+  /// обрабатываются по основанию «исполнение договора». Согласие нужно только
+  /// для хранения клиента в базе лояльности: баллы, VIP, персональные рассылки.
+  consentStatus      ConsentStatus @default(pending) @map("consent_status")
+  /// Когда последний раз отправляли ссылку на подтверждение.
+  consentRequestedAt DateTime?     @map("consent_requested_at")
+  consentConfirmedAt DateTime?     @map("consent_confirmed_at")
+
   dates           CustomerDate[]
   orders          Order[]
   offlineSales    OfflineSale[]
@@ -236,6 +246,14 @@ model Customer {
   certificatesActivated GiftCertificate[] @relation("CertificateActivatedFor")
 
   @@map("customers")
+}
+
+/// Статус согласия на обработку ПД для программы лояльности.
+/// Отзыв согласия отдельным статусом не выделяем: по 99-З отзыв означает
+/// прекращение обработки, то есть удаление клиента из базы лояльности.
+enum ConsentStatus {
+  pending
+  confirmed
 }
 
 /// Разделение выручки одного дня между продавцами.

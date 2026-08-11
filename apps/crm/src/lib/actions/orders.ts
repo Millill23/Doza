@@ -72,6 +72,9 @@ async function applyClose(orderId: number, userId: number) {
         }, 0) * 100,
       ) / 100;
     if (earn > 0) {
+      // Без согласия на обработку ПД начисления не будет. Закрытие заказа из-за
+      // этого не отменяем и результат не проверяем: товар уже у покупателя, а
+      // никаких обещаний про баллы здесь не показывается и не отправляется.
       await earnPoints(order.customerId, earn, days, {
         type: "order",
         id: order.id,

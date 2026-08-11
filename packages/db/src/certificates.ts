@@ -106,10 +106,18 @@ export async function activateCertificate(opts: {
     if (claimed.count !== 1)
       throw new CertificateError("Сертификат уже активирован");
 
-    await earnPoints(customer.id, awarded, opts.loyaltyDays, {
+    const accrued = await earnPoints(customer.id, awarded, opts.loyaltyDays, {
       type: "gift_certificate",
       id: cert.id,
     }, { tx, reason: `Активация сертификата ${code}` });
+
+    // Без согласия на обработку ПД баллы не начисляются — а значит сертификат
+    // сгорел бы впустую. Роняем транзакцию: код остаётся неактивированным,
+    // клиент даёт согласие и активирует его заново.
+    if (!accrued)
+      throw new CertificateError(
+        "Клиент не подтвердил согласие на обработку персональных данных — баллы начислить нельзя. Отправьте ему ссылку согласия и повторите активацию.",
+      );
   });
 
   const balance = await getBalance(customer.id);

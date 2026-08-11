@@ -23,15 +23,26 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
   if (password.length < 6)
     return json({ ok: false, error: "Пароль минимум 6 символов" }, 400);
+  // Регистрация в личном кабинете = вступление в программу лояльности, а она
+  // по 99-З требует согласия на обработку ПД. Галочка проверяется и на сервере.
+  if (body.consent !== true)
+    return json(
+      { ok: false, error: "Нужно согласие на обработку персональных данных" },
+      400,
+    );
 
   const res = await verifySmsCode(phone, "register", code);
   if (!res.ok) return json({ ok: false, error: res.error }, 400);
 
   const passwordHash = await hashPassword(password);
+  const consentFields = {
+    consentStatus: "confirmed" as const,
+    consentConfirmedAt: new Date(),
+  };
   const customer = await prisma.customer.upsert({
     where: { phone },
-    update: { name, passwordHash, phoneVerified: true },
-    create: { phone, name, passwordHash, phoneVerified: true },
+    update: { name, passwordHash, phoneVerified: true, ...consentFields },
+    create: { phone, name, passwordHash, phoneVerified: true, ...consentFields },
   });
 
   setSession(cookies, customer.id);

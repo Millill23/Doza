@@ -21,6 +21,8 @@
     ".": "./src/index.ts",
     "./loyalty": "./src/loyalty.ts",
     "./sms-codes": "./src/sms-codes.ts",
+    "./consent": "./src/consent.ts",
+    "./consent-rules": "./src/consent-rules.ts",
     "./promos": "./src/promos.ts",
     "./pricing": "./src/pricing.ts",
     "./certificates": "./src/certificates.ts",

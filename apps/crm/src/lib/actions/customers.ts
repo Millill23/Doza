@@ -1,57 +1,51 @@
 "use server";
 
 import { prisma } from "@doza/db";
-import { createSmsCode, verifySmsCode } from "@doza/db/sms-codes";
+import { requestConsent } from "@doza/db/consent";
 import { normalizePhone } from "@doza/shared";
 import { assertCustomerName } from "@doza/shared/customer-name";
 import { sendSms } from "@doza/shared/sms";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/session";
 
-/** Продавец инициирует регистрацию клиента: отправить SMS-код на его телефон. */
-export async function requestOfflineRegOtp(phoneRaw: string) {
-  await requireRole(["admin", "seller", "marketer"]);
-  const phone = normalizePhone(phoneRaw);
-  if (phone.length < 9) throw new Error("Некорректный телефон");
-
-  const existing = await prisma.customer.findUnique({ where: { phone } });
-  if (existing?.phoneVerified) {
-    return { ok: true, already: true, name: existing.name };
-  }
-
-  const code = await createSmsCode(phone, "offline_register");
-  const sms = await sendSms(phone, `${code} - код регистрации в программе лояльности DOZA`);
-  return { ok: true, smsSent: sms.ok };
-}
-
 export interface OfflineRegInput {
   phone: string;
   name: string;
-  otp: string;
   birthday?: string;
   dates?: { date: string; description: string }[];
 }
 
-/** Завершить регистрацию клиента продавцом после подтверждения кодом. */
+/**
+ * Регистрация клиента продавцом в кассе.
+ *
+ * Одноразового кода здесь больше нет: вместо него клиенту уходит ссылка на
+ * согласие с обработкой персональных данных (99-З). Переход по ней заодно
+ * подтверждает владение номером — то же, что давал код, но с юридически
+ * значимым согласием в придачу.
+ *
+ * Продажу это не задерживает: клиент заводится сразу, продавец работает
+ * дальше, а баллы начнут начисляться, как только придёт подтверждение.
+ */
 export async function registerCustomerOffline(input: OfflineRegInput) {
   await requireRole(["admin", "seller", "marketer"]);
   const phone = normalizePhone(input.phone);
+  if (phone.length < 9) throw new Error("Некорректный телефон");
   const name = assertCustomerName(input.name ?? "");
 
-  const otp = await verifySmsCode(phone, "offline_register", input.otp ?? "");
-  if (!otp.ok) throw new Error(otp.error ?? "Неверный код подтверждения");
+  const existing = await prisma.customer.findUnique({
+    where: { phone },
+    select: { id: true, name: true, consentStatus: true },
+  });
 
   const customer = await prisma.customer.upsert({
     where: { phone },
     update: {
       name,
-      phoneVerified: true,
       birthday: input.birthday ? new Date(input.birthday) : undefined,
     },
     create: {
       phone,
       name,
-      phoneVerified: true,
       birthday: input.birthday ? new Date(input.birthday) : undefined,
     },
   });
@@ -69,8 +63,18 @@ export async function registerCustomerOffline(input: OfflineRegInput) {
     }
   }
 
+  const alreadyConfirmed = existing?.consentStatus === "confirmed";
+  const consent = alreadyConfirmed
+    ? { smsSent: false }
+    : await requestConsent(customer.id, sendSms);
+
   revalidatePath("/customers");
-  return { ok: true, customerId: customer.id };
+  return {
+    ok: true,
+    customerId: customer.id,
+    alreadyConfirmed,
+    smsSent: consent.smsSent,
+  };
 }
 
 /** Зарегистрировать VIP-клиента (админ, без подтверждения телефона). */
@@ -108,6 +112,18 @@ export async function registerVip(
   });
 
   if (!before?.vipCardNumber) await sendVipWelcomeSms(phone, name);
+
+  // VIP — это программа лояльности, значит нужно согласие на обработку ПД.
+  // Отдельным сообщением после поздравления, чтобы не смешивать две темы.
+  const fresh = await prisma.customer.findUnique({
+    where: { id: customer.id },
+    select: { consentStatus: true },
+  });
+  if (fresh?.consentStatus !== "confirmed") {
+    await requestConsent(customer.id, sendSms).catch((e) =>
+      console.error("[customers] запрос согласия для VIP не ушёл:", e),
+    );
+  }
 
   revalidatePath("/customers");
   return { ok: true, customerId: customer.id };

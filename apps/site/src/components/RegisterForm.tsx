@@ -10,6 +10,7 @@ export default function RegisterForm() {
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
+  const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -51,7 +52,7 @@ export default function RegisterForm() {
       const r = await fetch("/api/auth/register/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, name, code, password }),
+        body: JSON.stringify({ phone, name, code, password, consent }),
       });
       const data = await r.json();
       if (!r.ok || !data.ok) {
@@ -94,8 +95,29 @@ export default function RegisterForm() {
             <label htmlFor="r-pass" className={labelCls}>Придумайте пароль</label>
             <input id="r-pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} className={inputCls} placeholder="минимум 6 символов" />
           </div>
+          {/*
+            Личный кабинет — это и есть программа лояльности, поэтому согласие
+            на обработку ПД спрашиваем прямо здесь: клиент уже на сайте, слать
+            ему ссылку в SMS незачем. Галочка обязательна — без неё аккаунт
+            заводить не для чего (покупать можно и без регистрации).
+          */}
+          <label className="flex cursor-pointer items-start gap-2.5 text-xs leading-relaxed text-ivory-muted">
+            <input
+              type="checkbox"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-gold-500"
+            />
+            <span>
+              Согласен(на) на обработку имени и номера телефона для программы
+              лояльности — начисление баллов, VIP-статус, персональные предложения.{" "}
+              <a href="/privacy" target="_blank" className="text-gold-400 underline-offset-2 hover:underline">
+                Подробнее
+              </a>
+            </span>
+          </label>
           {error && <p className="text-sm text-red-300">{error}</p>}
-          <button type="submit" disabled={loading} className="h-11 w-full rounded-full bg-gold-gradient text-sm font-medium text-ink-900 disabled:opacity-60">
+          <button type="submit" disabled={loading || !consent} className="h-11 w-full rounded-full bg-gold-gradient text-sm font-medium text-ink-900 disabled:opacity-60">
             {loading ? "…" : "Зарегистрироваться"}
           </button>
           <button type="button" onClick={() => setStep(1)} className="w-full text-xs text-ivory-faint hover:text-gold-400">

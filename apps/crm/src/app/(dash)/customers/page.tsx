@@ -4,25 +4,38 @@ import { formatByn, formatPhone } from "@doza/shared";
 import { getBalancesMap } from "@/lib/customers-data";
 import { getSession } from "@/lib/session";
 import VipRegisterForm from "@/components/VipRegisterForm";
+import {
+  ConsentBulkButton,
+  ConsentRequestButton,
+} from "@/components/ConsentControls";
+import { daysSinceRequest } from "@doza/db/consent-rules";
 
 export const dynamic = "force-dynamic";
 
 export default async function CustomersPage() {
-  const [customers, balances, session] = await Promise.all([
+  const [customers, balances, session, pendingCount] = await Promise.all([
     prisma.customer.findMany({ orderBy: { registeredAt: "desc" }, take: 200 }),
     getBalancesMap(),
     getSession(),
+    prisma.customer.count({ where: { consentStatus: "pending" } }),
   ]);
   const isAdmin = session?.user?.role === "admin";
+  const canBulk = isAdmin || session?.user?.role === "marketer";
 
   return (
     <div>
       <div className="mb-6 flex items-end justify-between">
         <div>
           <h1 className="mb-1 font-serif text-3xl text-ivory">Клиенты</h1>
-          <p className="text-sm text-ivory-faint">{customers.length} клиентов</p>
+          <p className="text-sm text-ivory-faint">
+            {customers.length} клиентов
+            {pendingCount > 0 && (
+              <span className="text-amber-300"> · {pendingCount} без согласия</span>
+            )}
+          </p>
         </div>
         <div className="flex items-center gap-3">
+          {canBulk && <ConsentBulkButton pendingCount={pendingCount} />}
           {isAdmin && <VipRegisterForm />}
           <Link
             href="/customers/register"
@@ -47,6 +60,7 @@ export default async function CustomersPage() {
                 <th className="px-4 py-3">Баллы</th>
                 <th className="px-4 py-3">Последняя покупка</th>
                 <th className="px-4 py-3">Регистрация</th>
+                <th className="px-4 py-3">Согласие</th>
               </tr>
             </thead>
             <tbody>
@@ -73,6 +87,37 @@ export default async function CustomersPage() {
                   </td>
                   <td className="px-4 py-3 text-xs text-ivory-faint">
                     {c.registeredAt.toLocaleDateString("ru-RU")}
+                  </td>
+                  <td className="px-4 py-3">
+                    {c.consentStatus === "confirmed" ? (
+                      <span
+                        className="text-xs text-green-300"
+                        title={
+                          c.consentConfirmedAt
+                            ? `Подтверждено ${c.consentConfirmedAt.toLocaleDateString("ru-RU")}`
+                            : undefined
+                        }
+                      >
+                        ✓ есть
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="whitespace-nowrap text-xs text-amber-300">
+                          ⚠ нет
+                          {c.consentRequestedAt && (
+                            <span className="text-ivory-faint">
+                              {" "}
+                              · {daysSinceRequest(c)} дн.
+                            </span>
+                          )}
+                        </span>
+                        <ConsentRequestButton
+                          customerId={c.id}
+                          label={c.consentRequestedAt ? "Напомнить" : "Запросить"}
+                          kind={c.consentRequestedAt ? "reminder" : "invite"}
+                        />
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
