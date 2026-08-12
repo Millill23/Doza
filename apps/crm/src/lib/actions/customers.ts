@@ -2,7 +2,7 @@
 
 import { prisma } from "@doza/db";
 import { requestConsent } from "@doza/db/consent";
-import { normalizePhone } from "@doza/shared";
+import { assertBelarusPhone } from "@doza/shared/phone";
 import { assertCustomerName } from "@doza/shared/customer-name";
 import { sendSms } from "@doza/shared/sms";
 import { revalidatePath } from "next/cache";
@@ -28,8 +28,7 @@ export interface OfflineRegInput {
  */
 export async function registerCustomerOffline(input: OfflineRegInput) {
   await requireRole(["admin", "seller", "marketer"]);
-  const phone = normalizePhone(input.phone);
-  if (phone.length < 9) throw new Error("Некорректный телефон");
+  const phone = assertBelarusPhone(input.phone);
   const name = assertCustomerName(input.name ?? "");
 
   const existing = await prisma.customer.findUnique({
@@ -84,8 +83,7 @@ export async function registerVip(
   cardRaw: string,
 ) {
   await requireRole(["admin"]);
-  const phone = normalizePhone(phoneRaw);
-  if (phone.length < 9) throw new Error("Некорректный телефон");
+  const phone = assertBelarusPhone(phoneRaw);
   const name = assertCustomerName(nameRaw ?? "");
   const card = (cardRaw ?? "").trim();
   if (!card) throw new Error("Укажите номер карты");
@@ -180,8 +178,7 @@ export async function updateCustomer(
   await requireRole(["admin"]);
 
   const name = assertCustomerName(input.name ?? "");
-  const phone = normalizePhone(input.phone ?? "");
-  if (phone.length < 9) throw new Error("Укажите корректный телефон");
+  const phone = assertBelarusPhone(input.phone ?? "");
 
   const taken = await prisma.customer.findUnique({
     where: { phone },
@@ -242,4 +239,51 @@ export async function removeCustomerDate(id: number, customerId: number) {
   await requireRole(["admin", "seller", "marketer"]);
   await prisma.customerDate.delete({ where: { id } });
   revalidatePath(`/customers/${customerId}`);
+}
+
+/**
+ * Полностью удалить клиента. Только админ.
+ *
+ * Заказы и продажи не удаляются: их хранение — самостоятельное правовое
+ * основание (исполнение договора и бухгалтерский учёт), оно не зависит от
+ * присутствия клиента в базе лояльности. Но связь с ним рвётся, а всё, что
+ * существовало только ради лояльности — баллы, журнал, памятные даты,
+ * привязка сертификатов — удаляется вместе с клиентом.
+ *
+ * Нужно и для отзыва согласия (по 99-З это требование прекратить обработку),
+ * и для обычной уборки: дубли, ошибочные записи, тестовые клиенты.
+ */
+export async function deleteCustomer(customerId: number) {
+  await requireRole(["admin"]);
+
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    select: { phone: true, name: true },
+  });
+  if (!customer) throw new Error("Клиент не найден");
+
+  await prisma.$transaction(async (tx) => {
+    // Журнал ссылается на партии, поэтому его удаляем первым.
+    await tx.loyaltyLog.deleteMany({ where: { customerId } });
+    await tx.loyaltyBatch.deleteMany({ where: { customerId } });
+    await tx.customerDate.deleteMany({ where: { customerId } });
+
+    await tx.order.updateMany({ where: { customerId }, data: { customerId: null } });
+    await tx.offlineSale.updateMany({ where: { customerId }, data: { customerId: null } });
+    await tx.giftCertificate.updateMany({
+      where: { buyerId: customerId },
+      data: { buyerId: null },
+    });
+    await tx.giftCertificate.updateMany({
+      where: { customerId },
+      data: { customerId: null },
+    });
+    // Неиспользованные коды и ссылки этого номера больше ни к чему не ведут.
+    await tx.smsCode.deleteMany({ where: { phone: customer.phone } });
+
+    await tx.customer.delete({ where: { id: customerId } });
+  });
+
+  revalidatePath("/customers");
+  return { ok: true, name: customer.name };
 }

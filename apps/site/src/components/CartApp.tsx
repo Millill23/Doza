@@ -1,4 +1,10 @@
 import { useEffect, useState } from "react";
+import PhoneInput from "./PhoneInput";
+import {
+  BELARUS_PREFIX,
+  isValidLocalDigits,
+  PHONE_ERROR,
+} from "@doza/shared/phone";
 
 interface CartItem {
   productId: number;
@@ -58,15 +64,18 @@ export default function CartApp() {
 
   // Поиск клиента по телефону (баланс баллов)
   useEffect(() => {
-    const digits = phone.replace(/\D/g, "");
-    if (digits.length < 9) {
+    // Ищем, только когда номер дописан целиком: иначе на каждой цифре улетал
+    // бы запрос с заведомо неполным номером.
+    if (!isValidLocalDigits(phone)) {
       setBalance(0);
       setCustomerName(null);
       return;
     }
     const t = setTimeout(async () => {
       try {
-        const r = await fetch(`/api/customer?phone=${encodeURIComponent(digits)}`);
+        const r = await fetch(
+          `/api/customer?phone=${encodeURIComponent(BELARUS_PREFIX + phone)}`,
+        );
         const data = await r.json();
         setBalance(data.balance || 0);
         setCustomerName(data.found ? data.name : null);
@@ -98,6 +107,10 @@ export default function CartApp() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!isValidLocalDigits(phone)) {
+      setError(PHONE_ERROR);
+      return;
+    }
     setSubmitting(true);
     try {
       const r = await fetch("/api/orders", {
@@ -105,7 +118,7 @@ export default function CartApp() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
-          phone,
+          phone: BELARUS_PREFIX + phone,
           deliveryType: delivery,
           address,
           comment,
@@ -255,12 +268,7 @@ export default function CartApp() {
           <label htmlFor="f-phone" className="mb-1.5 block text-xs uppercase tracking-luxe text-gold-500">
             Телефон
           </label>
-          <input
-            id="f-phone" type="tel" required value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className="h-11 w-full rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory placeholder:text-ivory-faint focus:border-gold-500 focus:outline-none"
-            placeholder="+375 (__) ___-__-__"
-          />
+          <PhoneInput id="f-phone" value={phone} onChange={setPhone} required />
           {customerName && (
             <p className="mt-1.5 text-xs text-botanical-300">
               С возвращением, {customerName}! Баланс баллов: {formatByn(balance)}

@@ -7,6 +7,7 @@ import CustomerDates from "@/components/CustomerDates";
 import VipManager from "@/components/VipManager";
 import CustomerEdit from "@/components/CustomerEdit";
 import ConsentPanel from "@/components/ConsentPanel";
+import CustomerDelete from "@/components/CustomerDelete";
 import { isConsentOverdue, CONSENT_TTL_DAYS } from "@doza/db/consent-rules";
 import { getSession } from "@/lib/session";
 
@@ -160,13 +161,11 @@ export default async function CustomerDetailPage({
             </h2>
             <ConsentPanel
               customerId={customer.id}
-              name={customer.name}
               status={customer.consentStatus}
               requestedAt={customer.consentRequestedAt?.toISOString() ?? null}
               confirmedAt={customer.consentConfirmedAt?.toISOString() ?? null}
               overdue={isConsentOverdue(customer)}
               ttlDays={CONSENT_TTL_DAYS}
-              canDelete={isAdmin}
             />
           </div>
           {isAdmin && (
@@ -185,6 +184,17 @@ export default async function CustomerDetailPage({
               description: d.description,
             }))}
           />
+
+          {isAdmin && (
+            <div className="mt-6 border-t border-ink-600/60 pt-4">
+              <CustomerDelete
+                customerId={customer.id}
+                name={customer.name}
+                balance={balance}
+                purchases={history.length}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>

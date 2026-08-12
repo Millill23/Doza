@@ -1,37 +1,26 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { deleteUnconsentedCustomer } from "@/lib/actions/consent";
 import { ConsentRequestButton } from "@/components/ConsentControls";
 
 /**
- * Блок согласия на обработку ПД в карточке клиента: статус, отправка ссылки
- * и удаление тех, кто не ответил за отведённый срок.
+ * Блок согласия на обработку ПД в карточке клиента: статус и отправка ссылки.
+ * Само удаление — отдельным блоком внизу карточки, оно шире по смыслу.
  */
 export default function ConsentPanel({
   customerId,
-  name,
   status,
   requestedAt,
   confirmedAt,
   overdue,
   ttlDays,
-  canDelete,
 }: {
   customerId: number;
-  name: string;
   status: string;
   requestedAt: string | null;
   confirmedAt: string | null;
   overdue: boolean;
   ttlDays: number;
-  canDelete: boolean;
 }) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const [err, setErr] = useState<string | null>(null);
-
   const fmt = (iso: string | null) =>
     iso ? new Date(iso).toLocaleDateString("ru-RU") : null;
 
@@ -70,42 +59,11 @@ export default function ConsentPanel({
         )}
       </div>
 
-      {canDelete && (
-        <div className="mt-4 border-t border-ink-600/60 pt-3">
-          {overdue ? (
-            <>
-              <button
-                onClick={() => {
-                  if (
-                    !confirm(
-                      `Удалить клиента «${name}»?\n\nБаллы, памятные даты и история лояльности будут удалены безвозвратно. Заказы и продажи останутся, но потеряют привязку к клиенту.\n\nОтменить это действие нельзя.`,
-                    )
-                  )
-                    return;
-                  start(async () => {
-                    try {
-                      await deleteUnconsentedCustomer(customerId);
-                      router.push("/customers");
-                      router.refresh();
-                    } catch (e) {
-                      setErr((e as Error).message);
-                    }
-                  });
-                }}
-                disabled={pending}
-                className="rounded-full border border-red-500/40 px-3 py-1.5 text-xs text-red-300 transition-colors hover:bg-red-500/10 disabled:opacity-50"
-              >
-                {pending ? "Удаляем…" : "Удалить клиента (нет согласия)"}
-              </button>
-              {err && <p className="mt-2 text-xs text-red-300">{err}</p>}
-            </>
-          ) : (
-            <p className="text-xs text-ivory-faint">
-              Удалить можно, если клиент не ответит в течение {ttlDays} дней после
-              отправки ссылки.
-            </p>
-          )}
-        </div>
+      {overdue && (
+        <p className="mt-3 border-t border-ink-600/60 pt-3 text-xs leading-relaxed text-ivory-faint">
+          Клиент молчит дольше {ttlDays} дней. По 99-З хранить его данные для
+          лояльности больше нет основания — удалить можно внизу карточки.
+        </p>
       )}
     </div>
   );

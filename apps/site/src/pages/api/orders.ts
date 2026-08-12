@@ -3,7 +3,8 @@ import { prisma } from "@doza/db";
 import { getBalance, spendPoints } from "@doza/db/loyalty";
 import { pickActivePromo, getGlobalPromo, mergePromos } from "@doza/db/promos";
 import { requestConsent } from "@doza/db/consent";
-import { normalizePhone, formatByn } from "@doza/shared";
+import { formatByn } from "@doza/shared";
+import { assertBelarusPhone } from "@doza/shared/phone";
 import { assertCustomerName } from "@doza/shared/customer-name";
 import { sendSms } from "@doza/shared/sms";
 import { notifyTelegram, tgEscape } from "../../lib/telegram";
@@ -41,18 +42,19 @@ export const POST: APIRoute = async ({ request }) => {
     return bad("Некорректный запрос");
   }
 
-  const phone = normalizePhone(body.phone ?? "");
   const deliveryType = body.deliveryType;
   const items = Array.isArray(body.items) ? body.items : [];
 
-  // Имя уходит в SMS и Telegram, поэтому проверяем состав символов.
+  // Имя уходит в SMS и Telegram, телефон становится идентификатором клиента —
+  // проверяем оба, не полагаясь на маску в браузере.
   let name: string;
+  let phone: string;
   try {
     name = assertCustomerName(body.name ?? "");
+    phone = assertBelarusPhone(body.phone ?? "");
   } catch (e) {
     return bad((e as Error).message);
   }
-  if (phone.length < 9) return bad("Укажите корректный номер телефона");
   if (deliveryType !== "pickup" && deliveryType !== "post")
     return bad("Выберите способ получения");
   if (deliveryType === "post" && !(body.address ?? "").trim())

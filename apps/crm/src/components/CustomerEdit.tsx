@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateCustomer } from "@/lib/actions/customers";
+import PhoneInput from "@/components/PhoneInput";
+import { BELARUS_PREFIX, toLocalDigits } from "@doza/shared/phone";
 
 export default function CustomerEdit({
   customerId,
@@ -17,7 +19,8 @@ export default function CustomerEdit({
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const [name, setName] = useState(initialName);
-  const [phone, setPhone] = useState(initialPhone);
+  // В поле живут только 9 цифр — префикс рисует PhoneInput.
+  const [phone, setPhone] = useState(toLocalDigits(initialPhone));
   const [err, setErr] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -59,12 +62,7 @@ export default function CustomerEdit({
           <label className="mb-1 block text-xs uppercase tracking-wide text-gold-500">
             Телефон
           </label>
-          <input
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="+375…"
-            className={field}
-          />
+          <PhoneInput value={phone} onChange={setPhone} />
         </div>
       </div>
 
@@ -82,7 +80,10 @@ export default function CustomerEdit({
             start(async () => {
               try {
                 setErr(null);
-                await updateCustomer(customerId, { name, phone });
+                await updateCustomer(customerId, {
+                  name,
+                  phone: BELARUS_PREFIX + phone,
+                });
                 setSaved(true);
                 setOpen(false);
                 router.refresh();
@@ -100,7 +101,7 @@ export default function CustomerEdit({
           onClick={() => {
             setOpen(false);
             setName(initialName);
-            setPhone(initialPhone);
+            setPhone(toLocalDigits(initialPhone));
             setErr(null);
           }}
           disabled={pending}

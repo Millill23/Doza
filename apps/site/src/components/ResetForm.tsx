@@ -1,4 +1,6 @@
 import { useState } from "react";
+import PhoneInput from "./PhoneInput";
+import { BELARUS_PREFIX } from "@doza/shared/phone";
 
 export default function ResetForm() {
   const [phone, setPhone] = useState("");
@@ -12,7 +14,7 @@ export default function ResetForm() {
       const r = await fetch("/api/auth/reset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone }),
+        body: JSON.stringify({ phone: BELARUS_PREFIX + phone }),
       });
       const data = await r.json();
       setDone(data.message || "Если номер зарегистрирован, новый пароль отправлен по SMS.");
@@ -41,11 +43,7 @@ export default function ResetForm() {
           <label htmlFor="rs-phone" className="mb-1.5 block text-xs uppercase tracking-luxe text-gold-500">
             Телефон
           </label>
-          <input
-            id="rs-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} required
-            className="h-11 w-full rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory placeholder:text-ivory-faint focus:border-gold-500 focus:outline-none"
-            placeholder="+375 (__) ___-__-__"
-          />
+          <PhoneInput id="rs-phone" value={phone} onChange={setPhone} required />
           <p className="mt-1.5 text-xs text-ivory-faint">
             Новый пароль придёт по SMS на этот номер.
           </p>

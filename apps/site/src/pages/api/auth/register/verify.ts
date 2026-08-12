@@ -1,7 +1,7 @@
 import type { APIRoute } from "astro";
 import { prisma } from "@doza/db";
 import { verifySmsCode } from "@doza/db/sms-codes";
-import { normalizePhone } from "@doza/shared";
+import { assertBelarusPhone } from "@doza/shared/phone";
 import { assertCustomerName } from "@doza/shared/customer-name";
 import { hashPassword, setSession } from "../../../../lib/customer-auth";
 
@@ -9,14 +9,15 @@ export const prerender = false;
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   const body = await request.json().catch(() => ({}));
-  const phone = normalizePhone(body.phone ?? "");
   const password = String(body.password ?? "");
   const code = String(body.code ?? "");
 
-  // Имя уходит в SMS и Telegram, поэтому проверяем состав символов.
+  // Имя уходит в SMS и Telegram, телефон становится идентификатором клиента.
   let name: string;
+  let phone: string;
   try {
     name = assertCustomerName(body.name ?? "");
+    phone = assertBelarusPhone(body.phone ?? "");
   } catch (e) {
     return json({ ok: false, error: (e as Error).message }, 400);
   }

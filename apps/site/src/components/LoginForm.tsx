@@ -1,4 +1,6 @@
 import { useState } from "react";
+import PhoneInput from "./PhoneInput";
+import { BELARUS_PREFIX } from "@doza/shared/phone";
 
 const inputCls =
   "h-11 w-full rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory placeholder:text-ivory-faint focus:border-gold-500 focus:outline-none";
@@ -18,7 +20,7 @@ export default function LoginForm() {
       const r = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, password }),
+        body: JSON.stringify({ phone: BELARUS_PREFIX + phone, password }),
       });
       const data = await r.json();
       if (!r.ok || !data.ok) {
@@ -38,7 +40,7 @@ export default function LoginForm() {
       <form onSubmit={submit} className="space-y-4">
         <div>
           <label htmlFor="l-phone" className={labelCls}>Телефон</label>
-          <input id="l-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} required className={inputCls} placeholder="+375 (__) ___-__-__" />
+          <PhoneInput id="l-phone" value={phone} onChange={setPhone} required />
         </div>
         <div>
           <label htmlFor="l-pass" className={labelCls}>Пароль</label>

@@ -1,20 +1,22 @@
 import type { APIRoute } from "astro";
 import { prisma } from "@doza/db";
 import { createSmsCode } from "@doza/db/sms-codes";
-import { normalizePhone } from "@doza/shared";
+import { assertBelarusPhone } from "@doza/shared/phone";
 import { sendSms } from "@doza/shared/sms";
 
 export const prerender = false;
 
 export const POST: APIRoute = async ({ request }) => {
   const body = await request.json().catch(() => ({}));
-  const phone = normalizePhone(body.phone ?? "");
   const name = (body.name ?? "").trim();
+  if (name.length < 2) return json({ ok: false, error: "Укажите имя" }, 400);
 
-  if (phone.length < 11)
-    return json({ ok: false, error: "Укажите корректный номер телефона" }, 400);
-  if (name.length < 2)
-    return json({ ok: false, error: "Укажите имя" }, 400);
+  let phone: string;
+  try {
+    phone = assertBelarusPhone(body.phone ?? "");
+  } catch (e) {
+    return json({ ok: false, error: (e as Error).message }, 400);
+  }
 
   const existing = await prisma.customer.findUnique({ where: { phone } });
   if (existing?.passwordHash) {

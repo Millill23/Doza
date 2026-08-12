@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { registerVip } from "@/lib/actions/customers";
+import PhoneInput from "@/components/PhoneInput";
+import { BELARUS_PREFIX } from "@doza/shared/phone";
 
 export default function VipRegisterForm() {
   const router = useRouter();
@@ -30,12 +32,7 @@ export default function VipRegisterForm() {
         Регистрация VIP-клиента (скидка 20% на всё)
       </p>
       <div className="grid gap-2 sm:grid-cols-3">
-        <input
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          placeholder="Телефон +375…"
-          className="h-10 rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory focus:border-gold-500 focus:outline-none"
-        />
+        <PhoneInput value={phone} onChange={setPhone} />
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -56,7 +53,7 @@ export default function VipRegisterForm() {
             start(async () => {
               try {
                 setErr(null);
-                await registerVip(phone, name, card);
+                await registerVip(BELARUS_PREFIX + phone, name, card);
                 setPhone("");
                 setName("");
                 setCard("");

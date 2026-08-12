@@ -8,6 +8,7 @@
     "./indexnow": "./src/indexnow.ts",
     "./telegram": "./src/telegram.ts",
     "./customer-name": "./src/customer-name.ts",
+    "./phone": "./src/phone.ts",
     "./day-range": "./src/day-range.ts"
   }
 }

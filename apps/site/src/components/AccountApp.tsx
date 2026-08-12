@@ -1,4 +1,6 @@
 import { useState } from "react";
+import PhoneInput from "./PhoneInput";
+import { BELARUS_PREFIX } from "@doza/shared/phone";
 
 function byn(n: number) {
   return `${n.toFixed(2)} BYN`;
@@ -27,7 +29,9 @@ export default function AccountApp() {
     setLoading(true);
     setSearched(false);
     try {
-      const r = await fetch(`/api/account?phone=${encodeURIComponent(phone)}`);
+      const r = await fetch(
+        `/api/account?phone=${encodeURIComponent(BELARUS_PREFIX + phone)}`,
+      );
       setData(await r.json());
     } catch {
       setData({ found: false });
@@ -47,13 +51,11 @@ export default function AccountApp() {
           Ваш номер телефона
         </label>
         <div className="flex gap-2">
-          <input
+          <PhoneInput
             id="acc-phone"
-            type="tel"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="+375 (__) ___-__-__"
-            className="h-11 flex-1 rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory placeholder:text-ivory-faint focus:border-gold-500 focus:outline-none"
+            onChange={setPhone}
+            className="flex-1"
           />
           <button
             type="submit"

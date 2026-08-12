@@ -2,11 +2,7 @@
 
 import { prisma } from "@doza/db";
 import { requestConsent } from "@doza/db/consent";
-import {
-  isConsentOverdue,
-  CONSENT_TTL_DAYS,
-  type ConsentSmsKind,
-} from "@doza/db/consent-rules";
+import { type ConsentSmsKind } from "@doza/db/consent-rules";
 import { sendSms } from "@doza/shared/sms";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/session";
@@ -83,53 +79,3 @@ export async function getConsentStatus(customerId: number) {
   };
 }
 
-/**
- * Удалить клиента, не давшего согласие в отведённый срок.
- *
- * Заказы и продажи остаются: их хранение — самостоятельное правовое основание
- * (исполнение договора и бухгалтерский учёт), оно не зависит от согласия на
- * лояльность. Но связь с клиентом рвётся, а всё, что жило исключительно на
- * согласии — баллы, памятные даты, привязка сертификатов — удаляется.
- */
-export async function deleteUnconsentedCustomer(customerId: number) {
-  await requireRole(["admin"]);
-
-  const customer = await prisma.customer.findUnique({
-    where: { id: customerId },
-    select: { phone: true, name: true, consentStatus: true, consentRequestedAt: true },
-  });
-  if (!customer) throw new Error("Клиент не найден");
-  if (customer.consentStatus === "confirmed")
-    throw new Error("Клиент дал согласие — удалять нельзя");
-  if (!customer.consentRequestedAt)
-    throw new Error("Клиенту ещё не отправляли запрос согласия");
-  if (!isConsentOverdue(customer))
-    throw new Error(
-      `С момента запроса не прошло ${CONSENT_TTL_DAYS} дней — клиент ещё может подтвердить`,
-    );
-
-  await prisma.$transaction(async (tx) => {
-    // Журнал ссылается на партии, поэтому его удаляем первым.
-    await tx.loyaltyLog.deleteMany({ where: { customerId } });
-    await tx.loyaltyBatch.deleteMany({ where: { customerId } });
-    await tx.customerDate.deleteMany({ where: { customerId } });
-
-    await tx.order.updateMany({ where: { customerId }, data: { customerId: null } });
-    await tx.offlineSale.updateMany({ where: { customerId }, data: { customerId: null } });
-    await tx.giftCertificate.updateMany({
-      where: { buyerId: customerId },
-      data: { buyerId: null },
-    });
-    await tx.giftCertificate.updateMany({
-      where: { customerId },
-      data: { customerId: null },
-    });
-    // Неиспользованные коды и ссылки этого номера больше ни к чему не ведут.
-    await tx.smsCode.deleteMany({ where: { phone: customer.phone } });
-
-    await tx.customer.delete({ where: { id: customerId } });
-  });
-
-  revalidatePath("/customers");
-  return { ok: true, name: customer.name };
-}

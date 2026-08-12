@@ -1,4 +1,6 @@
 import { useState } from "react";
+import PhoneInput from "./PhoneInput";
+import { BELARUS_PREFIX, isValidLocalDigits, PHONE_ERROR } from "@doza/shared/phone";
 
 const inputCls =
   "h-11 w-full rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory placeholder:text-ivory-faint focus:border-gold-500 focus:outline-none";
@@ -19,12 +21,16 @@ export default function RegisterForm() {
     e.preventDefault();
     setError(null);
     setInfo(null);
+    if (!isValidLocalDigits(phone)) {
+      setError(PHONE_ERROR);
+      return;
+    }
     setLoading(true);
     try {
       const r = await fetch("/api/auth/register/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, name }),
+        body: JSON.stringify({ phone: BELARUS_PREFIX + phone, name }),
       });
       const data = await r.json();
       if (!r.ok || !data.ok) {
@@ -52,7 +58,13 @@ export default function RegisterForm() {
       const r = await fetch("/api/auth/register/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, name, code, password, consent }),
+        body: JSON.stringify({
+          phone: BELARUS_PREFIX + phone,
+          name,
+          code,
+          password,
+          consent,
+        }),
       });
       const data = await r.json();
       if (!r.ok || !data.ok) {
@@ -77,7 +89,7 @@ export default function RegisterForm() {
           </div>
           <div>
             <label htmlFor="r-phone" className={labelCls}>Телефон</label>
-            <input id="r-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} required className={inputCls} placeholder="+375 (__) ___-__-__" />
+            <PhoneInput id="r-phone" value={phone} onChange={setPhone} required />
           </div>
           {error && <p className="text-sm text-red-300">{error}</p>}
           <button type="submit" disabled={loading} className="h-11 w-full rounded-full bg-gold-gradient text-sm font-medium text-ink-900 disabled:opacity-60">

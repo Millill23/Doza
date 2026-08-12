@@ -1,11 +1,19 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import {
   createOfflineSale,
   lookupCustomer,
   requestLoyaltySpendOtp,
 } from "@/lib/actions/cash";
+import PhoneInput from "@/components/PhoneInput";
+import { ConsentRequestButton } from "@/components/ConsentControls";
+import {
+  BELARUS_PREFIX,
+  isValidLocalDigits,
+  PHONE_ERROR,
+} from "@doza/shared/phone";
 // Тот же движок, что и на сервере — предпросмотр обязан совпадать с чеком.
 import { priceCart } from "@doza/db/pricing";
 
@@ -84,10 +92,15 @@ export default function CashRegister({
   const [query, setQuery] = useState("");
   const [brandFilter, setBrandFilter] = useState<string | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
+  /** Локальная часть номера (9 цифр), префикс +375 добавляется при отправке. */
   const [phone, setPhone] = useState("");
-  const [name, setName] = useState("");
   const [balance, setBalance] = useState(0);
   const [foundName, setFoundName] = useState<string | null>(null);
+  const [foundId, setFoundId] = useState<number | null>(null);
+  /** Найденный клиент не подтвердил согласие — баллы ему не начислятся. */
+  const [needsConsent, setNeedsConsent] = useState(false);
+  /** Искали и не нашли — предлагаем зарегистрировать. */
+  const [notFound, setNotFound] = useState(false);
   const [vipCard, setVipCard] = useState<string | null>(null);
   const [vipPercent, setVipPercent] = useState(0);
   const [subscribe, setSubscribe] = useState(false);
@@ -214,13 +227,20 @@ export default function CashRegister({
   }
 
   function checkPhone() {
+    if (!isValidLocalDigits(phone)) {
+      setError(PHONE_ERROR);
+      return;
+    }
+    setError(null);
     startTransition(async () => {
-      const r = await lookupCustomer(phone);
+      const r = await lookupCustomer(BELARUS_PREFIX + phone);
       setBalance(r.balance);
       setFoundName(r.found ? r.name : null);
+      setFoundId(r.id);
+      setNeedsConsent(r.found && !r.hasConsent);
+      setNotFound(!r.found);
       setVipCard(r.vipCard ?? null);
       setVipPercent(r.vipPercent ?? 0);
-      if (r.found && r.name && !name) setName(r.name);
     });
   }
 
@@ -242,9 +262,11 @@ export default function CashRegister({
     setCart([]);
 
     setPhone("");
-    setName("");
     setBalance(0);
     setFoundName(null);
+    setFoundId(null);
+    setNeedsConsent(false);
+    setNotFound(false);
     setVipCard(null);
     setVipPercent(0);
     setSubscribe(false);
@@ -271,8 +293,9 @@ export default function CashRegister({
             atomizerId: l.atomizerId,
           })),
 
-          phone: phone || undefined,
-          name: name || undefined,
+          // Отправляем номер, только если клиент реально найден: касса больше
+          // не заводит клиентов на лету — регистрация живёт в одном месте.
+          phone: foundName ? BELARUS_PREFIX + phone : undefined,
           loyaltySpend: effSpend,
           loyaltyOtp: otp || undefined,
           socialSubscribe: subscribe,
@@ -430,16 +453,25 @@ export default function CashRegister({
             Телефон клиента (для баллов)
           </label>
           <div className="flex gap-2">
-            <input
+            <PhoneInput
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+375…"
-              className="h-10 flex-1 rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory focus:border-gold-500 focus:outline-none"
+              onChange={(v) => {
+                setPhone(v);
+                // Номер изменили — прошлый результат поиска больше не про него.
+                setFoundName(null);
+                setFoundId(null);
+                setNeedsConsent(false);
+                setNotFound(false);
+                setVipCard(null);
+                setBalance(0);
+              }}
+              onEnter={checkPhone}
+              className="flex-1"
             />
             <button
               onClick={checkPhone}
               disabled={pending}
-              className="rounded-lg border border-gold-600/50 px-3 text-xs text-gold-400 hover:border-gold-500"
+              className="h-10 shrink-0 rounded-lg border border-gold-600/50 px-3 text-xs text-gold-400 hover:border-gold-500 disabled:opacity-50"
             >
               Найти
             </button>
@@ -454,13 +486,31 @@ export default function CashRegister({
               )}
             </p>
           )}
-          {phone && !foundName && (
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Имя нового клиента"
-              className="mt-2 h-10 w-full rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory focus:border-gold-500 focus:outline-none"
-            />
+          {needsConsent && foundId && (
+            <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+              <p className="mb-2 text-xs leading-relaxed text-amber-300">
+                Нет согласия на обработку данных — баллы за эту покупку не
+                начислятся. Отправьте ссылку и попросите подтвердить.
+              </p>
+              <ConsentRequestButton
+                customerId={foundId}
+                label="Отправить согласие"
+              />
+            </div>
+          )}
+          {notFound && (
+            <div className="mt-2 rounded-lg border border-gold-600/30 bg-ink-800 p-3">
+              <p className="mb-2 text-xs leading-relaxed text-ivory-faint">
+                Клиент не найден. Без регистрации продажу пробить можно, но
+                баллы начисляться не будут.
+              </p>
+              <Link
+                href={`/customers/register?phone=${phone}`}
+                className="inline-flex h-9 items-center rounded-full bg-gold-gradient px-4 text-xs font-medium text-ink-900"
+              >
+                Зарегистрировать нового клиента
+              </Link>
+            </div>
           )}
         </div>
 

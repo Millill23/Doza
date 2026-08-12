@@ -68,32 +68,44 @@ export interface CashItemInput {
 export async function lookupCustomer(phoneRaw: string) {
   await requireRole(["admin", "seller"]);
   const phone = normalizePhone(phoneRaw);
-  if (phone.length < 9) return { found: false, name: null, balance: 0 };
+  const miss = {
+    found: false as const,
+    id: null,
+    name: null,
+    balance: 0,
+    vipCard: null,
+    vipPercent: 0,
+    hasConsent: false,
+  };
+  if (phone.length < 9) return miss;
 
   const customer = await prisma.customer.findUnique({
     where: { phone },
-    select: { id: true, name: true, vipCardNumber: true },
+    select: { id: true, name: true, vipCardNumber: true, consentStatus: true },
   });
-  if (!customer)
-    return { found: false, name: null, balance: 0, vipCard: null, vipPercent: 0 };
+  if (!customer) return miss;
 
   const balance = await getBalance(customer.id);
   const vipPercent = customer.vipCardNumber
     ? await getSetting("vip_discount_percent", 20)
     : 0;
   return {
-    found: true,
+    found: true as const,
+    id: customer.id,
     name: customer.name,
     balance,
     vipCard: customer.vipCardNumber,
     vipPercent,
+    // Без согласия баллы не начисляются — продавец должен это видеть до того,
+    // как пробьёт чек и пообещает покупателю бонусы.
+    hasConsent: customer.consentStatus === "confirmed",
   };
 }
 
 interface CreateSaleInput {
   items: CashItemInput[];
+  /** Номер уже зарегистрированного клиента. Незнакомый номер просто игнорируется. */
   phone?: string;
-  name?: string;
   loyaltySpend?: number;
   loyaltyOtp?: string;
   /** Скидка 5% за подписку в соцсетях. */
@@ -154,33 +166,18 @@ export async function createOfflineSale(input: CreateSaleInput) {
 
   // Клиент (опционально)
   let customerId: number | null = null;
+  let customerName: string | null = null;
   let vipCard: string | null = null;
   if (input.phone) {
+    // Касса только привязывает чек к существующему клиенту. Заводить нового
+    // отсюда нельзя: регистрация — единая точка в разделе «Клиенты», иначе в
+    // базе плодятся безымянные «Покупатели» без согласия и памятных дат.
     const phone = normalizePhone(input.phone);
-    if (phone.length >= 9) {
-      // Имя необязательно, но если введено — проверяем: оно уходит в SMS и TG.
-      const typedName = (input.name ?? "").trim();
-      const safeName = typedName ? assertCustomerName(typedName) : "";
-      const existing = await prisma.customer.findUnique({
-        where: { phone },
-        select: { id: true },
-      });
-      const customer = await prisma.customer.upsert({
-        where: { phone },
-        update: safeName ? { name: safeName } : {},
-        create: { phone, name: safeName || "Покупатель" },
-      });
+    const customer = await prisma.customer.findUnique({ where: { phone } });
+    if (customer) {
       customerId = customer.id;
+      customerName = customer.name;
       vipCard = customer.vipCardNumber;
-
-      // Новому покупателю сразу отправляем ссылку на согласие — иначе баллы за
-      // эту же покупку не начислятся. Постоянным ничего не шлём: напоминание на
-      // каждый чек раздражает, для них есть кнопка в карточке клиента.
-      if (!existing) {
-        await requestConsent(customer.id, sendSms).catch((e) =>
-          console.error("[cash] запрос согласия не ушёл:", e),
-        );
-      }
     }
   }
 
@@ -391,7 +388,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
     const allLines = lines;
     const grossAll = total;
     const customerLine = customerId
-      ? `${tgEscape(input.name?.trim() || "Покупатель")}${input.phone ? ` (${normalizePhone(input.phone)})` : ""}`
+      ? `${tgEscape(customerName ?? "")} (${normalizePhone(input.phone ?? "")})`
       : "без клиента";
     await notifyTelegram(
       `🧾 <b>Оффлайн-продажа #${sale.id}</b>\n` +

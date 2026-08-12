@@ -4,16 +4,23 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { registerCustomerOffline } from "@/lib/actions/customers";
 import { getConsentStatus, sendConsentRequest } from "@/lib/actions/consent";
+import PhoneInput from "@/components/PhoneInput";
+import { BELARUS_PREFIX, isValidLocalDigits, PHONE_ERROR } from "@doza/shared/phone";
 
 const inputCls =
   "h-10 w-full rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory focus:border-gold-500 focus:outline-none";
 const labelCls = "mb-1.5 block text-xs uppercase tracking-wide text-gold-500";
 
-export default function OfflineRegister() {
+export default function OfflineRegister({
+  initialPhone = "",
+}: {
+  /** Локальные 9 цифр из кассы, если регистрацию начали оттуда. */
+  initialPhone?: string;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [step, setStep] = useState<1 | 2>(1);
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(initialPhone);
   const [name, setName] = useState("");
   const [birthday, setBirthday] = useState("");
   const [dates, setDates] = useState<{ date: string; description: string }[]>([]);
@@ -49,6 +56,10 @@ export default function OfflineRegister() {
   function register() {
     setErr(null);
     setInfo(null);
+    if (!isValidLocalDigits(phone)) {
+      setErr(PHONE_ERROR);
+      return;
+    }
     if (name.trim().length < 2) {
       setErr("Укажите имя");
       return;
@@ -56,7 +67,7 @@ export default function OfflineRegister() {
     startTransition(async () => {
       try {
         const r = await registerCustomerOffline({
-          phone,
+          phone: BELARUS_PREFIX + phone,
           name,
           birthday: birthday || undefined,
           dates,
@@ -92,11 +103,17 @@ export default function OfflineRegister() {
         <div className="space-y-4">
           <div>
             <label className={labelCls}>Телефон клиента</label>
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+375…" className={inputCls} />
+            <PhoneInput value={phone} onChange={setPhone} autoFocus={!initialPhone} />
           </div>
           <div>
             <label className={labelCls}>Имя</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Только русские буквы"
+              autoFocus={Boolean(initialPhone)}
+              className={inputCls}
+            />
           </div>
           <div>
             <label className={labelCls}>День рождения (необязательно)</label>
