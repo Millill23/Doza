@@ -11,6 +11,7 @@ import {
   assertBelarusPhone,
   formatLocalDigits,
   PHONE_ERROR,
+  toStoredPhone,
 } from "./phone.ts";
 
 test("разбирает все варианты записи одного номера", () => {
@@ -71,4 +72,18 @@ test("маска форматирует и незаконченный ввод",
   assert.equal(formatLocalDigits("292453333"), "29 245-33-33");
   // Лишние цифры обрезаются, а не ломают формат.
   assert.equal(formatLocalDigits("2924533339999"), "29 245-33-33");
+});
+
+test("toStoredPhone приводит любой ввод к виду из базы", () => {
+  // Регрессия: касса отдавала девять цифр без префикса, сервер искал
+  // «291234567» и не находил клиента — продавец видел непонятную ошибку.
+  assert.equal(toStoredPhone("291234567"), "375291234567");
+  assert.equal(toStoredPhone("375291234567"), "375291234567");
+  assert.equal(toStoredPhone("+375 (29) 123-45-67"), "375291234567");
+  assert.equal(toStoredPhone("80291234567"), "375291234567");
+});
+
+test("toStoredPhone не проверяет код оператора", () => {
+  // Номера, заведённые до строгой маски, обязаны находиться в кассе.
+  assert.equal(toStoredPhone("171234567"), "375171234567");
 });

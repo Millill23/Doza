@@ -56,6 +56,16 @@ export const SMS_KINDS = {
     hint: "Когда клиенту зачислен подарочный сертификат.",
     required: false,
   },
+  birthday_gift: {
+    label: "Поздравление с днём рождения",
+    hint: "Раз в год в день рождения, вместе с подарочными баллами.",
+    required: false,
+  },
+  date_discount: {
+    label: "Скидка к памятной дате",
+    hint: "За несколько дней до памятной даты клиента.",
+    required: false,
+  },
 } as const;
 
 export type SmsKind = keyof typeof SMS_KINDS;

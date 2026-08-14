@@ -58,6 +58,7 @@ function byn(n: number) {
 const DISCOUNT_LABEL: Record<string, string> = {
   vip: "VIP",
   social: "за подписки",
+  date: "по памятной дате",
   promo: "акция",
   super: "супер-акция",
   none: "",
@@ -99,6 +100,14 @@ export default function CashRegister({
   const [foundId, setFoundId] = useState<number | null>(null);
   /** Найденный клиент не подтвердил согласие — баллы ему не начислятся. */
   const [needsConsent, setNeedsConsent] = useState(false);
+  /** Действующая разовая скидка клиента по памятной дате. */
+  const [dateReward, setDateReward] = useState<{
+    percent: number;
+    description: string;
+    validUntil: string;
+  } | null>(null);
+  /** Покупатель согласился её потратить сейчас. */
+  const [useDate, setUseDate] = useState(false);
   /** Искали и не нашли — предлагаем зарегистрировать. */
   const [notFound, setNotFound] = useState(false);
   const [vipCard, setVipCard] = useState<string | null>(null);
@@ -164,6 +173,7 @@ export default function CashRegister({
       })),
       vipPercent,
       socialPercent,
+      datePercent: useDate ? (dateReward?.percent ?? 0) : 0,
       productPromoPercent: promoMap,
       superPromo: superPromo
         ? {
@@ -172,7 +182,7 @@ export default function CashRegister({
           }
         : null,
     });
-  }, [cart, vipPercent, socialPercent, superPromo]);
+  }, [cart, vipPercent, socialPercent, useDate, dateReward, superPromo]);
 
   const total = priced.gross;
   const netTotal = priced.net;
@@ -238,6 +248,8 @@ export default function CashRegister({
       setFoundName(r.found ? r.name : null);
       setFoundId(r.id);
       setNeedsConsent(r.found && !r.hasConsent);
+      setDateReward(r.dateReward);
+      setUseDate(false);
       setNotFound(!r.found);
       setVipCard(r.vipCard ?? null);
       setVipPercent(r.vipPercent ?? 0);
@@ -248,10 +260,15 @@ export default function CashRegister({
     setError(null);
     startTransition(async () => {
       try {
-        const r = await requestLoyaltySpendOtp(phone, effSpend);
+        // Номер уходит в полном виде: в поле лежат только девять цифр.
+        const r = await requestLoyaltySpendOtp(BELARUS_PREFIX + phone, effSpend);
+        if (!r.ok) {
+          setError(r.error ?? "Не удалось отправить код");
+          return;
+        }
         setOtpSent(true);
         if (!r.smsSent)
-          setError("SMS не настроены — код не отправлен. Обратитесь к администратору.");
+          setError("Код не отправлен: проверьте настройки SMS в разделе «SMS-рассылки».");
       } catch (e) {
         setError((e as Error).message);
       }
@@ -267,6 +284,8 @@ export default function CashRegister({
     setFoundId(null);
     setNeedsConsent(false);
     setNotFound(false);
+    setDateReward(null);
+    setUseDate(false);
     setVipCard(null);
     setVipPercent(0);
     setSubscribe(false);
@@ -300,6 +319,7 @@ export default function CashRegister({
           loyaltyOtp: otp || undefined,
           socialSubscribe: subscribe,
           socialStory: story,
+          useDateReward: useDate,
           sellerId,
         });
         setDone({
@@ -462,6 +482,8 @@ export default function CashRegister({
                 setFoundId(null);
                 setNeedsConsent(false);
                 setNotFound(false);
+                setDateReward(null);
+                setUseDate(false);
                 setVipCard(null);
                 setBalance(0);
               }}
@@ -485,6 +507,33 @@ export default function CashRegister({
                 </span>
               )}
             </p>
+          )}
+          {dateReward && (
+            <div className="mt-2 rounded-lg border border-botanical-500/40 bg-botanical-500/5 p-3">
+              <p className="text-xs font-medium text-botanical-300">
+                🎁 Скидка {dateReward.percent}% — «{dateReward.description}»
+              </p>
+              <p className="mt-0.5 text-[11px] text-ivory-faint">
+                Действует до{" "}
+                {new Date(dateReward.validUntil).toLocaleDateString("ru-RU")}.
+                Разовая: если покупатель не хочет тратить сейчас, оставьте
+                выключенной — скидка сохранится до конца срока.
+              </p>
+              <button
+                type="button"
+                onClick={() => setUseDate((v) => !v)}
+                className={`mt-2 ${chipCls(useDate)}`}
+              >
+                {useDate ? "✓ Применена" : `Применить −${dateReward.percent}%`}
+              </button>
+              {useDate && priced.kind !== "date" && (
+                <p className="mt-2 text-[11px] leading-snug text-amber-300">
+                  Сейчас выгоднее{" "}
+                  {DISCOUNT_LABEL[priced.kind] || "другая скидка"} — эта останется
+                  неиспользованной.
+                </p>
+              )}
+            </div>
           )}
           {needsConsent && foundId && (
             <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">

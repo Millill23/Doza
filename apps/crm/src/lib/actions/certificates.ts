@@ -8,7 +8,7 @@ import {
   CERTIFICATE_DENOMINATIONS,
 } from "@doza/db/certificates";
 import { sendSmsFromCrm } from "@/lib/sms";
-import { normalizePhone } from "@doza/shared";
+import { toStoredPhone } from "@doza/shared/phone";
 import { assertCustomerName } from "@doza/shared/customer-name";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/session";
@@ -39,7 +39,7 @@ export async function prepareCertificate(denomination: number, phoneRaw?: string
   let vipCard: string | null = null;
   let vipPercent = 0;
 
-  const phone = phoneRaw ? normalizePhone(phoneRaw) : "";
+  const phone = phoneRaw ? toStoredPhone(phoneRaw) : "";
   if (phone.length >= 9) {
     const customer = await prisma.customer.findUnique({
       where: { phone },
@@ -81,7 +81,7 @@ export async function issueCertificate(input: {
   let buyerId: number | null = null;
   let vipPercent = 0;
   let vipCard: string | null = null;
-  const phone = input.phone ? normalizePhone(input.phone) : "";
+  const phone = input.phone ? toStoredPhone(input.phone) : "";
   if (phone.length >= 9) {
     const customer = await prisma.customer.findUnique({
       where: { phone },
@@ -136,7 +136,7 @@ export async function activateCertificateInCrm(input: {
   const session = await requireRole(["admin", "seller"]);
   const activatedById = Number(session.user.id);
 
-  const phone = normalizePhone(input.phone ?? "");
+  const phone = toStoredPhone(input.phone ?? "");
   if (phone.length < 9) throw new Error("Укажите корректный телефон клиента");
 
   // Имя необязательно, но если введено — проверяем: оно уходит в SMS и TG.

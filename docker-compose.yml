@@ -22,6 +22,10 @@ services:
     env_file: .env
     environment:
       UPLOADS_DIR: /uploads
+      # Магазин работает в Беларуси, а контейнер по умолчанию живёт в UTC.
+      # Без этого «сегодня» в отчётах и датах наступает на три часа позже:
+      # вечерние продажи уезжают в следующий день.
+      TZ: Europe/Minsk
     volumes:
       - uploads:/uploads:ro
     depends_on:
@@ -38,6 +42,7 @@ services:
     env_file: .env
     environment:
       UPLOADS_DIR: /uploads
+      TZ: Europe/Minsk
     volumes:
       - uploads:/uploads
     depends_on:
@@ -46,17 +51,23 @@ services:
     expose:
       - "3000"
 
-  # Планировщик: раз в час дёргает напоминания об акциях (идемпотентно)
+  # Планировщик. Дёргает задачи каждые 15 минут, а не раз в час: подарки
+  # рассылаются строго в 11:00 по Минску, и при часовом шаге короткий
+  # перезапуск контейнера мог бы сдвинуть цикл и съесть это окно целиком.
+  # Обе задачи идемпотентны, поэтому лишние вызовы безвредны: подарки
+  # выдаются один раз за повод, напоминания об акции — один раз за акцию.
   cron:
     image: alpine:3
     restart: unless-stopped
     env_file: .env
+    environment:
+      TZ: Europe/Minsk
     depends_on:
       - crm
     command:
       - sh
       - -c
-      - 'while true; do sleep 3600; wget -q -O- "http://crm:3000/api/cron/promo-reminders?key=$${CRON_SECRET}" >/dev/null 2>&1 || true; done'
+      - 'while true; do sleep 900; wget -q -O- "http://crm:3000/api/cron/promo-reminders?key=$${CRON_SECRET}" >/dev/null 2>&1 || true; wget -q -O- "http://crm:3000/api/cron/daily-rewards?key=$${CRON_SECRET}" >/dev/null 2>&1 || true; done'
 
   nginx:
     image: nginx:alpine

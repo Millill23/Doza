@@ -31,6 +31,11 @@ export interface PricingInput {
   vipPercent?: number;
   /** Скидка за подписку/сторис, % (суммарно за обе). 0 — нет. */
   socialPercent?: number;
+  /**
+   * Скидка по памятной дате, %. Передаётся, только если продавец её применил:
+   * покупатель вправе отказаться и приберечь на потом.
+   */
+  datePercent?: number;
   /** Лучшая активная акция на конкретный товар, % (ключ — productId). */
   productPromoPercent?: Record<number, number>;
   /** Акция «на все товары», % — применяется к любой позиции. */
@@ -40,7 +45,7 @@ export interface PricingInput {
 }
 
 /** Какая механика в итоге дала скидку (для журнала и отчётов). */
-export type DiscountKind = "none" | "vip" | "social" | "promo" | "super";
+export type DiscountKind = "none" | "vip" | "social" | "date" | "promo" | "super";
 
 export interface PricingResult {
   /** Сумма без скидок. */
@@ -105,12 +110,12 @@ function unitAfter(unitPrice: number, percent: number): number {
  */
 function percentScenario(
   input: PricingInput,
-  opts: { vip: number; social: number },
+  opts: { vip: number; social: number; date: number },
 ): { lineNet: number[]; total: number } {
   const lineNet: number[] = [];
   let total = 0;
   for (const l of input.lines) {
-    const pct = Math.max(opts.vip, opts.social, promoFor(input, l.productId));
+    const pct = Math.max(opts.vip, opts.social, opts.date, promoFor(input, l.productId));
     const sum = r2(unitAfter(l.unitPrice, pct) * l.qty);
     lineNet.push(sum);
     total += sum;
@@ -168,17 +173,22 @@ export function priceCart(input: PricingInput): PricingResult {
 
   const vip = clampPercent(input.vipPercent);
   const social = clampPercent(input.socialPercent);
+  const date = clampPercent(input.datePercent);
 
-  const withAll = percentScenario(safe, { vip, social });
+  const withAll = percentScenario(safe, { vip, social, date });
   // Базовый сценарий — только акции товаров. Нужен, чтобы понять, дал ли
-  // выигрыш именно VIP/соцскидка, или всё сделала обычная акция.
-  const promoOnly = percentScenario(safe, { vip: 0, social: 0 });
+  // выигрыш именно персональная скидка, или всё сделала обычная акция.
+  const promoOnly = percentScenario(safe, { vip: 0, social: 0, date: 0 });
 
   let best = { lineNet: withAll.lineNet, total: withAll.total, freeUnits: 0 };
   let kind: DiscountKind;
 
   if (withAll.total < promoOnly.total) {
-    kind = vip >= social ? "vip" : "social";
+    // При равных процентах побеждает механика, которая ничего не тратит:
+    // скидка по дате одноразовая, и списывать её ради того же результата,
+    // что даёт VIP-карта, — значит обокрасть покупателя.
+    const bestPct = Math.max(vip, social, date);
+    kind = bestPct === vip ? "vip" : bestPct === social ? "social" : "date";
   } else {
     kind = promoOnly.total < gross ? "promo" : "none";
   }

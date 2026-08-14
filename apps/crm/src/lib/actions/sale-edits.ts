@@ -108,7 +108,14 @@ export async function cancelOfflineSale(saleId: number, reason: string) {
       }
     }
 
-    // 4. Статус + журнал
+    // 4. Возврат разовой скидки по памятной дате: продажи не было — значит и
+    // скидка не потрачена. Срок при этом не продлевается, окно то же.
+    await tx.dateReward.updateMany({
+      where: { usedSaleId: sale.id },
+      data: { usedAt: null, usedSaleId: null },
+    });
+
+    // 5. Статус + журнал
     await tx.offlineSale.update({
       where: { id: sale.id },
       data: { status: "cancelled" },

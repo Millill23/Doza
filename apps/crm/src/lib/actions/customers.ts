@@ -274,6 +274,9 @@ export async function deleteCustomer(customerId: number) {
     // Журнал ссылается на партии, поэтому его удаляем первым.
     await tx.loyaltyLog.deleteMany({ where: { customerId } });
     await tx.loyaltyBatch.deleteMany({ where: { customerId } });
+    // Награды по датам ссылаются и на клиента, и на сами даты — снимаем их
+    // раньше дат, иначе внешний ключ не даст удалить.
+    await tx.dateReward.deleteMany({ where: { customerId } });
     await tx.customerDate.deleteMany({ where: { customerId } });
 
     await tx.order.updateMany({ where: { customerId }, data: { customerId: null } });

@@ -54,6 +54,22 @@ export function isValidBelarusPhone(input: string): boolean {
 }
 
 /**
+ * Привести номер к хранимому виду для поиска в базе.
+ *
+ * В отличие от `assertBelarusPhone` не проверяет код оператора: поиск обязан
+ * находить и номера, заведённые до появления строгой маски. Нужна там, где
+ * номер приходит из интерфейса в любом виде — поле ввода отдаёт девять цифр
+ * без префикса, и без приведения запрос уходил бы искать «291234567», чего в
+ * базе нет никогда.
+ */
+export function toStoredPhone(input: string): string {
+  const local = toLocalDigits(input);
+  return local.length === BELARUS_LOCAL_LENGTH
+    ? BELARUS_PREFIX + local
+    : digitsOnly(input);
+}
+
+/**
  * Проверить и вернуть номер в хранимом виде `375XXXXXXXXX`.
  * Бросает Error с текстом, который показывается продавцу или покупателю.
  */

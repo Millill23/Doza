@@ -238,6 +238,7 @@ model Customer {
   consentConfirmedAt DateTime?     @map("consent_confirmed_at")
 
   dates           CustomerDate[]
+  dateRewards     DateReward[]
   orders          Order[]
   offlineSales    OfflineSale[]
   loyaltyBatches  LoyaltyBatch[]
@@ -381,8 +382,53 @@ model CustomerDate {
   customer    Customer @relation(fields: [customerId], references: [id])
   date        DateTime @db.Date
   description String
+  rewards     DateReward[]
 
   @@map("customer_dates")
+}
+
+/// Что дарим по дате: баллы на день рождения или разовую скидку на памятную.
+enum DateRewardKind {
+  birthday
+  memorable
+}
+
+/// Награда за дату: подарок ко дню рождения или разовая скидка к памятной дате.
+///
+/// Отдельная запись нужна по двум причинам. Во-первых, начисление обязано быть
+/// однократным: задача крутится каждый час, и без следа «уже выдано» клиент
+/// получал бы подарок двадцать четыре раза в сутки. Во-вторых, скидку покупатель
+/// вправе не использовать сразу — она ждёт его до конца срока, и это состояние
+/// нужно где-то хранить.
+model DateReward {
+  id             Int            @id @default(autoincrement())
+  customerId     Int            @map("customer_id")
+  customer       Customer       @relation(fields: [customerId], references: [id])
+  kind           DateRewardKind
+  /// Памятная дата, породившая скидку. null — день рождения.
+  customerDateId Int?           @map("customer_date_id")
+  customerDate   CustomerDate?  @relation(fields: [customerDateId], references: [id])
+
+  /// Повод в виде строки: `birthday-2026` или `date-17-2026`. Именно по нему
+  /// работает защита от повторной выдачи — составной ключ с nullable-колонкой
+  /// в Postgres не сработал бы, там NULL не равен NULL.
+  occasionKey    String         @map("occasion_key")
+
+  /// Скидка в процентах (для памятной даты).
+  percent        Decimal?       @db.Decimal(5, 2)
+  /// Подаренные баллы (для дня рождения).
+  pointsByn      Decimal?       @map("points_byn") @db.Decimal(10, 2)
+
+  validFrom      DateTime       @map("valid_from")
+  validUntil     DateTime       @map("valid_until")
+  /// Когда скидку применили в кассе. null — ещё не использована.
+  usedAt         DateTime?      @map("used_at")
+  usedSaleId     Int?           @map("used_sale_id")
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  @@unique([customerId, occasionKey])
+  @@index([customerId, usedAt])
+  @@map("date_rewards")
 }
 
 // ─── Лояльность ───────────────────────────────────────────────────────────────

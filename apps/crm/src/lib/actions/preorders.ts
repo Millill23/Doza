@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@doza/db";
-import { normalizePhone } from "@doza/shared";
+import { toStoredPhone } from "@doza/shared/phone";
 import { requireRole } from "@/lib/session";
 import { notifyTelegram, tgEscape } from "@/lib/telegram";
 import { revalidatePath } from "next/cache";
@@ -19,7 +19,7 @@ export async function createPreorder(input: CreatePreorderInput) {
   const sellerId = Number(session.user.id);
 
   const customerName = input.customerName?.trim();
-  const phone = normalizePhone(input.phone ?? "");
+  const phone = toStoredPhone(input.phone ?? "");
   const wish = input.wish?.trim();
   const note = input.note?.trim() || null;
 

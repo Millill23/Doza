@@ -3,7 +3,7 @@
 import { prisma } from "@doza/db";
 import { earnPoints, getBalance, spendPoints } from "@doza/db/loyalty";
 import { sendSmsFromCrm } from "@/lib/sms";
-import { normalizePhone } from "@doza/shared";
+import { toStoredPhone } from "@doza/shared/phone";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/session";
 import { notifyTelegram, tgEscape } from "@/lib/telegram";
@@ -21,7 +21,7 @@ function fmt(n: number): string {
 /** Найти клиента по телефону — для подстановки имени перед начислением. */
 export async function findCustomerForPoints(phoneRaw: string) {
   await requireRole(["admin"]);
-  const phone = normalizePhone(phoneRaw);
+  const phone = toStoredPhone(phoneRaw);
   if (phone.length < 9) return { found: false as const };
 
   const customer = await prisma.customer.findUnique({
@@ -49,7 +49,7 @@ export async function grantPoints(input: {
 }) {
   const session = await requireRole(["admin"]);
 
-  const phone = normalizePhone(input.phone ?? "");
+  const phone = toStoredPhone(input.phone ?? "");
   if (phone.length < 9) throw new Error("Укажите корректный телефон клиента");
 
   const amount = Math.round(Number(input.amount) * 100) / 100;
@@ -128,7 +128,7 @@ export async function deductPoints(input: {
 }) {
   const session = await requireRole(["admin"]);
 
-  const phone = normalizePhone(input.phone ?? "");
+  const phone = toStoredPhone(input.phone ?? "");
   if (phone.length < 9) throw new Error("Укажите корректный телефон клиента");
 
   const amount = Math.round(Number(input.amount) * 100) / 100;

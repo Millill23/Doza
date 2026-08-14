@@ -11,25 +11,38 @@ import {
 import { priceCart } from "@doza/db/pricing";
 import { createSmsCode, verifySmsCode } from "@doza/db/sms-codes";
 import { requestConsent } from "@doza/db/consent";
+import { activeDateReward, consumeDateReward } from "@doza/db/rewards";
 import { sendSmsFromCrm } from "@/lib/sms";
-import { normalizePhone } from "@doza/shared";
+import { toStoredPhone } from "@doza/shared/phone";
 import { assertCustomerName } from "@doza/shared/customer-name";
 import { sendSms } from "@doza/shared/sms";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/session";
 import { notifyTelegram, tgEscape } from "@/lib/telegram";
 
+/** Отказ, понятный продавцу. Форма ответа общая с успешной веткой. */
+function fail(error: string) {
+  return { ok: false as const, error, smsSent: false, balance: 0 };
+}
+
 /** Отправить покупателю SMS-код для подтверждения списания баллов. */
 export async function requestLoyaltySpendOtp(phoneRaw: string, amount: number) {
   const session = await requireRole(["admin", "seller"]);
-  const phone = normalizePhone(phoneRaw);
-  if (phone.length < 9) throw new Error("Некорректный телефон");
-  if (amount <= 0) throw new Error("Укажите количество баллов");
+  // Приводим к хранимому виду: поле ввода отдаёт девять цифр без префикса, и
+  // прежний `normalizePhone` пропускал их как есть — поиск шёл по «291234567»,
+  // клиент не находился, а продавец видел лишь «ошибка сервера».
+  const phone = toStoredPhone(phoneRaw);
+
+  // Ожидаемые отказы возвращаем значением, а не исключением: в production
+  // Next.js прячет текст ошибки server action за digest, и до продавца
+  // доходила бы бессмысленная строка вместо причины.
+  if (phone.length < 12) return fail("Некорректный телефон");
+  if (amount <= 0) return fail("Укажите количество баллов");
 
   const customer = await prisma.customer.findUnique({ where: { phone } });
-  if (!customer) throw new Error("Клиент не найден");
+  if (!customer) return fail("Клиент не найден — проверьте номер");
   const balance = await getBalance(customer.id);
-  if (balance <= 0) throw new Error("У клиента нет баллов");
+  if (balance <= 0) return fail("У клиента нет баллов");
 
   const code = await createSmsCode(phone, "loyalty_spend", { amount });
   const sms = await sendSmsFromCrm({
@@ -39,7 +52,7 @@ export async function requestLoyaltySpendOtp(phoneRaw: string, amount: number) {
     customerId: customer.id,
     userId: Number(session.user.id),
   });
-  return { ok: true, smsSent: sms.ok, balance };
+  return { ok: true as const, error: null, smsSent: sms.ok, balance };
 }
 
 async function getSetting(key: string, fallback: number): Promise<number> {
@@ -51,6 +64,7 @@ async function getSetting(key: string, fallback: number): Promise<number> {
 const DISCOUNT_LABEL: Record<string, string> = {
   vip: "VIP",
   social: "за подписки",
+  date: "по памятной дате",
   promo: "акция",
   super: "супер-акция",
   none: "",
@@ -71,10 +85,11 @@ export interface CashItemInput {
 /** Поиск клиента по телефону + баланс баллов. */
 export async function lookupCustomer(phoneRaw: string) {
   await requireRole(["admin", "seller"]);
-  const phone = normalizePhone(phoneRaw);
+  const phone = toStoredPhone(phoneRaw);
   const miss = {
     found: false as const,
     id: null,
+    dateReward: null,
     name: null,
     balance: 0,
     vipCard: null,
@@ -93,9 +108,19 @@ export async function lookupCustomer(phoneRaw: string) {
   const vipPercent = customer.vipCardNumber
     ? await getSetting("vip_discount_percent", 20)
     : 0;
+  const reward = await activeDateReward(customer.id);
   return {
     found: true as const,
     id: customer.id,
+    /** Действующая скидка по памятной дате — продавец предлагает её покупателю. */
+    dateReward: reward
+      ? {
+          id: reward.id,
+          percent: reward.percent,
+          description: reward.description,
+          validUntil: reward.validUntil.toISOString(),
+        }
+      : null,
     name: customer.name,
     balance,
     vipCard: customer.vipCardNumber,
@@ -116,6 +141,8 @@ interface CreateSaleInput {
   socialSubscribe?: boolean;
   /** Скидка 5% за отметку в сторис. */
   socialStory?: boolean;
+  /** Применить разовую скидку по памятной дате (покупатель согласился). */
+  useDateReward?: boolean;
   /** Оформить продажу от лица другого продавца (только админ). */
   sellerId?: number;
 }
@@ -176,7 +203,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
     // Касса только привязывает чек к существующему клиенту. Заводить нового
     // отсюда нельзя: регистрация — единая точка в разделе «Клиенты», иначе в
     // базе плодятся безымянные «Покупатели» без согласия и памятных дат.
-    const phone = normalizePhone(input.phone);
+    const phone = toStoredPhone(input.phone);
     const customer = await prisma.customer.findUnique({ where: { phone } });
     if (customer) {
       customerId = customer.id;
@@ -231,6 +258,13 @@ export async function createOfflineSale(input: CreateSaleInput) {
     productPromoPercent[r.productId] = promo.discountPercent;
   }
 
+  // Скидку по памятной дате применяем, только если продавец её включил:
+  // покупатель вправе отказаться и приберечь на следующую покупку.
+  let dateReward = null;
+  if (customerId && input.useDateReward) {
+    dateReward = await activeDateReward(customerId);
+  }
+
   const priced = priceCart({
     lines: resolved.map((r) => ({
       productId: r.productId,
@@ -239,6 +273,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
     })),
     vipPercent: vipPct,
     socialPercent: socialPct,
+    datePercent: dateReward?.percent ?? 0,
     productPromoPercent,
     allProductsPromoPercent: globalPromo.discountPercent,
     superPromo,
@@ -251,7 +286,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
   // Списание баллов — требует подтверждения кодом из SMS
   let loyaltySpent = 0;
   if (customerId && input.loyaltySpend && input.loyaltySpend > 0) {
-    const phone = normalizePhone(input.phone ?? "");
+    const phone = toStoredPhone(input.phone ?? "");
     const otp = await verifySmsCode(phone, "loyalty_spend", input.loyaltyOtp ?? "");
     if (!otp.ok) {
       throw new Error(
@@ -286,6 +321,13 @@ export async function createOfflineSale(input: CreateSaleInput) {
       },
     },
   });
+
+  // Скидку списываем, только если она действительно сработала. Когда выгоднее
+  // оказались VIP или акция, разовая скидка остаётся у клиента на следующий раз.
+  let dateRewardUsed = false;
+  if (dateReward && priced.kind === "date") {
+    dateRewardUsed = await consumeDateReward(dateReward.id, sale.id);
+  }
 
   // Списание остатков
   for (const r of resolved) {
@@ -360,7 +402,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
           : `Спасибо за покупку! Всего бонусов: ${fmtPoints(balance)}`;
       await sendSmsFromCrm({
         kind: "purchase",
-        phone: normalizePhone(input.phone),
+        phone: toStoredPhone(input.phone),
         text,
         customerId,
         userId: actorId,
@@ -398,7 +440,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
     const allLines = lines;
     const grossAll = total;
     const customerLine = customerId
-      ? `${tgEscape(customerName ?? "")} (${normalizePhone(input.phone ?? "")})`
+      ? `${tgEscape(customerName ?? "")} (${toStoredPhone(input.phone ?? "")})`
       : "без клиента";
     await notifyTelegram(
       `🧾 <b>Оффлайн-продажа #${sale.id}</b>\n` +
@@ -424,6 +466,8 @@ export async function createOfflineSale(input: CreateSaleInput) {
     discount: totalDiscount,
     /** Какая механика сработала — показываем продавцу в итогах чека. */
     discountKind: priced.discount > 0 ? priced.kind : "none",
+    /** Разовая скидка по дате списана — продавцу стоит это сказать покупателю. */
+    dateRewardUsed,
     discountLabel: priced.discount > 0 ? (DISCOUNT_LABEL[priced.kind] ?? "") : "",
     freeUnits: priced.freeUnits,
     earned,

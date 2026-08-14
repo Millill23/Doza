@@ -317,3 +317,56 @@ test("сумма позиций совпадает с итогом", () => {
   const sum = Math.round(r.lineNet.reduce((s, v) => s + v, 0) * 100) / 100;
   assert.equal(sum, r.net);
 });
+
+// ─── Скидка по памятной дате ──────────────────────────────────────────────
+
+test("скидка по дате применяется, когда она лучшая", () => {
+  const r = priceCart({
+    lines: [{ productId: 1, qty: 1, unitPrice: 100 }],
+    datePercent: 15,
+  });
+  assert.equal(r.net, 85);
+  assert.equal(r.kind, "date");
+});
+
+test("VIP выгоднее — скидка по дате не тратится", () => {
+  const r = priceCart({
+    lines: [{ productId: 1, qty: 1, unitPrice: 100 }],
+    vipPercent: 20,
+    datePercent: 15,
+  });
+  assert.equal(r.net, 80);
+  assert.equal(r.kind, "vip");
+});
+
+test("при равных процентах побеждает VIP, а не одноразовая скидка", () => {
+  // Списать разовую скидку ради того же результата, что даёт карта, —
+  // значит незаметно отобрать её у покупателя.
+  const r = priceCart({
+    lines: [{ productId: 1, qty: 1, unitPrice: 100 }],
+    vipPercent: 15,
+    datePercent: 15,
+  });
+  assert.equal(r.net, 85);
+  assert.equal(r.kind, "vip");
+});
+
+test("скидка по дате не складывается с акцией товара", () => {
+  const r = priceCart({
+    lines: [{ productId: 1, qty: 1, unitPrice: 100 }],
+    productPromoPercent: { 1: 10 },
+    datePercent: 15,
+  });
+  assert.equal(r.net, 85, "берётся максимум, а не 10% + 15%");
+  assert.equal(r.kind, "date");
+});
+
+test("акция выгоднее скидки по дате — дата не тратится", () => {
+  const r = priceCart({
+    lines: [{ productId: 1, qty: 1, unitPrice: 100 }],
+    productPromoPercent: { 1: 30 },
+    datePercent: 15,
+  });
+  assert.equal(r.net, 70);
+  assert.equal(r.kind, "promo");
+});

@@ -7,43 +7,10 @@
 
 import { prisma } from "./index";
 import { effectiveCashbackPercent } from "./pricing";
+import { pickActivePromo, mergePromos, type EffectivePromo } from "./promo-rules";
 
-export interface PromoInput {
-  discountPercent: number | null;
-  cashbackPercent: number | null;
-  startsAt: Date | null;
-  endsAt: Date | null;
-}
-
-export interface EffectivePromo {
-  /** активная скидка на цену, % (0 если нет) */
-  discountPercent: number;
-  /** активный повышенный кешбек из акции, % (null если акция не задаёт кешбек) */
-  cashbackPercent: number | null;
-}
-
-/** Выбрать эффективную акцию на момент `now`: максимум скидки и максимум кешбека среди активных. */
-export function pickActivePromo(
-  promos: PromoInput[],
-  now: Date = new Date(),
-): EffectivePromo {
-  const t = now.getTime();
-  let discount = 0;
-  let cashback: number | null = null;
-  for (const p of promos) {
-    const started = !p.startsAt || p.startsAt.getTime() <= t;
-    const notEnded = !p.endsAt || p.endsAt.getTime() >= t;
-    if (!started || !notEnded) continue;
-    if (p.discountPercent != null && p.discountPercent > discount)
-      discount = p.discountPercent;
-    if (
-      p.cashbackPercent != null &&
-      (cashback == null || p.cashbackPercent > cashback)
-    )
-      cashback = p.cashbackPercent;
-  }
-  return { discountPercent: discount, cashbackPercent: cashback };
-}
+// Правила — в отдельном модуле, чтобы их можно было проверить без базы.
+export * from "./promo-rules";
 
 /**
  * Активная акция «на все товары» (в БД `product_id IS NULL`).
@@ -167,13 +134,3 @@ export async function getCashbackRates(
   return rates;
 }
 
-/** Объединить адресную акцию товара с глобальной: берётся лучшее, не сумма. */
-export function mergePromos(own: EffectivePromo, global: EffectivePromo): EffectivePromo {
-  return {
-    discountPercent: Math.max(own.discountPercent, global.discountPercent),
-    cashbackPercent:
-      own.cashbackPercent == null && global.cashbackPercent == null
-        ? null
-        : Math.max(own.cashbackPercent ?? 0, global.cashbackPercent ?? 0),
-  };
-}
