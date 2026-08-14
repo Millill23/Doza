@@ -1,7 +1,7 @@
 import type { APIRoute } from "astro";
 import { prisma } from "@doza/db";
 import { activateCertificate, CertificateError } from "@doza/db/certificates";
-import { sendSms } from "@doza/shared/sms";
+import { sendSmsFromSite } from "../../../lib/sms";
 import { getCustomerId } from "../../../lib/customer-auth";
 import { notifyTelegram, tgEscape } from "../../../lib/telegram";
 
@@ -52,10 +52,12 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   }
 
   try {
-    await sendSms(
-      result.customerPhone,
-      `Сертификат активирован! Вам начислено ${fmt(result.awarded)} бонусов. Всего бонусов: ${fmt(result.balance)}`,
-    );
+    await sendSmsFromSite({
+      kind: "certificate",
+      phone: result.customerPhone,
+      text: `Сертификат активирован! Вам начислено ${fmt(result.awarded)} бонусов. Всего бонусов: ${fmt(result.balance)}`,
+      customerId: result.customerId,
+    });
   } catch (e) {
     console.error("[account] SMS об активации не отправлена:", e);
   }

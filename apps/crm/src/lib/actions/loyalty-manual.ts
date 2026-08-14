@@ -2,8 +2,8 @@
 
 import { prisma } from "@doza/db";
 import { earnPoints, getBalance, spendPoints } from "@doza/db/loyalty";
+import { sendSmsFromCrm } from "@/lib/sms";
 import { normalizePhone } from "@doza/shared";
-import { sendSms } from "@doza/shared/sms";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/session";
 import { notifyTelegram, tgEscape } from "@/lib/telegram";
@@ -82,10 +82,13 @@ export async function grantPoints(input: {
   const balance = await getBalance(customer.id);
 
   try {
-    await sendSms(
+    await sendSmsFromCrm({
+      kind: "points_manual",
       phone,
-      `Вам начислено ${fmt(amount)} бонусов: ${reason}. Всего бонусов: ${fmt(balance)}`,
-    );
+      text: `Вам начислено ${fmt(amount)} бонусов: ${reason}. Всего бонусов: ${fmt(balance)}`,
+      customerId: customer.id,
+      userId: Number(session.user.id),
+    });
   } catch (e) {
     console.error("[loyalty] SMS о начислении не отправлена:", e);
   }

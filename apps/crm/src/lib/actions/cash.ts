@@ -11,6 +11,7 @@ import {
 import { priceCart } from "@doza/db/pricing";
 import { createSmsCode, verifySmsCode } from "@doza/db/sms-codes";
 import { requestConsent } from "@doza/db/consent";
+import { sendSmsFromCrm } from "@/lib/sms";
 import { normalizePhone } from "@doza/shared";
 import { assertCustomerName } from "@doza/shared/customer-name";
 import { sendSms } from "@doza/shared/sms";
@@ -20,7 +21,7 @@ import { notifyTelegram, tgEscape } from "@/lib/telegram";
 
 /** Отправить покупателю SMS-код для подтверждения списания баллов. */
 export async function requestLoyaltySpendOtp(phoneRaw: string, amount: number) {
-  await requireRole(["admin", "seller"]);
+  const session = await requireRole(["admin", "seller"]);
   const phone = normalizePhone(phoneRaw);
   if (phone.length < 9) throw new Error("Некорректный телефон");
   if (amount <= 0) throw new Error("Укажите количество баллов");
@@ -31,10 +32,13 @@ export async function requestLoyaltySpendOtp(phoneRaw: string, amount: number) {
   if (balance <= 0) throw new Error("У клиента нет баллов");
 
   const code = await createSmsCode(phone, "loyalty_spend", { amount });
-  const sms = await sendSms(
+  const sms = await sendSmsFromCrm({
+    kind: "otp_loyalty_spend",
     phone,
-    `${code} - Код подтверждения для списания ${amount} баллов`,
-  );
+    text: `${code} - Код подтверждения для списания ${amount} баллов`,
+    customerId: customer.id,
+    userId: Number(session.user.id),
+  });
   return { ok: true, smsSent: sms.ok, balance };
 }
 
@@ -354,7 +358,13 @@ export async function createOfflineSale(input: CreateSaleInput) {
         : earned > 0
           ? `Спасибо за покупку! Вам начислено ${fmtPoints(earned)} бонусов. Всего бонусов: ${fmtPoints(balance)}`
           : `Спасибо за покупку! Всего бонусов: ${fmtPoints(balance)}`;
-      await sendSms(normalizePhone(input.phone), text);
+      await sendSmsFromCrm({
+        kind: "purchase",
+        phone: normalizePhone(input.phone),
+        text,
+        customerId,
+        userId: actorId,
+      });
     } catch (e) {
       console.error("[cash] sms о покупке не отправлена:", e);
     }

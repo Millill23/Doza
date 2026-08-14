@@ -1,7 +1,7 @@
 import type { APIRoute } from "astro";
 import { prisma } from "@doza/db";
 import { normalizePhone } from "@doza/shared";
-import { sendSms } from "@doza/shared/sms";
+import { sendSmsFromSite } from "../../../lib/sms";
 import { hashPassword } from "../../../lib/customer-auth";
 
 export const prerender = false;
@@ -31,7 +31,12 @@ export const POST: APIRoute = async ({ request }) => {
       where: { id: customer.id },
       data: { passwordHash: await hashPassword(newPass) },
     });
-    await sendSms(phone, `Новый пароль для входа в DOZA: ${newPass}`);
+    await sendSmsFromSite({
+      kind: "password_reset",
+      phone,
+      text: `Новый пароль для входа в DOZA: ${newPass}`,
+      customerId: customer.id,
+    });
   }
 
   return new Response(

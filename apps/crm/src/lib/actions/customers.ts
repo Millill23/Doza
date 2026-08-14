@@ -3,6 +3,8 @@
 import { prisma } from "@doza/db";
 import { requestConsent } from "@doza/db/consent";
 import { assertBelarusPhone } from "@doza/shared/phone";
+import { sendSmsFromCrm } from "@/lib/sms";
+import { notifyTelegram } from "@/lib/telegram";
 import { assertCustomerName } from "@doza/shared/customer-name";
 import { sendSms } from "@doza/shared/sms";
 import { revalidatePath } from "next/cache";
@@ -65,7 +67,7 @@ export async function registerCustomerOffline(input: OfflineRegInput) {
   const alreadyConfirmed = existing?.consentStatus === "confirmed";
   const consent = alreadyConfirmed
     ? { smsSent: false }
-    : await requestConsent(customer.id, sendSms);
+    : await requestConsent(customer.id, sendSms, "invite", { notify: notifyTelegram });
 
   revalidatePath("/customers");
   return {
@@ -109,7 +111,7 @@ export async function registerVip(
     create: { phone, name, vipCardNumber: card, phoneVerified: true },
   });
 
-  if (!before?.vipCardNumber) await sendVipWelcomeSms(phone, name);
+  if (!before?.vipCardNumber) await sendVipWelcomeSms(phone, name, customer.id);
 
   // VIP — это программа лояльности, значит нужно согласие на обработку ПД.
   // Отдельным сообщением после поздравления, чтобы не смешивать две темы.
@@ -118,7 +120,7 @@ export async function registerVip(
     select: { consentStatus: true },
   });
   if (fresh?.consentStatus !== "confirmed") {
-    await requestConsent(customer.id, sendSms).catch((e) =>
+    await requestConsent(customer.id, sendSms, "invite", { notify: notifyTelegram }).catch((e) =>
       console.error("[customers] запрос согласия для VIP не ушёл:", e),
     );
   }
@@ -131,12 +133,18 @@ export async function registerVip(
  * Поздравительная SMS новому VIP-клиенту.
  * Сбой отправки не должен ломать регистрацию — только пишем в лог.
  */
-async function sendVipWelcomeSms(phone: string, name: string) {
+async function sendVipWelcomeSms(
+  phone: string,
+  name: string,
+  customerId?: number,
+) {
   try {
-    await sendSms(
+    await sendSmsFromCrm({
+      kind: "vip_welcome",
       phone,
-      `Поздравляем, ${name} - вы стали VIP клиентом магазина оригинальной парфюмерии DOZA`,
-    );
+      text: `Поздравляем, ${name} - вы стали VIP клиентом магазина оригинальной парфюмерии DOZA`,
+      customerId,
+    });
   } catch (e) {
     console.error("[customers] VIP SMS не отправлена:", e);
   }
@@ -162,7 +170,7 @@ export async function attachVipCard(customerId: number, cardRaw: string) {
   });
   // Клиент стал VIP только что — поздравляем.
   if (before && !before.vipCardNumber)
-    await sendVipWelcomeSms(before.phone, before.name);
+    await sendVipWelcomeSms(before.phone, before.name, customerId);
   revalidatePath(`/customers/${customerId}`);
 }
 

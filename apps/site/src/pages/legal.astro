@@ -1,23 +1,27 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import { COMPANY, COMPANY_FILLED } from "../lib/company";
+import { COMPANY } from "../lib/company";
 
-const rows = [
-  ["Полное наименование", COMPANY.legalName],
-  ["УНП", COMPANY.unp],
-  ["Юридический адрес", COMPANY.legalAddress],
-  ["Фактический адрес", COMPANY.actualAddress],
-  ["Дата государственной регистрации", COMPANY.registrationDate],
-  ["Орган, осуществивший регистрацию", COMPANY.registrationAuthority],
-  ["№ в Торговом реестре РБ", COMPANY.tradeRegisterNumber],
-  ["Дата регистрации в Торговом реестре", COMPANY.tradeRegisterDate],
-  ["Телефоны", COMPANY.phones.join(", ")],
-  ["Электронная почта", COMPANY.email],
-  ["Режим работы", COMPANY.workingHours],
-  ["Расчётный счёт", COMPANY.bankAccount],
-  ["Банк", `${COMPANY.bankName}, БИК ${COMPANY.bankBic}`],
-  ["Рассмотрение претензий", COMPANY.complaintsContact],
-];
+// Незаполненные реквизиты просто не показываем: пустая строка в таблице лучше,
+// чем «(ожидается)» на глазах у покупателя.
+const rows = (
+  [
+    ["Полное наименование", COMPANY.legalName],
+    ["УНП", COMPANY.unp],
+    ["Юридический адрес", COMPANY.legalAddress],
+    ["Фактический адрес", COMPANY.actualAddress],
+    ["Дата государственной регистрации", COMPANY.registrationDate],
+    ["Орган, осуществивший регистрацию", COMPANY.registrationAuthority],
+    ["№ в Торговом реестре РБ", COMPANY.tradeRegisterNumber],
+    ["Дата регистрации в Торговом реестре", COMPANY.tradeRegisterDate],
+    ["Телефоны", COMPANY.phones.join(", ")],
+    ["Электронная почта", COMPANY.email],
+    ["Режим работы", COMPANY.workingHours],
+    ["Расчётный счёт", COMPANY.bankAccount],
+    ["Банк", `${COMPANY.bankName}, БИК ${COMPANY.bankBic}`],
+    ["Рассмотрение претензий", COMPANY.complaintsContact],
+  ] as [string, string | null][]
+).filter(([, value]) => Boolean(value));
 ---
 
 <Layout title="Юридическая информация — DOZA">
@@ -25,13 +29,6 @@ const rows = [
     <h1 class="mb-8 font-serif text-4xl font-semibold text-gold-gradient sm:text-5xl">
       Юридическая информация
     </h1>
-
-    {!COMPANY_FILLED && (
-      <p class="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">
-        ⚠️ Реквизиты пока не заполнены (плейсхолдеры). Заполните файл
-        <code class="mx-1 rounded bg-ink-800 px-1.5 py-0.5 text-gold-400">apps/site/src/lib/company.ts</code>.
-      </p>
-    )}
 
     <div class="overflow-hidden rounded-2xl border border-ink-600/60 bg-ink-700">
       <dl class="divide-y divide-ink-600/40">

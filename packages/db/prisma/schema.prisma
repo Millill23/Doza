@@ -350,6 +350,31 @@ model SmsCode {
   @@map("sms_codes")
 }
 
+/// Журнал всех отправленных SMS.
+///
+/// Нужен не для истории ради истории: без него не видно, что реально уходит
+/// клиентам. Повторные напоминания о согласии рассылались людям ежедневно, и
+/// заметить это можно было только по жалобе. Теперь по журналу считается
+/// пауза между отправками и лимит попыток.
+model SmsLog {
+  id         Int       @id @default(autoincrement())
+  phone      String
+  /// Категория: consent_invite | consent_reminder | otp_register | purchase | …
+  kind       String
+  text       String
+  /// Ушло ли сообщение (ответ шлюза).
+  ok         Boolean
+  error      String?
+  customerId Int?      @map("customer_id")
+  /// Кто инициировал: сотрудник CRM или null, если отправил сайт/система.
+  userId     Int?      @map("user_id")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([phone, kind])
+  @@index([createdAt])
+  @@map("sms_log")
+}
+
 model CustomerDate {
   id          Int      @id @default(autoincrement())
   customerId  Int      @map("customer_id")

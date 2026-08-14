@@ -2,6 +2,11 @@ import crypto from "node:crypto";
 import { prisma } from "./index";
 import { createSmsCode, findSmsCodeByToken } from "./sms-codes";
 import {
+  sendTrackedSms,
+  checkConsentSendAllowed,
+  type SmsSender,
+} from "./sms-log";
+import {
   CONSENT_SMS,
   CONSENT_TTL_MS,
   consentLink,
@@ -54,8 +59,9 @@ export interface ConsentRequestResult {
  */
 export async function requestConsent(
   customerId: number,
-  sendSms: (phone: string, text: string) => Promise<{ ok: boolean; error?: string }>,
+  sendSms: SmsSender,
   kind: ConsentSmsKind = "invite",
+  opts?: { userId?: number | null; notify?: (text: string) => Promise<unknown> },
 ): Promise<ConsentRequestResult> {
   const customer = await prisma.customer.findUnique({
     where: { id: customerId },
@@ -65,6 +71,13 @@ export async function requestConsent(
   if (customer.consentStatus === "confirmed")
     return { ok: true, smsSent: false, token: "", error: "Согласие уже получено" };
 
+  // Пауза и лимит проверяются здесь, а не в интерфейсе: кнопка есть в списке
+  // клиентов, в карточке и в кассе, и полагаться на дисциплину нажимающего
+  // нельзя — именно так людям и прилетало по сообщению в день.
+  const verdict = await checkConsentSendAllowed(customer.phone);
+  if (!verdict.allowed)
+    return { ok: false, smsSent: false, token: "", error: verdict.reason };
+
   // Токен короткий, чтобы ссылка влезала в SMS: 96 бит случайности хватает —
   // подобрать одноразовую ссылку перебором невозможно.
   const token = crypto.randomBytes(12).toString("hex");
@@ -73,10 +86,15 @@ export async function requestConsent(
     ttlMs: CONSENT_TTL_MS,
   });
 
-  const sms = await sendSms(
-    customer.phone,
-    CONSENT_SMS[kind](consentLink(siteUrl(), token)),
-  );
+  const sms = await sendTrackedSms({
+    kind: kind === "reminder" ? "consent_reminder" : "consent_invite",
+    phone: customer.phone,
+    text: CONSENT_SMS[kind](consentLink(siteUrl(), token)),
+    send: sendSms,
+    notify: opts?.notify,
+    customerId,
+    userId: opts?.userId ?? null,
+  });
   if (sms.ok) {
     await prisma.customer.update({
       where: { id: customerId },
@@ -84,7 +102,7 @@ export async function requestConsent(
     });
   }
 
-  return { ok: true, smsSent: sms.ok, token, error: sms.error };
+  return { ok: sms.ok, smsSent: sms.ok, token, error: sms.error };
 }
 
 export interface ConsentPageData {

@@ -7,9 +7,9 @@ import {
   CertificateError,
   CERTIFICATE_DENOMINATIONS,
 } from "@doza/db/certificates";
+import { sendSmsFromCrm } from "@/lib/sms";
 import { normalizePhone } from "@doza/shared";
 import { assertCustomerName } from "@doza/shared/customer-name";
-import { sendSms } from "@doza/shared/sms";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/session";
 import { notifyTelegram, tgEscape } from "@/lib/telegram";
@@ -165,10 +165,13 @@ export async function activateCertificateInCrm(input: {
   }
 
   try {
-    await sendSms(
+    await sendSmsFromCrm({
+      kind: "certificate",
       phone,
-      `Сертификат активирован! Вам начислено ${fmt(result.awarded)} бонусов. Всего бонусов: ${fmt(result.balance)}`,
-    );
+      text: `Сертификат активирован! Вам начислено ${fmt(result.awarded)} бонусов. Всего бонусов: ${fmt(result.balance)}`,
+      customerId: result.customerId,
+      userId: activatedById,
+    });
   } catch (e) {
     console.error("[certificates] SMS об активации не отправлена:", e);
   }

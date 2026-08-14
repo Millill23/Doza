@@ -147,7 +147,7 @@ export const POST: APIRoute = async ({ request }) => {
   // неподтверждённым согласием тут ничего не шлём: иначе каждый их заказ
   // превращался бы в напоминание. Для них есть ручная отправка из CRM.
   if (!existing) {
-    await requestConsent(customer.id, sendSms).catch((e) =>
+    await requestConsent(customer.id, sendSms, "invite", { notify: notifyTelegram }).catch((e) =>
       console.error("[orders] не удалось запросить согласие:", e),
     );
   }

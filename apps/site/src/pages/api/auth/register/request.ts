@@ -2,7 +2,7 @@ import type { APIRoute } from "astro";
 import { prisma } from "@doza/db";
 import { createSmsCode } from "@doza/db/sms-codes";
 import { assertBelarusPhone } from "@doza/shared/phone";
-import { sendSms } from "@doza/shared/sms";
+import { sendSmsFromSite } from "../../../../lib/sms";
 
 export const prerender = false;
 
@@ -27,7 +27,11 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   const code = await createSmsCode(phone, "register", { name });
-  const sms = await sendSms(phone, `${code} — код подтверждения регистрации DOZA`);
+  const sms = await sendSmsFromSite({
+    kind: "otp_register",
+    phone,
+    text: `${code} — код подтверждения регистрации DOZA`,
+  });
 
   return json({ ok: true, smsSent: sms.ok });
 };
