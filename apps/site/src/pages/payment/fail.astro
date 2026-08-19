@@ -1,0 +1,77 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { COMPANY } from "../../lib/company";
+import { verifyAndApply } from "../../lib/payment-verify";
+
+export const prerender = false;
+
+// Сюда покупатель попадает при отказе банка, при отмене оплаты и по истечении
+// срока. Статус всё равно перепроверяем у шлюза: он мог успеть измениться, и
+// заказ бывает уже оплачен, хотя покупателя вернуло на эту страницу.
+const token = Astro.url.searchParams.get("token") ?? "";
+
+let result = null;
+try {
+  result = await verifyAndApply(token);
+} catch (e) {
+  console.error("[payment/fail] проверка не удалась:", e);
+}
+
+const paid = result?.paymentStatus === "paid";
+const refunded = (result?.pointsRefunded ?? 0) > 0;
+---
+
+<Layout title={paid ? "Заказ оплачен — DOZA" : "Оплата не прошла — DOZA"}>
+  <section class="container-luxe max-w-2xl py-16">
+    {
+      paid ? (
+        <div class="rounded-2xl border border-botanical-500/30 bg-botanical-500/5 p-8 text-center">
+          <p class="mb-2 text-4xl">✓</p>
+          <h1 class="mb-3 font-serif text-3xl text-ivory">Заказ всё-таки оплачен</h1>
+          <p class="text-sm text-ivory-muted">
+            Банк подтвердил оплату заказа №{result?.orderId}. Платить повторно не нужно.
+          </p>
+          <a
+            href="/catalog"
+            class="mt-6 inline-flex h-11 items-center justify-center rounded-full bg-gold-gradient px-8 text-sm font-medium text-ink-900"
+          >
+            В каталог
+          </a>
+        </div>
+      ) : (
+        <div class="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-8 text-center">
+          <p class="mb-2 text-4xl">✕</p>
+          <h1 class="mb-3 font-serif text-2xl text-ivory">Оплата не прошла</h1>
+          <p class="text-sm leading-relaxed text-ivory-muted">
+            Деньги не списаны. Заказ не оформлен — товары остались в корзине,
+            можно попробовать оплатить ещё раз.
+          </p>
+          {refunded && (
+            <p class="mt-3 text-sm text-botanical-300">
+              Списанные баллы возвращены на ваш счёт.
+            </p>
+          )}
+          <div class="mt-6 flex flex-wrap justify-center gap-3">
+            <a
+              href="/cart"
+              class="inline-flex h-11 items-center justify-center rounded-full bg-gold-gradient px-8 text-sm font-medium text-ink-900"
+            >
+              Вернуться в корзину
+            </a>
+            <a
+              href="/catalog"
+              class="inline-flex h-11 items-center justify-center rounded-full border border-ink-600 px-8 text-sm text-ivory-muted transition-colors hover:border-gold-500"
+            >
+              В каталог
+            </a>
+          </div>
+          <p class="mt-5 text-sm text-ivory-faint">
+            Если деньги всё же списались — напишите на{" "}
+            <span class="text-gold-400">{COMPANY.email}</span> или позвоните{" "}
+            <span class="text-gold-400">{COMPANY.phones[0]}</span>, разберёмся.
+          </p>
+        </div>
+      )
+    }
+  </section>
+</Layout>

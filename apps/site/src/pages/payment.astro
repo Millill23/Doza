@@ -1,0 +1,90 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { COMPANY } from "../lib/company";
+
+/**
+ * Правила оплаты и безопасность платежей — обязательный раздел по требованиям
+ * банков и платёжных систем для подключения интернет-эквайринга.
+ */
+---
+
+<Layout title="Оплата и безопасность платежей — DOZA">
+  <section class="container-luxe max-w-3xl py-12">
+    <h1 class="mb-8 font-serif text-3xl font-semibold text-gold-gradient sm:text-4xl">
+      Оплата и безопасность платежей
+    </h1>
+
+    <div class="space-y-6 text-sm leading-relaxed text-ivory-muted">
+      <div>
+        <h2 class="mb-2 font-serif text-xl text-ivory">Как оплатить заказ</h2>
+        <p>
+          Заказ оплачивается полностью в момент оформления. После нажатия
+          «Перейти к оплате» вы попадаете на защищённую страницу платёжного
+          провайдера, где вводите данные карты и подтверждаете платёж.
+        </p>
+        <p class="mt-2">
+          Принимаются карты Visa, Mastercard и БЕЛКАРТ, а также Apple Pay и
+          Google Pay. Валюта расчётов — белорусский рубль (BYN).
+        </p>
+      </div>
+
+      <div>
+        <h2 class="mb-2 font-serif text-xl text-ivory">Безопасность</h2>
+        <p>
+          Обработку платежей выполняет сервис bePaid. Реквизиты вашей карты
+          вводятся на странице провайдера, передаются по защищённому каналу и
+          <strong class="text-ivory"> не попадают на наш сайт</strong> — мы их не
+          видим и не храним.
+        </p>
+        <p class="mt-2">
+          Платежи проходят проверку 3-D Secure: банк дополнительно
+          подтверждает, что операцию совершает владелец карты.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="mb-2 font-serif text-xl text-ivory">Если оплата не прошла</h2>
+        <p>
+          Деньги не списываются, заказ не оформляется, а списанные баллы
+          возвращаются на ваш счёт. Можно вернуться в корзину и попробовать
+          снова. Если средства всё же списались, а заказ не подтвердился —
+          напишите нам, разберёмся.
+        </p>
+        <p class="mt-2">
+          На оплату отводится час с момента оформления. Неоплаченный заказ
+          автоматически аннулируется.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="mb-2 font-serif text-xl text-ivory">Возврат средств</h2>
+        <p>
+          При отказе от заказа до отправки или при возврате товара
+          ненадлежащего качества деньги возвращаются тем же способом, которым
+          была произведена оплата, в срок не более 7 рабочих дней с момента
+          обращения.
+        </p>
+        <p class="mt-2">
+          Парфюмерная продукция надлежащего качества обмену и возврату не
+          подлежит — она входит в соответствующий перечень непродовольственных
+          товаров.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="mb-2 font-serif text-xl text-ivory">Получатель платежа</h2>
+        <p>
+          {COMPANY.legalName}, УНП {COMPANY.unp}, {COMPANY.legalAddress}.
+          Контакты: {COMPANY.email}, {COMPANY.phones.join(", ")}.
+        </p>
+      </div>
+    </div>
+
+    <div class="mt-8 flex flex-wrap items-center gap-4">
+      <img src="/img/pay/visa.svg" alt="Visa" class="h-6 w-auto" />
+      <img src="/img/pay/mastercard.svg" alt="Mastercard Identity Check" class="h-8 w-auto" />
+      <img src="/img/pay/belkart.svg" alt="БЕЛКАРТ" class="h-7 w-auto" />
+      <img src="/img/pay/bepaid.svg" alt="bePaid" class="h-5 w-auto" />
+    </div>
+  </section>
+</Layout>

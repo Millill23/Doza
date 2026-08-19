@@ -1,13 +1,15 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import Hero from "../components/Hero.astro";
+import PaymentBadges from "../components/PaymentBadges.astro";
 import { organizationLd } from "../lib/seo";
 ---
 
 <Layout
   title="DOZA — оригинальная парфюмерия на распив в Беларуси"
-  description="Оригинальные ароматы на распив: объёмы 3, 5 и 10 мл. Более 100 позиций люксовой и нишевой парфюмерии. Оплата при получении, доставка по Беларуси, баллы за покупки."
+  description="Оригинальные ароматы на распив: объёмы 3, 5 и 10 мл. Более 100 позиций люксовой и нишевой парфюмерии. Оплата картой онлайн, доставка по Беларуси, баллы за покупки."
   jsonLd={[organizationLd()]}
 >
   <Hero />
+  <PaymentBadges />
 </Layout>

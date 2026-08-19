@@ -135,6 +135,15 @@ export default function CartApp() {
         setError(data.error || "Не удалось оформить заказ");
         return;
       }
+      // Корзину чистим только при переходе к оплате: если платёж не состоится,
+      // покупатель вернётся на /payment/fail и захочет попробовать снова.
+      if (data.redirectUrl) {
+        writeCart([]);
+        setCart([]);
+        window.location.href = data.redirectUrl;
+        return;
+      }
+      // Заказ полностью покрыт баллами — платить нечего.
       writeCart([]);
       setCart([]);
       setDoneOrderId(data.orderId);
@@ -161,8 +170,8 @@ export default function CartApp() {
           Номер вашего заказа: <span className="text-gold-400">#{doneOrderId}</span>
         </p>
         <p className="mb-6 text-sm font-light text-ivory-muted">
-          Мы свяжемся с вами по телефону для подтверждения. Оплата производится
-          при получении — в магазине или на почте. Предоплата не требуется.
+          Заказ полностью оплачен баллами. Мы свяжемся с вами по телефону для
+          подтверждения.
         </p>
         <a
           href="/catalog"
@@ -363,7 +372,7 @@ export default function CartApp() {
             </div>
           )}
           <div className="flex justify-between pt-1 text-base font-medium text-ivory">
-            <span>К оплате при получении</span>
+            <span>К оплате</span>
             <span className="text-gold-gradient">{formatByn(toPay)}</span>
           </div>
         </div>
@@ -405,12 +414,12 @@ export default function CartApp() {
           type="submit" disabled={submitting || !consent}
           className="inline-flex h-12 w-full cursor-pointer items-center justify-center rounded-full bg-gold-gradient text-base font-medium text-ink-900 shadow-gold transition-all hover:shadow-gold-lg disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {submitting ? "Оформляем…" : "Оформить заказ"}
+          {submitting ? "Переходим к оплате…" : "Перейти к оплате"}
         </button>
 
         <p className="text-center text-xs font-light leading-relaxed text-ivory-faint">
-          Оплата производится при получении заказа — в магазине или на почте.
-          Предоплата не требуется.
+          Оплата картой на защищённой странице банка. Реквизиты карты не
+          проходят через наш сайт.
         </p>
       </form>
     </div>

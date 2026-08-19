@@ -9,6 +9,8 @@
     "./telegram": "./src/telegram.ts",
     "./customer-name": "./src/customer-name.ts",
     "./phone": "./src/phone.ts",
+    "./bepaid": "./src/bepaid.ts",
+    "./bepaid-rules": "./src/bepaid-rules.ts",
     "./day-range": "./src/day-range.ts"
   }
 }

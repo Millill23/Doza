@@ -101,6 +101,15 @@ export async function changeOrderStatus(orderId: number, next: OrderStatus) {
     throw new Error(`Недопустимый переход: ${order.status} → ${next}`);
   }
 
+  // Магазин работает по стопроцентной предоплате: неоплаченный заказ нельзя
+  // ни подтвердить, ни собрать, ни отправить. Отклонить — можно.
+  const needsPayment: OrderStatus[] = ["confirmed", "shipped", "closed"];
+  if (needsPayment.includes(next) && order.paymentStatus !== "paid") {
+    throw new Error(
+      "Заказ не оплачен — отправлять его нельзя. Дождитесь оплаты или отклоните заказ.",
+    );
+  }
+
   if (next === "closed") {
     await applyClose(orderId, userId);
   }

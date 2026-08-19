@@ -485,11 +485,65 @@ model Order {
   totalByn        Decimal     @map("total_byn") @db.Decimal(10, 2)
   loyaltySpentByn Decimal     @default(0) @map("loyalty_spent_byn") @db.Decimal(10, 2)
   trackingNumber  String?     @map("tracking_number")
+
+  /// Оплата заказа. Магазин работает по стопроцентной предоплате, поэтому
+  /// заказ нельзя собирать и отправлять, пока здесь не `paid`.
+  paymentStatus   PaymentStatus @default(pending) @map("payment_status")
+  paidAt          DateTime?     @map("paid_at")
+  payments        Payment[]
+
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
   items           OrderItem[]
 
   @@map("orders")
+}
+
+enum PaymentStatus {
+  /// Заказ создан, оплату ждём.
+  pending
+  /// Деньги получены и подтверждены запросом к платёжному шлюзу.
+  paid
+  /// Шлюз отклонил оплату.
+  failed
+  /// Покупатель не оплатил в отведённое время.
+  expired
+}
+
+/// Способ оплаты. ЕРИП заведён заранее, но пока не подключён.
+enum PaymentMethodKind {
+  card
+  erip
+}
+
+/// Попытка оплаты через bePaid.
+///
+/// Одна на каждый переход к оплате: покупатель может вернуться и попробовать
+/// снова, и каждая попытка должна остаться в истории — иначе при разборе
+/// спорного платежа неоткуда узнать, что происходило.
+model Payment {
+  id         Int               @id @default(autoincrement())
+  orderId    Int               @map("order_id")
+  order      Order             @relation(fields: [orderId], references: [id])
+  method     PaymentMethodKind @default(card)
+
+  /// Токен платежа bePaid. По нему запрашивается настоящий статус — телу
+  /// уведомления доверять нельзя, оно ничем не подписано.
+  token      String            @unique
+  /// UID транзакции в шлюзе, появляется после обработки.
+  uid        String?
+  amountByn  Decimal           @map("amount_byn") @db.Decimal(10, 2)
+  status     String            @default("pending")
+  /// Тестовая транзакция. В проде такие не засчитываются как оплата.
+  isTest     Boolean           @default(false) @map("is_test")
+  /// Сообщение шлюза — пригодится, когда покупатель спросит, почему отказ.
+  message    String?
+  paidAt     DateTime?         @map("paid_at")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+
+  @@index([orderId])
+  @@map("payments")
 }
 
 enum OrderStatus {

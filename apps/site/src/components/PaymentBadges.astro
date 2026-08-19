@@ -1,0 +1,76 @@
+---
+import { COMPANY } from "../lib/company";
+
+/**
+ * Реквизиты продавца и логотипы платёжных систем.
+ *
+ * Требование банков и НКФО «ЕРИП»: наименование, УНП, орган и дата
+ * регистрации, адрес, режим работы и контакты должны быть на главной
+ * странице, а не только на отдельной странице реквизитов. Логотипы
+ * платёжных систем — там же.
+ */
+interface Props {
+  /** ЕРИП пока не подключён — показываем логотип только когда заработает. */
+  showErip?: boolean;
+}
+const { showErip = false } = Astro.props;
+
+const cards = [
+  { src: "/img/pay/visa.svg", alt: "Visa", h: "h-6" },
+  { src: "/img/pay/mastercard.svg", alt: "Mastercard Identity Check", h: "h-8" },
+  { src: "/img/pay/belkart.svg", alt: "БЕЛКАРТ", h: "h-7" },
+  { src: "/img/pay/apple-pay.svg", alt: "Apple Pay", h: "h-6" },
+  { src: "/img/pay/google-pay.svg", alt: "Google Pay", h: "h-6" },
+];
+---
+
+<section class="border-t border-ink-600/60 bg-ink-800/40 py-10">
+  <div class="container-luxe">
+    <div class="grid gap-8 lg:grid-cols-[1fr_auto]">
+      <div class="text-xs leading-relaxed text-ivory-faint">
+        <p class="mb-1 text-sm text-ivory-muted">{COMPANY.legalName}</p>
+        <p>
+          УНП {COMPANY.unp}. Зарегистрировано {COMPANY.registrationDate},
+          {COMPANY.registrationAuthority}.
+        </p>
+        {
+          COMPANY.tradeRegisterNumber && (
+            <p>
+              В Торговом реестре Республики Беларусь: №{COMPANY.tradeRegisterNumber}
+              {COMPANY.tradeRegisterDate ? ` от ${COMPANY.tradeRegisterDate}` : ""}.
+            </p>
+          )
+        }
+        <p>{COMPANY.legalAddress}</p>
+        <p class="mt-1">
+          Магазин: {COMPANY.actualAddress}. {COMPANY.workingHours}.
+        </p>
+        <p>
+          {COMPANY.phones.join(", ")} · {COMPANY.email}
+        </p>
+      </div>
+
+      <div class="flex flex-col items-start gap-3 lg:items-end">
+        <div class="flex flex-wrap items-center gap-4">
+          {
+            cards.map((c) => (
+              <img src={c.src} alt={c.alt} class={`${c.h} w-auto opacity-90`} loading="lazy" />
+            ))
+          }
+          {
+            showErip && (
+              <img src="/img/pay/erip.svg" alt="Система «Расчёт» (ЕРИП)" class="h-8 w-auto" loading="lazy" />
+            )
+          }
+        </div>
+        <div class="flex items-center gap-2 text-[11px] text-ivory-faint">
+          <span>Платежи обрабатывает</span>
+          <img src="/img/pay/bepaid.svg" alt="bePaid" class="h-4 w-auto" loading="lazy" />
+        </div>
+        <a href="/payment" class="text-[11px] text-gold-400 hover:text-gold-300">
+          Правила оплаты и безопасность платежей
+        </a>
+      </div>
+    </div>
+  </div>
+</section>

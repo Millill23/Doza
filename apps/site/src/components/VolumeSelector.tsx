@@ -152,7 +152,7 @@ export default function VolumeSelector({
       </div>
 
       <p className="text-center text-xs font-light text-ivory-faint">
-        Оплата при получении — в магазине или на почте. Предоплата не требуется.
+        Оплата картой онлайн на защищённой странице банка.
       </p>
     </div>
   );

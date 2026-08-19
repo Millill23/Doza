@@ -17,3 +17,6 @@ tz_text.txt
 # загруженные фото (хранятся вне git)
 uploads/*
 !uploads/.gitkeep
+
+# Материалы от bePaid (инструкции, логотипы) — не часть кода
+bepaid_instructions/

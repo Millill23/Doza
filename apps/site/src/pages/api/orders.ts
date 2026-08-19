@@ -3,13 +3,18 @@ import { prisma } from "@doza/db";
 import { getBalance, spendPoints } from "@doza/db/loyalty";
 import { pickActivePromo, getGlobalPromo, mergePromos } from "@doza/db/promos";
 import { requestConsent } from "@doza/db/consent";
-import { formatByn } from "@doza/shared";
+import { createPaymentAttempt, refundOrderPoints } from "@doza/db/payments";
 import { assertBelarusPhone } from "@doza/shared/phone";
 import { assertCustomerName } from "@doza/shared/customer-name";
 import { sendSms } from "@doza/shared/sms";
-import { notifyTelegram, tgEscape } from "../../lib/telegram";
+import { createCardCheckout } from "@doza/shared/bepaid";
+import { notifyTelegram } from "../../lib/telegram";
+import { notifyOrder } from "../../lib/order-notify";
 
 export const prerender = false;
+
+/** Сколько у покупателя есть времени на оплату, прежде чем заказ отменится. */
+const PAYMENT_TTL_MS = 60 * 60 * 1000;
 
 interface IncomingItem {
   productId: number;
@@ -195,31 +200,68 @@ export const POST: APIRoute = async ({ request }) => {
     });
   }
 
-  // Telegram-уведомление продавцам
   const toPay = Math.round((total - loyaltySpent) * 100) / 100;
-  const lines = [
-    `🆕 <b>Новый заказ #${order.id}</b>`,
-    ``,
-    // Всё, что ввёл покупатель, экранируем: символ «<» ломает parse_mode=HTML
-    // и Telegram отклоняет сообщение целиком.
-    `👤 ${tgEscape(name)}`,
-    `📞 +${phone}`,
-    `🚚 ${deliveryType === "pickup" ? "Самовывоз" : "Доставка почтой"}`,
-    deliveryType === "post" && body.address ? `📍 ${tgEscape(body.address)}` : "",
-    ``,
-    `<b>Состав:</b>`,
-    ...orderItems.map((i) => `• ${tgEscape(i.label)} — ${formatByn(i.priceByn * i.qty)}`),
-    ``,
-    `Сумма: <b>${formatByn(total)}</b>`,
-    loyaltySpent > 0 ? `Списано баллов: ${formatByn(loyaltySpent)}` : "",
-    `К оплате при получении: <b>${formatByn(toPay)}</b>`,
-    body.comment ? `\n💬 ${tgEscape(body.comment)}` : "",
-  ].filter(Boolean);
 
-  await notifyTelegram(lines.join("\n"));
+  // Заказ бесплатным быть не может: если баллы покрыли всё, платить нечем и
+  // платёжную страницу создавать не за что.
+  if (toPay <= 0) {
+    await prisma.order.update({
+      where: { id: order.id },
+      data: { paymentStatus: "paid", paidAt: new Date() },
+    });
+    await notifyOrder(order.id, "оплачен баллами");
+    return json({ ok: true, orderId: order.id, total, toPay, paid: true }, 201);
+  }
 
-  return new Response(JSON.stringify({ ok: true, orderId: order.id, total, toPay }), {
-    status: 201,
+  // Создаём платёжную страницу. Уведомление продавцам шлём не сейчас, а после
+  // оплаты: заказ, брошенный на странице банка, продавцу не нужен.
+  const origin = new URL(request.url).origin;
+  let redirectUrl: string;
+  try {
+    const checkout = await createCardCheckout({
+      amountByn: toPay,
+      description: `Заказ №${order.id} — DOZA`,
+      trackingId: String(order.id),
+      customer: { firstName: name, phone: `+${phone}` },
+      positions: orderItems.map((i) => ({
+        name: i.label,
+        priceByn: i.priceByn,
+        quantity: i.qty,
+      })),
+      successUrl: `${origin}/payment/success`,
+      declineUrl: `${origin}/payment/fail`,
+      failUrl: `${origin}/payment/fail`,
+      cancelUrl: `${origin}/payment/fail`,
+      notificationUrl: `${origin}/api/payments/webhook`,
+      expiredAt: new Date(Date.now() + PAYMENT_TTL_MS),
+    });
+    await createPaymentAttempt({
+      orderId: order.id,
+      token: checkout.token,
+      amountByn: toPay,
+    });
+    redirectUrl = checkout.redirectUrl;
+  } catch (e) {
+    // Платёжная страница не создалась — заказ есть, но оплатить его нечем.
+    // Возвращаем баллы сразу, иначе они зависнут списанными.
+    console.error("[orders] не удалось создать платёж:", e);
+    await refundOrderPoints(order.id);
+    await prisma.order.update({
+      where: { id: order.id },
+      data: { paymentStatus: "failed", status: "rejected" },
+    });
+    return bad(
+      "Не удалось перейти к оплате. Попробуйте ещё раз или свяжитесь с нами.",
+      502,
+    );
+  }
+
+  return json({ ok: true, orderId: order.id, total, toPay, redirectUrl }, 201);
+};
+
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
     headers: { "Content-Type": "application/json" },
   });
-};
+}

@@ -87,6 +87,12 @@ export default async function OrdersPage({
                     <span className={`rounded-full border px-2.5 py-1 text-xs ${ORDER_STATUS_STYLE[o.status]}`}>
                       {ORDER_STATUS_LABEL[o.status]}
                     </span>
+                    {/* Неоплаченный заказ собирать нельзя — видно сразу в списке. */}
+                    {o.paymentStatus !== "paid" && (
+                      <span className="mt-1 block text-[11px] text-amber-300">
+                        {o.paymentStatus === "pending" ? "ждёт оплаты" : "не оплачен"}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-xs text-ivory-faint">
                     {o.createdAt.toLocaleDateString("ru-RU")}

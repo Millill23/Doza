@@ -1,0 +1,63 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { COMPANY } from "../../lib/company";
+import { verifyAndApply } from "../../lib/payment-verify";
+
+export const prerender = false;
+
+// bePaid добавляет в адрес token, uid и status. Берём только token: параметр
+// status покупатель может поправить в адресной строке, поэтому оплату
+// подтверждаем собственным запросом к шлюзу.
+const token = Astro.url.searchParams.get("token") ?? "";
+
+let result = null;
+let error: string | null = null;
+try {
+  result = await verifyAndApply(token);
+} catch (e) {
+  console.error("[payment/success] проверка не удалась:", e);
+  error = "Не удалось проверить платёж";
+}
+
+const paid = result?.paymentStatus === "paid";
+---
+
+<Layout title={paid ? "Заказ оплачен — DOZA" : "Проверяем платёж — DOZA"}>
+  <section class="container-luxe max-w-2xl py-16">
+    {
+      paid ? (
+        <div class="rounded-2xl border border-botanical-500/30 bg-botanical-500/5 p-8 text-center">
+          <p class="mb-2 text-4xl">✓</p>
+          <h1 class="mb-3 font-serif text-3xl text-ivory">Заказ оплачен</h1>
+          <p class="text-sm leading-relaxed text-ivory-muted">
+            Спасибо! Заказ №{result?.orderId} оплачен, мы уже собираем его.
+            Свяжемся с вами по указанному телефону.
+          </p>
+          <a
+            href="/catalog"
+            class="mt-6 inline-flex h-11 items-center justify-center rounded-full bg-gold-gradient px-8 text-sm font-medium text-ink-900"
+          >
+            Вернуться в каталог
+          </a>
+        </div>
+      ) : (
+        <div class="rounded-2xl border border-ink-600/60 bg-ink-700 p-8 text-center">
+          <p class="mb-2 text-4xl">⏳</p>
+          <h1 class="mb-3 font-serif text-2xl text-ivory">Проверяем платёж</h1>
+          <p class="text-sm leading-relaxed text-ivory-muted">
+            {error
+              ? "Не получилось сразу подтвердить оплату."
+              : "Банк ещё не подтвердил операцию."}{" "}
+            Если деньги списаны, заказ подтвердится автоматически в течение
+            нескольких минут — повторно платить не нужно.
+          </p>
+          <p class="mt-4 text-sm text-ivory-faint">
+            Остались вопросы — напишите на{" "}
+            <span class="text-gold-400">{COMPANY.email}</span> или позвоните{" "}
+            <span class="text-gold-400">{COMPANY.phones[0]}</span>.
+          </p>
+        </div>
+      )
+    }
+  </section>
+</Layout>
