@@ -1,9 +1,11 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import LoginForm from "../components/LoginForm.tsx";
-import { getCustomerId } from "../lib/customer-auth";
+import { currentCustomerId } from "../lib/customer-auth";
 
-if (getCustomerId(Astro.cookies)) return Astro.redirect("/account");
+// Проверяем, что клиент из cookie ещё есть в базе. Иначе отправим его в
+// кабинет, тот вернёт его сюда — и так по кругу до ERR_TOO_MANY_REDIRECTS.
+if (await currentCustomerId(Astro.cookies)) return Astro.redirect("/account");
 ---
 
 <Layout title="Вход — DOZA" noindex={true}>

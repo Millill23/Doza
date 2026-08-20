@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import bcrypt from "bcryptjs";
 import type { AstroCookies } from "astro";
+import { prisma } from "@doza/db";
 
 /**
  * Лёгкая сессия покупателя: подписанный HMAC-токен в httpOnly cookie.
@@ -66,6 +67,32 @@ export function clearSession(cookies: AstroCookies) {
 
 export function getCustomerId(cookies: AstroCookies): number | null {
   return verifySessionToken(cookies.get(COOKIE)?.value);
+}
+
+/**
+ * Клиент текущей сессии — или null, если её нет либо клиента уже удалили.
+ *
+ * Одной подписи cookie мало: она остаётся валидной и после того, как клиента
+ * убрали из базы. Из-за этого страницы отфутболивали друг друга по кругу —
+ * `/login` видел сессию и отправлял в кабинет, кабинет не находил клиента и
+ * отправлял обратно, а браузер упирался в ERR_TOO_MANY_REDIRECTS. Выйти можно
+ * было только вручную почистив cookie. Поэтому мёртвую сессию здесь же и гасим.
+ */
+export async function currentCustomerId(
+  cookies: AstroCookies,
+): Promise<number | null> {
+  const id = getCustomerId(cookies);
+  if (id === null) return null;
+
+  const exists = await prisma.customer.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  if (!exists) {
+    clearSession(cookies);
+    return null;
+  }
+  return id;
 }
 
 // ── Пароли ───────────────────────────────────────────────────────────────────

@@ -3,7 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import AccountPanel from "../components/AccountPanel.tsx";
 import { prisma } from "@doza/db";
 import { getBalance } from "@doza/db/loyalty";
-import { getCustomerId } from "../lib/customer-auth";
+import { getCustomerId, clearSession } from "../lib/customer-auth";
 import { ORDER_STATUS_PUBLIC_LABEL } from "@doza/db/order-rules";
 import { formatPhone } from "@doza/shared";
 
@@ -11,7 +11,12 @@ const id = getCustomerId(Astro.cookies);
 if (!id) return Astro.redirect("/login");
 
 const customer = await prisma.customer.findUnique({ where: { id } });
-if (!customer) return Astro.redirect("/login");
+if (!customer) {
+  // Клиента удалили, а подписанная cookie осталась. Не погасив её, мы отправим
+  // человека на /login, тот увидит «живую» сессию и вернёт его сюда — круг.
+  clearSession(Astro.cookies);
+  return Astro.redirect("/login");
+}
 
 const now = new Date();
 const [balance, batches, orders, dates] = await Promise.all([
