@@ -51,11 +51,12 @@ services:
     expose:
       - "3000"
 
-  # Планировщик. Дёргает задачи каждые 15 минут, а не раз в час: подарки
-  # рассылаются строго в 11:00 по Минску, и при часовом шаге короткий
-  # перезапуск контейнера мог бы сдвинуть цикл и съесть это окно целиком.
-  # Обе задачи идемпотентны, поэтому лишние вызовы безвредны: подарки
-  # выдаются один раз за повод, напоминания об акции — один раз за акцию.
+  # Планировщик. Шаг в 5 минут задан сверкой платежей: покупатель может
+  # закрыть вкладку сразу после оплаты, не нажав «Продолжить», и если вебхук
+  # не дойдёт, заказ обязан всё равно попасть к продавцу без долгого ожидания.
+  # Все три задачи идемпотентны, поэтому частые вызовы безвредны: подарки
+  # выдаются раз за повод, напоминание — раз за акцию, а уже оплаченный заказ
+  # повторная сверка не трогает.
   cron:
     image: alpine:3
     restart: unless-stopped
@@ -64,10 +65,11 @@ services:
       TZ: Europe/Minsk
     depends_on:
       - crm
+      - site
     command:
       - sh
       - -c
-      - 'while true; do sleep 900; wget -q -O- "http://crm:3000/api/cron/promo-reminders?key=$${CRON_SECRET}" >/dev/null 2>&1 || true; wget -q -O- "http://crm:3000/api/cron/daily-rewards?key=$${CRON_SECRET}" >/dev/null 2>&1 || true; done'
+      - 'while true; do sleep 300; wget -q -O- "http://crm:3000/api/cron/promo-reminders?key=$${CRON_SECRET}" >/dev/null 2>&1 || true; wget -q -O- "http://crm:3000/api/cron/daily-rewards?key=$${CRON_SECRET}" >/dev/null 2>&1 || true; wget -q -O- "http://site:4321/api/cron/reconcile-payments?key=$${CRON_SECRET}" >/dev/null 2>&1 || true; done'
 
   nginx:
     image: nginx:alpine

@@ -172,6 +172,30 @@ export async function createPaymentAttempt(opts: {
   });
 }
 
+/**
+ * Токены платежей, по которым заказ всё ещё числится неоплаченным.
+ *
+ * Нужны для сверки со шлюзом. Полагаться на один только вебхук нельзя: он
+ * может не дойти (перезапуск во время деплоя, сбой сети, исчерпанные попытки
+ * доставки), а покупатель имеет полное право закрыть вкладку сразу после
+ * оплаты и не нажать «Продолжить». Тогда деньги списаны, а заказ висит.
+ *
+ * Берём окно в несколько суток: токен живёт час, но bePaid отмечает его
+ * просроченным не мгновенно, а старые заказы разбирать смысла нет.
+ */
+export async function pendingPaymentTokens(withinDays = 3): Promise<string[]> {
+  const since = new Date(Date.now() - withinDays * 24 * 60 * 60 * 1000);
+  const rows = await prisma.payment.findMany({
+    where: {
+      createdAt: { gte: since },
+      order: { paymentStatus: "pending" },
+    },
+    orderBy: { createdAt: "asc" },
+    select: { token: true },
+  });
+  return rows.map((r) => r.token);
+}
+
 /** Заказ с последней попыткой оплаты — для страниц возврата. */
 export async function orderWithPayment(orderId: number) {
   return prisma.order.findUnique({
