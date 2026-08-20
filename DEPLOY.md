@@ -170,7 +170,26 @@ cd ~/doza
 git pull
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 # если были новые миграции БД:
-docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile tools run --rm migrate
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile tools run --rm --build migrate
+```
+
+⚠️ **`--build` в команде `run` обязателен.** Сервис `migrate` сидит в профиле
+`tools`, поэтому `up -d --build` его не пересобирает: образ остаётся тем, что
+был при прошлой сборке. Внутри него — старые файлы, и запуск падает на
+`Cannot find module` или молча не применяет новые миграции.
+
+### Разовые скрипты каталога
+
+Тот же образ гоняет скрипты наполнения. `--build` нужен по той же причине:
+
+```bash
+# новые поступления (существующие карточки не трогает)
+docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+  run --rm --build migrate node prisma/seed-products.mjs
+
+# похожие ароматы (заполняет только пустые)
+docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+  run --rm --build migrate node prisma/seed-similar.mjs
 ```
 
 ---

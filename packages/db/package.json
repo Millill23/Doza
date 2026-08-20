@@ -1,6 +1,7 @@
 {
   "name": "@doza/db",
   "version": "0.0.1",
+  "type": "module",
   "scripts": {
     "generate": "prisma generate",
     "migrate": "prisma migrate dev",
