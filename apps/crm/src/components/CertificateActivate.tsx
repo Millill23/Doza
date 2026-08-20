@@ -3,9 +3,17 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { activateCertificateInCrm } from "@/lib/actions/certificates";
+import { ConsentRequestButton } from "@/components/ConsentControls";
 
 function byn(n: number) {
   return `${n.toFixed(2)} BYN`;
+}
+
+/** Клиент не дал согласие: сертификат цел, но баллы начислить нельзя. */
+interface ConsentBlock {
+  customerId: number;
+  customerName: string;
+  message: string;
 }
 
 export default function CertificateActivate() {
@@ -15,6 +23,7 @@ export default function CertificateActivate() {
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  const [blocked, setBlocked] = useState<ConsentBlock | null>(null);
   const [done, setDone] = useState<{
     awarded: number;
     balance: number;
@@ -103,12 +112,48 @@ export default function CertificateActivate() {
 
       {err && <p className="mb-3 text-sm text-red-300">{err}</p>}
 
+      {/* Нет согласия — объясняем, что делать, и даём сделать это отсюда же.
+          Сертификат при этом не потрачен: код остаётся рабочим. */}
+      {blocked && (
+        <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4">
+          <h3 className="mb-2 text-sm font-medium text-amber-300">
+            {blocked.customerName}: нет согласия на обработку данных
+          </h3>
+          <p className="mb-3 text-xs leading-relaxed text-ivory-muted">
+            {blocked.message}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <ConsentRequestButton
+              customerId={blocked.customerId}
+              label="Отправить согласие"
+            />
+            <button
+              onClick={() => setBlocked(null)}
+              className="rounded-full border border-ink-600 px-3 py-1 text-xs text-ivory-muted hover:border-gold-600/50"
+            >
+              Активировать заново
+            </button>
+          </div>
+        </div>
+      )}
+
       <button
         onClick={() =>
           start(async () => {
             try {
               setErr(null);
+              setBlocked(null);
               const res = await activateCertificateInCrm({ code, phone, name });
+              if (!res.ok) {
+                if (res.reason === "no_consent")
+                  setBlocked({
+                    customerId: res.customerId,
+                    customerName: res.customerName,
+                    message: res.message,
+                  });
+                else setErr(res.message);
+                return;
+              }
               setDone({
                 awarded: res.awarded,
                 balance: res.balance,

@@ -6,7 +6,9 @@ import {
   createOfflineSale,
   lookupCustomer,
   requestLoyaltySpendOtp,
+  checkCertificate,
 } from "@/lib/actions/cash";
+import { applyCertificate, daysLeft } from "@doza/db/certificate-rules";
 import PhoneInput from "@/components/PhoneInput";
 import { ConsentRequestButton } from "@/components/ConsentControls";
 import {
@@ -119,6 +121,10 @@ export default function CashRegister({
   const [spend, setSpend] = useState(0);
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
+  /** Код сертификата и результат его проверки. */
+  const [certCode, setCertCode] = useState("");
+  const [cert, setCert] = useState<{ balance: number; expiresAt: string } | null>(null);
+  const [certError, setCertError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [done, setDone] = useState<{
     saleId: number;
@@ -126,6 +132,8 @@ export default function CashRegister({
     discountLabel?: string;
     earned?: number;
     cashbackBlocked?: boolean;
+    certPaid?: number;
+    certRemaining?: number;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -190,7 +198,14 @@ export default function CashRegister({
   const discount = Math.round((total - netTotal) * 100) / 100;
   const maxSpend = Math.min(balance, netAll);
   const effSpend = usePoints ? Math.min(spend || maxSpend, maxSpend) : 0;
-  const toPay = Math.max(0, Math.round((netAll - effSpend) * 100) / 100);
+  const dueAfterPoints = Math.max(0, Math.round((netAll - effSpend) * 100) / 100);
+
+  // Тот же расчёт, что и на сервере: продавец должен видеть остаток заранее и
+  // назвать его покупателю, а не узнавать после закрытия чека.
+  const certUse = cert
+    ? applyCertificate({ balance: cert.balance, due: dueAfterPoints })
+    : null;
+  const toPay = certUse ? certUse.toPay : dueAfterPoints;
 
   function addLine(p: ProductOpt, v: VolumeOpt) {
     setCart((prev) => {
@@ -294,6 +309,22 @@ export default function CashRegister({
     setSpend(0);
     setOtp("");
     setOtpSent(false);
+    setCertCode("");
+    setCert(null);
+    setCertError(null);
+  }
+
+  function findCertificate() {
+    setCertError(null);
+    startTransition(async () => {
+      const r = await checkCertificate(certCode);
+      if (!r.ok) {
+        setCert(null);
+        setCertError(r.reason ?? "Сертификат недоступен");
+        return;
+      }
+      setCert({ balance: r.balance!, expiresAt: r.expiresAt! });
+    });
   }
 
   function closeSale() {
@@ -320,6 +351,7 @@ export default function CashRegister({
           socialSubscribe: subscribe,
           socialStory: story,
           useDateReward: useDate,
+          certificateCode: cert ? certCode : undefined,
           sellerId,
         });
         setDone({
@@ -328,6 +360,8 @@ export default function CashRegister({
           discountLabel: res.discountLabel,
           earned: res.earned,
           cashbackBlocked: res.cashbackBlocked,
+          certPaid: res.certPaid,
+          certRemaining: res.certRemaining,
         });
         resetCart();
       } catch (e) {
@@ -342,6 +376,15 @@ export default function CashRegister({
         <h2 className="mb-2 font-serif text-2xl text-green-300">Продажа закрыта</h2>
         <p className="mb-1 text-ivory-muted">Продажа №{done.saleId}</p>
         <p className="mb-1 text-ivory">Оплачено: {byn(done.toPay)}</p>
+        {done.certPaid ? (
+          <p className="mb-1 text-sm text-botanical-300">
+            Сертификатом: {byn(done.certPaid)} · остаток{" "}
+            <b>{byn(done.certRemaining ?? 0)}</b>
+            {done.certRemaining
+              ? " — скажите покупателю, он потратит его в следующий раз"
+              : " — сертификат израсходован"}
+          </p>
+        ) : null}
         {done.discountLabel && (
           <p className="mb-1 text-sm text-botanical-300">
             Применена скидка: {done.discountLabel}
@@ -673,6 +716,52 @@ export default function CashRegister({
           </div>
         )}
 
+        {/* Сертификат. Отдельно от блока баллов: платить им можно и без
+            телефона, и без согласия — это средство на предъявителя. */}
+        <div className="border-t border-ink-600/60 pt-4">
+          <label className="mb-1.5 block text-xs uppercase tracking-wide text-gold-500">
+            Сертификат
+          </label>
+          <div className="flex gap-2">
+            <input
+              value={certCode}
+              onChange={(e) => {
+                setCertCode(e.target.value.toUpperCase());
+                setCert(null);
+                setCertError(null);
+              }}
+              onKeyDown={(e) => e.key === "Enter" && findCertificate()}
+              placeholder="ABCD2345"
+              maxLength={12}
+              className="h-10 flex-1 rounded-lg border border-ink-600 bg-ink-800 px-3 font-mono text-sm tracking-[0.2em] text-ivory focus:border-gold-500 focus:outline-none"
+            />
+            <button
+              onClick={findCertificate}
+              disabled={pending || !certCode.trim()}
+              className="h-10 shrink-0 rounded-lg border border-gold-600/50 px-3 text-xs text-gold-400 hover:border-gold-500 disabled:opacity-50"
+            >
+              Проверить
+            </button>
+          </div>
+          {certError && (
+            <p className="mt-1.5 text-xs text-red-300">{certError}</p>
+          )}
+          {cert && certUse && (
+            <div className="mt-2 rounded-lg border border-botanical-500/40 bg-botanical-500/5 p-3 text-xs">
+              <p className="text-botanical-300">
+                Остаток на сертификате: {byn(cert.balance)} · сгорает{" "}
+                {new Date(cert.expiresAt).toLocaleDateString("ru-RU")} (
+                {daysLeft(new Date(cert.expiresAt))} дн.)
+              </p>
+              <p className="mt-1 text-ivory-faint">
+                {certUse.applied > 0
+                  ? `Спишем ${byn(certUse.applied)}, останется ${byn(certUse.remaining)} на следующую покупку.`
+                  : "Добавьте товары — списывать пока нечего."}
+              </p>
+            </div>
+          )}
+        </div>
+
         {/* Итого */}
         <div className="space-y-1 border-t border-ink-600/60 pt-3 text-sm">
           <div className="flex justify-between text-ivory-muted">
@@ -699,6 +788,11 @@ export default function CashRegister({
           {effSpend > 0 && (
             <div className="flex justify-between text-botanical-300">
               <span>Баллы</span><span>−{byn(effSpend)}</span>
+            </div>
+          )}
+          {certUse && certUse.applied > 0 && (
+            <div className="flex justify-between text-botanical-300">
+              <span>Сертификат</span><span>−{byn(certUse.applied)}</span>
             </div>
           )}
           <div className="flex justify-between text-base font-medium text-ivory">

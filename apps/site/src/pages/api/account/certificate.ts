@@ -1,6 +1,10 @@
 import type { APIRoute } from "astro";
 import { prisma } from "@doza/db";
-import { activateCertificate, CertificateError } from "@doza/db/certificates";
+import {
+  activateCertificate,
+  CertificateError,
+  ConsentRequiredError,
+} from "@doza/db/certificates";
 import { sendSmsFromSite } from "../../../lib/sms";
 import { getCustomerId } from "../../../lib/customer-auth";
 import { notifyTelegram, tgEscape } from "../../../lib/telegram";
@@ -45,6 +49,19 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       loyaltyDays: days,
     });
   } catch (e) {
+    // Баллы — отдельная цель обработки данных, и без согласия их не начислить.
+    // Но сертификат при этом остаётся рабочим: им можно расплатиться в
+    // магазине, ничего не подтверждая. Об этом и говорим, чтобы человек не
+    // решил, что подарок пропал.
+    if (e instanceof ConsentRequiredError)
+      return json(
+        {
+          ok: false,
+          error:
+            "Чтобы обменять сертификат на баллы, нужно согласие на обработку персональных данных — подтвердите его по ссылке из SMS. Сертификат цел: им можно расплатиться в магазине без всякого согласия.",
+        },
+        400,
+      );
     if (e instanceof CertificateError)
       return json({ ok: false, error: e.message }, 400);
     console.error("[account] ошибка активации сертификата:", e);

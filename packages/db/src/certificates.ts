@@ -13,6 +13,11 @@ import {
   normalizeCertificateCode,
   isValidCertificateCode,
   certificateAward,
+  certificateExpiresAt,
+  canRedeem,
+  canActivate,
+  applyCertificate,
+  type CertificateState,
 } from "./certificate-rules";
 
 // Реэкспорт правил, чтобы приложениям хватало одного импорта.
@@ -20,6 +25,36 @@ export * from "./certificate-rules";
 
 /** Ошибка активации с понятным для продавца/клиента текстом. */
 export class CertificateError extends Error {}
+
+/**
+ * Клиент не подтвердил согласие на обработку ПД — баллы начислить нельзя.
+ *
+ * Отдельный класс, а не просто текст: продавцу мало сообщения, ему нужна рядом
+ * кнопка «отправить согласие», а для неё интерфейсу нужно знать и причину, и
+ * id клиента.
+ */
+export class ConsentRequiredError extends CertificateError {
+  constructor(readonly customerId: number) {
+    super(
+      "Клиент не подтвердил согласие на обработку персональных данных — начислить баллы нельзя.",
+    );
+  }
+}
+
+/** Привести запись из базы к виду, с которым работают чистые правила. */
+function toState(cert: {
+  status: string;
+  balanceByn: unknown;
+  denomination: unknown;
+  expiresAt: Date;
+}): CertificateState {
+  return {
+    status: cert.status as CertificateState["status"],
+    balanceByn: Number(cert.balanceByn),
+    denomination: Number(cert.denomination),
+    expiresAt: cert.expiresAt,
+  };
+}
 
 /**
  * Подобрать код, которого ещё нет в базе.
@@ -73,10 +108,9 @@ export async function activateCertificate(opts: {
 
   const cert = await prisma.giftCertificate.findUnique({ where: { code } });
   if (!cert) throw new CertificateError("Сертификат с таким кодом не найден");
-  if (cert.status === "activated")
-    throw new CertificateError("Сертификат уже активирован");
-  if (cert.status === "cancelled")
-    throw new CertificateError("Сертификат аннулирован");
+
+  const usable = canActivate(toState(cert));
+  if (!usable.ok) throw new CertificateError(usable.reason);
 
   const customer = await prisma.customer.findUnique({
     where: { id: opts.customerId },
@@ -93,10 +127,15 @@ export async function activateCertificate(opts: {
 
   await prisma.$transaction(async (tx) => {
     // Условный UPDATE — защита от повторной активации при гонке.
+    // Условие по остатку, а не только по статусу: если параллельно прошла
+    // оплата в кассе, остаток уже не полный — обменивать нечего.
     const claimed = await tx.giftCertificate.updateMany({
-      where: { id: cert.id, status: "new" },
+      where: { id: cert.id, status: "new", balanceByn: cert.denomination },
       data: {
         status: "activated",
+        // Остаток обнуляем: номинал ушёл баллами, и платить им в кассе больше
+        // нельзя — иначе магазин отдаст одну сумму дважды.
+        balanceByn: 0,
         customerId: customer.id,
         activatedById: opts.activatedById ?? null,
         activatedAt: new Date(),
@@ -104,7 +143,7 @@ export async function activateCertificate(opts: {
       },
     });
     if (claimed.count !== 1)
-      throw new CertificateError("Сертификат уже активирован");
+      throw new CertificateError("Сертификат уже использован");
 
     const accrued = await earnPoints(customer.id, awarded, opts.loyaltyDays, {
       type: "gift_certificate",
@@ -114,10 +153,7 @@ export async function activateCertificate(opts: {
     // Без согласия на обработку ПД баллы не начисляются — а значит сертификат
     // сгорел бы впустую. Роняем транзакцию: код остаётся неактивированным,
     // клиент даёт согласие и активирует его заново.
-    if (!accrued)
-      throw new CertificateError(
-        "Клиент не подтвердил согласие на обработку персональных данных — баллы начислить нельзя. Отправьте ему ссылку согласия и повторите активацию.",
-      );
+    if (!accrued) throw new ConsentRequiredError(customer.id);
   });
 
   const balance = await getBalance(customer.id);
@@ -133,4 +169,154 @@ export async function activateCertificate(opts: {
     customerPhone: customer.phone,
     isVip,
   };
+}
+
+/** Дата сгорания для сертификата, выпускаемого сейчас. */
+export function newCertificateExpiry(): Date {
+  return certificateExpiresAt(new Date());
+}
+
+export interface CertificateLookup {
+  ok: boolean;
+  /** Причина отказа — показываем продавцу. */
+  reason?: string;
+  id?: number;
+  code?: string;
+  balance?: number;
+  denomination?: number;
+  expiresAt?: string;
+}
+
+/**
+ * Найти сертификат по коду и сказать, можно ли им платить.
+ *
+ * Отдельно от списания: продавец сначала проверяет код при покупателе и видит
+ * остаток, и только потом закрывает чек. Отказ возвращаем значением, а не
+ * исключением — «сертификат просрочен» это не сбой, а нормальный ответ.
+ */
+export async function lookupCertificate(codeRaw: string): Promise<CertificateLookup> {
+  const code = normalizeCertificateCode(codeRaw);
+  if (!isValidCertificateCode(code))
+    return { ok: false, reason: "Код состоит из 8 символов — проверьте ввод" };
+
+  const cert = await prisma.giftCertificate.findUnique({ where: { code } });
+  if (!cert) return { ok: false, reason: "Сертификат с таким кодом не найден" };
+
+  const usable = canRedeem(toState(cert));
+  if (!usable.ok) return { ok: false, reason: usable.reason };
+
+  return {
+    ok: true,
+    id: cert.id,
+    code: cert.code,
+    balance: Number(cert.balanceByn),
+    denomination: Number(cert.denomination),
+    expiresAt: cert.expiresAt.toISOString(),
+  };
+}
+
+export interface RedeemResult {
+  certificateId: number;
+  code: string;
+  /** Списано с сертификата по этому чеку. */
+  applied: number;
+  /** Осталось на сертификате. */
+  remaining: number;
+}
+
+/**
+ * Списать с сертификата в счёт продажи.
+ *
+ * Списание идёт условным UPDATE по текущему остатку: если тем же кодом в этот
+ * момент платят на второй кассе, выиграет только одна операция — иначе остаток
+ * можно потратить дважды.
+ *
+ * Вызывается уже после создания продажи, поэтому `saleId` обязателен: списание
+ * без чека — это потерянные деньги, которые некуда вернуть.
+ */
+export async function redeemCertificate(opts: {
+  code: string;
+  saleId: number;
+  /** Сумма к оплате после скидок и списания баллов. */
+  due: number;
+  userId?: number | null;
+}): Promise<RedeemResult> {
+  const code = normalizeCertificateCode(opts.code);
+  const cert = await prisma.giftCertificate.findUnique({ where: { code } });
+  if (!cert) throw new CertificateError("Сертификат с таким кодом не найден");
+
+  const usable = canRedeem(toState(cert));
+  if (!usable.ok) throw new CertificateError(usable.reason);
+
+  const { applied, remaining } = applyCertificate({
+    balance: Number(cert.balanceByn),
+    due: opts.due,
+  });
+  if (applied <= 0)
+    throw new CertificateError("По этому чеку списывать с сертификата нечего");
+
+  return prisma.$transaction(async (tx) => {
+    const claimed = await tx.giftCertificate.updateMany({
+      where: { id: cert.id, balanceByn: cert.balanceByn, status: "new" },
+      data: {
+        balanceByn: remaining,
+        // Пустой сертификат помечаем сразу: продавцу не придётся гадать,
+        // почему код «есть, но не работает».
+        ...(remaining <= 0 ? { status: "spent" as const } : {}),
+      },
+    });
+    if (claimed.count !== 1)
+      throw new CertificateError(
+        "Сертификатом только что воспользовались — проверьте остаток заново",
+      );
+
+    await tx.certificateRedemption.create({
+      data: {
+        certificateId: cert.id,
+        saleId: opts.saleId,
+        amountByn: applied,
+        balanceAfter: remaining,
+        userId: opts.userId ?? null,
+      },
+    });
+
+    return { certificateId: cert.id, code, applied, remaining };
+  });
+}
+
+/**
+ * Вернуть на сертификат всё, что списали по отменённой продаже.
+ *
+ * Срок действия при этом не продлевается: покупки не было, но и время не
+ * повернулось вспять.
+ */
+export async function revokeSaleRedemptions(
+  saleId: number,
+  tx: {
+    certificateRedemption: typeof prisma.certificateRedemption;
+    giftCertificate: typeof prisma.giftCertificate;
+  } = prisma,
+): Promise<number> {
+  const rows = await tx.certificateRedemption.findMany({
+    where: { saleId, revokedAt: null },
+  });
+
+  let returned = 0;
+  for (const r of rows) {
+    const amount = Number(r.amountByn);
+    await tx.giftCertificate.update({
+      where: { id: r.certificateId },
+      data: {
+        balanceByn: { increment: amount },
+        // Сертификат снова можно тратить: деньги на нём опять есть.
+        status: "new",
+      },
+    });
+    await tx.certificateRedemption.update({
+      where: { id: r.id },
+      data: { revokedAt: new Date() },
+    });
+    returned += amount;
+  }
+  return Math.round(returned * 100) / 100;
 }

@@ -2,7 +2,11 @@ import Link from "next/link";
 import { prisma } from "@doza/db";
 import { requireRole } from "@/lib/session";
 import CertificateIssue from "@/components/CertificateIssue";
-import { CERTIFICATE_DENOMINATIONS } from "@doza/db/certificates";
+import {
+  CERTIFICATE_DENOMINATIONS,
+  CERTIFICATE_LIFETIME_DAYS,
+  daysLeft,
+} from "@doza/db/certificates";
 
 export const dynamic = "force-dynamic";
 
@@ -18,8 +22,9 @@ function fmt(d: Date | null): string {
 }
 
 const STATUS: Record<string, { label: string; cls: string }> = {
-  new: { label: "Не активирован", cls: "text-botanical-300" },
-  activated: { label: "Активирован", cls: "text-ivory-faint" },
+  new: { label: "Действует", cls: "text-botanical-300" },
+  activated: { label: "Обменян на баллы", cls: "text-ivory-faint" },
+  spent: { label: "Израсходован", cls: "text-ivory-faint" },
   cancelled: { label: "Аннулирован", cls: "text-red-300" },
 };
 
@@ -35,7 +40,12 @@ export default async function CertificatesPage() {
     take: 100,
   });
 
-  const active = certificates.filter((c) => c.status === "new").length;
+  // «Действующий» — с остатком и не просроченный: именно столько денег магазин
+  // ещё должен покупателям.
+  const now = new Date();
+  const active = certificates.filter(
+    (c) => c.status === "new" && c.expiresAt > now,
+  ).length;
 
   return (
     <div>
@@ -43,7 +53,9 @@ export default async function CertificatesPage() {
         <div>
           <h1 className="mb-1 font-serif text-3xl text-ivory">Сертификаты</h1>
           <p className="text-sm text-ivory-faint">
-            Выпуск подарочных сертификатов. Не активировано: {active}.
+            Действующих: {active}. Срок жизни — {CERTIFICATE_LIFETIME_DAYS} дней
+            с выпуска. Сертификатом можно расплатиться в кассе (остаток
+            сохраняется) либо один раз обменять его на баллы.
           </p>
         </div>
         <Link
@@ -69,15 +81,20 @@ export default async function CertificatesPage() {
               <tr>
                 <th className="px-4 py-3">Код</th>
                 <th className="px-4 py-3">Номинал</th>
-                <th className="px-4 py-3">Оплачено</th>
+                <th className="px-4 py-3">Остаток</th>
                 <th className="px-4 py-3">Статус</th>
+                <th className="px-4 py-3">Действует до</th>
                 <th className="px-4 py-3">Активировал</th>
                 <th className="px-4 py-3">Выпущен</th>
               </tr>
             </thead>
             <tbody>
               {certificates.map((c) => {
-                const st = STATUS[c.status] ?? STATUS.new;
+                const expired = c.expiresAt <= new Date();
+                const st = expired && c.status === "new"
+                  ? { label: "Просрочен", cls: "text-red-300" }
+                  : (STATUS[c.status] ?? STATUS.new);
+                const left = Number(c.balanceByn);
                 return (
                   <tr key={c.id} className="border-t border-ink-600/40 bg-ink-700">
                     <td className="px-4 py-3 font-mono tracking-widest text-gold-300">
@@ -86,14 +103,26 @@ export default async function CertificatesPage() {
                     <td className="px-4 py-3 text-ivory">
                       {Number(c.denomination).toFixed(2)}
                     </td>
-                    <td className="px-4 py-3 text-ivory-muted">
-                      {Number(c.paidByn).toFixed(2)}
+                    <td className="px-4 py-3 text-ivory">
+                      {left > 0 ? (
+                        <span className="text-gold-400">{left.toFixed(2)}</span>
+                      ) : (
+                        <span className="text-ivory-faint">—</span>
+                      )}
                     </td>
                     <td className={`px-4 py-3 text-xs ${st.cls}`}>
                       {st.label}
                       {c.status === "activated" && c.awardedByn != null && (
                         <span className="ml-1 text-gold-400">
                           +{Number(c.awardedByn).toFixed(2)}
+                        </span>
+                      )}
+                    </td>
+                    <td className={`px-4 py-3 text-xs ${expired ? "text-red-300" : "text-ivory-muted"}`}>
+                      {c.expiresAt.toLocaleDateString("ru-RU")}
+                      {!expired && c.status === "new" && (
+                        <span className="ml-1 text-ivory-faint">
+                          ({daysLeft(c.expiresAt)} дн.)
                         </span>
                       )}
                     </td>

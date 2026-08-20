@@ -4,8 +4,11 @@ import { prisma } from "@doza/db";
 import {
   activateCertificate,
   reserveUniqueCode,
+  newCertificateExpiry,
   CertificateError,
+  ConsentRequiredError,
   CERTIFICATE_DENOMINATIONS,
+  CERTIFICATE_LIFETIME_DAYS,
 } from "@doza/db/certificates";
 import { sendSmsFromCrm } from "@/lib/sms";
 import { toStoredPhone } from "@doza/shared/phone";
@@ -100,6 +103,10 @@ export async function issueCertificate(input: {
       code: input.code,
       denomination: nominal,
       paidByn: paid,
+      // Тратить можно весь номинал, а не уплаченную сумму: VIP-скидка — это
+      // скидка на покупку сертификата, а не уменьшение его ценности.
+      balanceByn: nominal,
+      expiresAt: newCertificateExpiry(),
       buyerId,
       issuedById,
     },
@@ -160,7 +167,20 @@ export async function activateCertificateInCrm(input: {
       loyaltyDays: days,
     });
   } catch (e) {
-    if (e instanceof CertificateError) throw new Error(e.message);
+    // Отсутствие согласия — не поломка, а житейская ситуация: продавцу нужен
+    // не текст ошибки, а кнопка «отправить согласие» рядом с ней. Поэтому
+    // возвращаем значением, а не исключением.
+    if (e instanceof ConsentRequiredError)
+      return {
+        ok: false as const,
+        reason: "no_consent" as const,
+        customerId: e.customerId,
+        customerName: customer.name,
+        message:
+          "Клиент не подтвердил согласие на обработку персональных данных, поэтому начислить баллы нельзя. Сертификат не тронут — отправьте клиенту ссылку, дождитесь подтверждения и активируйте снова. Либо расплатитесь этим сертификатом прямо в кассе: там согласие не требуется.",
+      };
+    if (e instanceof CertificateError)
+      return { ok: false as const, reason: "invalid" as const, message: e.message };
     throw e;
   }
 
@@ -196,5 +216,5 @@ export async function activateCertificateInCrm(input: {
   }
 
   revalidatePath("/certificates");
-  return result;
+  return { ok: true as const, ...result };
 }

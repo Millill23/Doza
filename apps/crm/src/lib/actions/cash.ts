@@ -10,6 +10,7 @@ import {
 } from "@doza/db/promos";
 import { priceCart } from "@doza/db/pricing";
 import { createSmsCode, verifySmsCode } from "@doza/db/sms-codes";
+import { lookupCertificate, redeemCertificate } from "@doza/db/certificates";
 import { requestConsent } from "@doza/db/consent";
 import { activeDateReward, consumeDateReward } from "@doza/db/rewards";
 import { sendSmsFromCrm } from "@/lib/sms";
@@ -143,6 +144,11 @@ interface CreateSaleInput {
   socialStory?: boolean;
   /** Применить разовую скидку по памятной дате (покупатель согласился). */
   useDateReward?: boolean;
+  /**
+   * Код подарочного сертификата. Оплата им не требует ни телефона, ни
+   * согласия на обработку данных — сертификат на предъявителя.
+   */
+  certificateCode?: string;
   /** Оформить продажу от лица другого продавца (только админ). */
   sellerId?: number;
 }
@@ -298,6 +304,19 @@ export async function createOfflineSale(input: CreateSaleInput) {
     loyaltySpent = Math.round(loyaltySpent * 100) / 100;
   }
 
+  // Сертификат проверяем до создания продажи: если код просрочен или пуст,
+  // чек не должен появиться в базе с несуществующей оплатой.
+  const certCode = (input.certificateCode ?? "").trim();
+  const dueAfterPoints = Math.round((saleTotal - loyaltySpent) * 100) / 100;
+  if (certCode) {
+    const found = await lookupCertificate(certCode);
+    if (!found.ok) throw new Error(found.reason ?? "Сертификат недоступен");
+    if (dueAfterPoints <= 0)
+      throw new Error(
+        "Чек уже покрыт баллами — списывать с сертификата нечего. Уберите одно из двух.",
+      );
+  }
+
   // Создание закрытой продажи
   const sale = await prisma.offlineSale.create({
     data: {
@@ -321,6 +340,21 @@ export async function createOfflineSale(input: CreateSaleInput) {
       },
     },
   });
+
+  // Оплата сертификатом. Списываем после создания чека: списание без чека —
+  // это деньги, которые некуда вернуть при отмене.
+  let certPaid = 0;
+  let certRemaining = 0;
+  if (certCode) {
+    const red = await redeemCertificate({
+      code: certCode,
+      saleId: sale.id,
+      due: dueAfterPoints,
+      userId: actorId,
+    });
+    certPaid = red.applied;
+    certRemaining = red.remaining;
+  }
 
   // Скидку списываем, только если она действительно сработала. Когда выгоднее
   // оказались VIP или акция, разовая скидка остаётся у клиента на следующий раз.
@@ -451,7 +485,10 @@ export async function createOfflineSale(input: CreateSaleInput) {
           ? `Сумма: ${grossAll.toFixed(2)} BYN\nСкидка: −${totalDiscount.toFixed(2)}${DISCOUNT_LABEL[priced.kind] ? ` (${DISCOUNT_LABEL[priced.kind]})` : ""}\n`
           : "") +
         `Итого: <b>${saleTotal.toFixed(2)} BYN</b>` +
-        (loyaltySpent > 0 ? `\nСписано баллов: ${loyaltySpent.toFixed(2)}` : ""),
+        (loyaltySpent > 0 ? `\nСписано баллов: ${loyaltySpent.toFixed(2)}` : "") +
+        (certPaid > 0
+          ? `\n🎁 Сертификатом: ${certPaid.toFixed(2)} (остаток ${certRemaining.toFixed(2)})`
+          : ""),
     );
   } catch (e) {
     console.error("[cash] telegram notify failed:", e);
@@ -474,6 +511,16 @@ export async function createOfflineSale(input: CreateSaleInput) {
     /** Кешбек не начислен — клиент не подтвердил согласие на обработку ПД. */
     cashbackBlocked,
     loyaltySpent,
-    toPay: Math.round((saleTotal - loyaltySpent) * 100) / 100,
+    /** Оплачено сертификатом по этому чеку. */
+    certPaid,
+    /** Что осталось на сертификате — продавец называет это покупателю. */
+    certRemaining,
+    toPay: Math.round((saleTotal - loyaltySpent - certPaid) * 100) / 100,
   };
+}
+
+/** Проверить код сертификата при покупателе — до закрытия чека. */
+export async function checkCertificate(code: string) {
+  await requireRole(["admin", "seller"]);
+  return lookupCertificate(code);
 }

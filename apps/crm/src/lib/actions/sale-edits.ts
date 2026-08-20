@@ -2,6 +2,7 @@
 
 import { prisma } from "@doza/db";
 import { earnPoints } from "@doza/db/loyalty";
+import { revokeSaleRedemptions } from "@doza/db/certificates";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/session";
 
@@ -39,6 +40,9 @@ export async function cancelOfflineSale(saleId: number, reason: string) {
       priceByn: Number(i.priceByn),
     })),
   };
+
+  /** Сколько вернулось на сертификат — попадёт в журнал изменений. */
+  let certReturned = 0;
 
   await prisma.$transaction(async (tx) => {
     // 1. Возврат остатков
@@ -115,7 +119,10 @@ export async function cancelOfflineSale(saleId: number, reason: string) {
       data: { usedAt: null, usedSaleId: null },
     });
 
-    // 5. Статус + журнал
+    // 5. Возврат оплаты сертификатом — тоже без продления срока.
+    certReturned = await revokeSaleRedemptions(sale.id, tx);
+
+    // 6. Статус + журнал
     await tx.offlineSale.update({
       where: { id: sale.id },
       data: { status: "cancelled" },
@@ -124,7 +131,11 @@ export async function cancelOfflineSale(saleId: number, reason: string) {
       data: {
         saleId: sale.id,
         userId,
-        changeDescription: `Отмена продажи: ${reason || "без указания причины"}`,
+        changeDescription:
+          `Отмена продажи: ${reason || "без указания причины"}` +
+          (certReturned > 0
+            ? ` · возвращено на сертификат ${certReturned.toFixed(2)} BYN`
+            : ""),
         beforeJson: before,
         afterJson: { status: "cancelled" },
       },
@@ -133,4 +144,6 @@ export async function cancelOfflineSale(saleId: number, reason: string) {
 
   revalidatePath(`/cash/sales/${saleId}`);
   revalidatePath("/cash/sales");
+  revalidatePath("/certificates");
+  return { certReturned };
 }

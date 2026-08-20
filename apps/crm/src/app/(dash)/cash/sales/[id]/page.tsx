@@ -27,6 +27,7 @@ export default async function SaleDetailPage({
     include: {
       items: { include: { product: { include: { brand: true } } } },
       certificates: true,
+      redemptions: { include: { certificate: { select: { code: true } } } },
       seller: { select: { name: true } },
       customer: { select: { id: true, name: true } },
       edits: { orderBy: { editedAt: "desc" } },
@@ -40,7 +41,11 @@ export default async function SaleDetailPage({
   });
   const editorMap = new Map(editors.map((u) => [u.id, u.name]));
 
-  const toPay = Number(sale.totalByn) - Number(sale.loyaltySpentByn);
+  // Отменённые списания в оплату не идут: их уже вернули на сертификат.
+  const certPaid = sale.redemptions
+    .filter((r) => !r.revokedAt)
+    .reduce((sum, r) => sum + Number(r.amountByn), 0);
+  const toPay = Number(sale.totalByn) - Number(sale.loyaltySpentByn) - certPaid;
 
   return (
     <div>
@@ -86,8 +91,18 @@ export default async function SaleDetailPage({
                   <span>Списано баллов</span><span>−{formatByn(Number(sale.loyaltySpentByn))}</span>
                 </div>
               )}
+              {sale.redemptions.map((r) => (
+                <div
+                  key={r.id}
+                  className={`flex justify-between ${r.revokedAt ? "text-ivory-faint line-through" : "text-botanical-300"}`}
+                >
+                  <span>Сертификат {r.certificate.code}</span>
+                  <span>−{formatByn(Number(r.amountByn))}</span>
+                </div>
+              ))}
               <div className="flex justify-between text-base font-medium text-ivory">
-                <span>Оплачено</span><span className="text-gold-gradient">{formatByn(toPay)}</span>
+                <span>Оплачено деньгами</span>
+                <span className="text-gold-gradient">{formatByn(toPay)}</span>
               </div>
             </div>
             {sale.customer && (

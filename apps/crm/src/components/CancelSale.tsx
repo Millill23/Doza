@@ -23,7 +23,8 @@ export default function CancelSale({ saleId }: { saleId: number }) {
   return (
     <div className="space-y-3 rounded-xl border border-red-500/40 bg-red-500/5 p-4">
       <p className="text-sm text-ivory">
-        Отмена вернёт остатки и баллы. Действие будет записано в журнал.
+        Отмена вернёт остатки, баллы и оплату сертификатом. Действие будет
+        записано в журнал.
       </p>
       <input
         value={reason}
