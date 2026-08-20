@@ -3,6 +3,7 @@ import { getBalance } from "@doza/db/loyalty";
 import { prisma } from "@doza/db";
 import { currentCustomerId } from "../../../lib/customer-auth";
 import { quoteCart, vipPercentFor, CartError } from "../../../lib/cart-pricing";
+import { offerProductIds } from "../../../lib/upsell";
 
 export const prerender = false;
 
@@ -45,7 +46,10 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
   try {
     const cart = await quoteCart(items, { vipPercent });
-    return json({ ok: true, session, cart });
+    // Корзине важно лишь, есть ли предложение: от этого зависит, ведёт кнопка
+    // на шаг допродажи или сразу к оплате. Пустой страницы быть не должно.
+    const upsellCount = (await offerProductIds(items)).length;
+    return json({ ok: true, session, cart, upsellCount });
   } catch (e) {
     if (e instanceof CartError)
       return json({ ok: false, error: e.message, session }, 400);

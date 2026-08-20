@@ -16,6 +16,15 @@ export interface PricingLine {
   qty: number;
   /** Цена за единицу до скидок. */
   unitPrice: number;
+  /**
+   * Скидка допродажи, % — только для этой строки.
+   *
+   * В отличие от VIP и соцскидок, действует не на весь чек, а на конкретную
+   * позицию: покупателю предложили добрать аромат к заказу, и предложение
+   * касается только его. Право на такую скидку подтверждает сервер, а не
+   * корзина в браузере.
+   */
+  upsellPercent?: number;
 }
 
 /** Правило супер-акции «1+1=3»: каждый `groupSize`-й товар бесплатно. */
@@ -93,10 +102,17 @@ function clampPercent(p: number | undefined): number {
   return Math.min(100, p as number);
 }
 
-/** Процент акции именно на этот товар (макс. из «на все товары» и адресной). */
-function promoFor(input: PricingInput, productId: number): number {
-  const own = input.productPromoPercent?.[productId] ?? 0;
-  return Math.max(clampPercent(input.allProductsPromoPercent), clampPercent(own));
+/**
+ * Процент скидки, привязанной к самой позиции: акция на товар, акция «на все
+ * товары» или предложение допродажи. Берём максимум — они не складываются.
+ */
+function promoFor(input: PricingInput, line: PricingLine): number {
+  const own = input.productPromoPercent?.[line.productId] ?? 0;
+  return Math.max(
+    clampPercent(input.allProductsPromoPercent),
+    clampPercent(own),
+    clampPercent(line.upsellPercent),
+  );
 }
 
 /** Цена единицы после процентной скидки (совпадает с прежней логикой кассы). */
@@ -115,7 +131,7 @@ function percentScenario(
   const lineNet: number[] = [];
   let total = 0;
   for (const l of input.lines) {
-    const pct = Math.max(opts.vip, opts.social, opts.date, promoFor(input, l.productId));
+    const pct = Math.max(opts.vip, opts.social, opts.date, promoFor(input, l));
     const sum = r2(unitAfter(l.unitPrice, pct) * l.qty);
     lineNet.push(sum);
     total += sum;
@@ -137,7 +153,7 @@ function superScenario(
   const units: { lineIndex: number; price: number }[] = [];
 
   input.lines.forEach((l, i) => {
-    const pct = promoFor(input, l.productId);
+    const pct = promoFor(input, l);
     const unit = unitAfter(l.unitPrice, pct);
     lineNet.push(r2(unit * l.qty));
     if (rule.isEligible(l.productId)) {

@@ -25,6 +25,7 @@ interface Quote {
   kind: "none" | "vip" | "social" | "date" | "promo" | "super";
 }
 import { BELARUS_REGIONS, validateDelivery } from "@doza/shared/delivery";
+import { saveCheckout, placeOrder, type CheckoutForm } from "../lib/checkout-client";
 
 /** Общий вид поля ввода — их в форме доставки восемь. */
 const FIELD =
@@ -93,6 +94,8 @@ export default function CartApp() {
   const [account, setAccount] = useState<Account | null>(null);
   /** Суммы со скидками — считает сервер, здесь мы их только показываем. */
   const [quote, setQuote] = useState<Quote | null>(null);
+  /** Есть ли что предложить добрать: от этого зависит, куда ведёт кнопка. */
+  const [hasOffer, setHasOffer] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -128,6 +131,7 @@ export default function CartApp() {
         const data = await r.json();
         if (cancelled) return;
         setQuote(data.cart ?? null);
+        setHasOffer((data.upsellCount ?? 0) > 0);
         if (data.session?.authenticated) {
           setAccount(data.session);
           setBalance(data.session.balance || 0);
@@ -212,47 +216,42 @@ export default function CartApp() {
         return;
       }
     }
-    setSubmitting(true);
-    try {
-      const r = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          phone: BELARUS_PREFIX + phone,
-          deliveryType: delivery,
-          delivery: delivery === "post" ? deliveryData : undefined,
-          comment,
-          loyaltySpend: effectiveSpend,
-          items: cart.map((i) => ({
-            productId: i.productId,
-            volumeMl: i.volumeMl,
-            qty: i.qty,
-          })),
-        }),
-      });
-      const data = await r.json();
-      if (!r.ok || !data.ok) {
-        setError(data.error || "Не удалось оформить заказ");
-        return;
-      }
-      // Корзину чистим только при переходе к оплате: если платёж не состоится,
-      // покупатель вернётся на /payment/fail и захочет попробовать снова.
-      if (data.redirectUrl) {
-        writeCart([]);
-        setCart([]);
-        window.location.href = data.redirectUrl;
-        return;
-      }
-      // Заказ полностью покрыт баллами — платить нечего.
-      writeCart([]);
-      setCart([]);
-      setDoneOrderId(data.orderId);
-    } catch {
-      setError("Ошибка сети. Попробуйте ещё раз.");
-    } finally {
-      setSubmitting(false);
+
+    const form: CheckoutForm = {
+      name,
+      phone,
+      deliveryType: delivery,
+      delivery: deliveryData,
+      comment,
+      loyaltySpend: effectiveSpend,
+    };
+
+    // Есть что предложить — сначала показываем предложение. Форма уже
+    // проверена, поэтому дальше покупателю останется только нажать «оплатить».
+    if (hasOffer) {
+      saveCheckout(form);
+      window.location.href = "/cart/offer";
+      return;
     }
+
+    setSubmitting(true);
+    const res = await placeOrder(form, cart);
+    setSubmitting(false);
+
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    // Корзину чистим только при переходе к оплате: если платёж не состоится,
+    // покупатель вернётся на /payment/fail и захочет попробовать снова.
+    writeCart([]);
+    setCart([]);
+    if ("redirectUrl" in res) {
+      window.location.href = res.redirectUrl;
+      return;
+    }
+    // Заказ полностью покрыт баллами — платить нечего.
+    setDoneOrderId(res.orderId);
   }
 
   if (!mounted) return null;
@@ -605,7 +604,11 @@ export default function CartApp() {
           type="submit" disabled={submitting || !consent}
           className="inline-flex h-12 w-full cursor-pointer items-center justify-center rounded-full bg-gold-gradient text-base font-medium text-ink-900 shadow-gold transition-all hover:shadow-gold-lg disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {submitting ? "Переходим к оплате…" : "Перейти к оплате"}
+          {submitting
+            ? "Переходим к оплате…"
+            : hasOffer
+              ? "Далее"
+              : "Перейти к оплате"}
         </button>
 
         <p className="text-center text-xs font-light leading-relaxed text-ivory-faint">

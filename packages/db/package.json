@@ -33,6 +33,8 @@
     "./pricing": "./src/pricing.ts",
     "./certificates": "./src/certificates.ts",
     "./certificate-rules": "./src/certificate-rules.ts",
-    "./sales-split": "./src/sales-split.ts"
+    "./sales-split": "./src/sales-split.ts",
+    "./similar-rules": "./src/similar-rules.ts",
+    "./upsell-rules": "./src/upsell-rules.ts"
   }
 }

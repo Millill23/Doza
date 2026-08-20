@@ -1,6 +1,8 @@
 import { prisma } from "@doza/db";
 import { priceCart, type DiscountKind } from "@doza/db/pricing";
 import { pickActivePromo, getGlobalPromo, mergePromos } from "@doza/db/promos";
+import { upsellPercentFor } from "@doza/db/upsell-rules";
+import { offerableProductIds } from "./upsell";
 
 /**
  * Расчёт корзины на сайте.
@@ -17,6 +19,8 @@ export interface QuoteItem {
   productId: number;
   volumeMl: number;
   qty: number;
+  /** Позиция взята из допродажи. Слово браузера — сервер это перепроверит. */
+  fromUpsell?: boolean;
 }
 
 export interface QuotedLine {
@@ -105,8 +109,19 @@ export async function quoteCart(
   // Акция «на все товары» не привязана к товару — достаём отдельно.
   const globalPromo = await getGlobalPromo();
 
+  // Что мы вправе продать со скидкой допродажи. Считаем сами, по своей
+  // таблице похожих: пометка в корзине — заявка, а не разрешение.
+  const offered = new Set(
+    items.some((i) => i.fromUpsell) ? await offerableProductIds(items) : [],
+  );
+
   const productPromoPercent: Record<number, number> = {};
-  const lines: { productId: number; qty: number; unitPrice: number }[] = [];
+  const lines: {
+    productId: number;
+    qty: number;
+    unitPrice: number;
+    upsellPercent?: number;
+  }[] = [];
   const meta: { volumeMl: number; label: string }[] = [];
 
   for (const item of items) {
@@ -127,7 +142,12 @@ export async function quoteCart(
       promo.discountPercent,
     );
 
-    lines.push({ productId: item.productId, qty, unitPrice: Number(rec.priceByn) });
+    lines.push({
+      productId: item.productId,
+      qty,
+      unitPrice: Number(rec.priceByn),
+      upsellPercent: upsellPercentFor(item, offered),
+    });
     meta.push({
       volumeMl: item.volumeMl,
       label: `${rec.product.brand.name} ${rec.product.name}, ${item.volumeMl} мл ×${qty}`,

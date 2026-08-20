@@ -1,0 +1,20 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import UpsellApp from "../../components/UpsellApp.tsx";
+
+export const prerender = false;
+---
+
+<Layout title="Добавить к заказу — DOZA" noindex={true}>
+  <section class="container-luxe py-12">
+    <header class="mb-8 text-center">
+      <h1 class="font-serif text-3xl font-semibold text-ivory sm:text-4xl">
+        Почти готово
+      </h1>
+      <p class="mt-2 text-sm font-light text-ivory-muted">
+        Остался один шаг до оплаты
+      </p>
+    </header>
+    <UpsellApp client:load />
+  </section>
+</Layout>

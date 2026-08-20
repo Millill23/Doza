@@ -26,6 +26,11 @@ interface IncomingItem {
   productId: number;
   volumeMl: number;
   qty: number;
+  /**
+   * Позиция взята из допродажи. Само по себе это ничего не даёт: право на
+   * скидку сервер подтверждает своим списком предложенного (`quoteCart`).
+   */
+  fromUpsell?: boolean;
 }
 
 interface OrderBody {
