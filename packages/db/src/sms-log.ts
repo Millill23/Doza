@@ -64,7 +64,22 @@ export async function sendTrackedSms(opts: {
   userId?: number | null;
 }): Promise<SendSmsResult> {
   if (!(await isSmsKindEnabled(opts.kind))) {
-    return { ok: false, skipped: true, error: "Отправка этой категории выключена в настройках" };
+    const error = "Отправка этой категории выключена в настройках";
+    // Пишем и это тоже. Иначе выключенный переключатель выглядит как молчание
+    // шлюза: сообщений нет, следов нет, и понять, почему клиенту ничего не
+    // пришло, можно только перечитав настройки наугад.
+    await prisma.smsLog.create({
+      data: {
+        phone: opts.phone,
+        kind: opts.kind,
+        text: opts.text,
+        ok: false,
+        error,
+        customerId: opts.customerId ?? null,
+        userId: opts.userId ?? null,
+      },
+    });
+    return { ok: false, skipped: true, error };
   }
 
   let ok = false;

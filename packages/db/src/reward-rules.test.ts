@@ -8,6 +8,7 @@ import {
   anniversaryIn,
   rewardWindow,
   issueYearFor,
+  anniversaryPassed,
   isBirthdayToday,
   occasionKey,
   isRewardUsable,
@@ -28,7 +29,7 @@ test("день исходной даты читается в UTC, а не в м�
   // отрицательном смещении дали бы 16 мая — и подарок уехал бы на сутки.
   assert.deepEqual(anniversaryIn(stored(1990, 5, 17), 2026), d(2026, 5, 17));
   assert.equal(isBirthdayToday(stored(1990, 5, 17), d(2026, 5, 17)), true);
-  assert.equal(issueYearFor(stored(1995, 8, 17), d(2026, 8, 14), 3), 2026);
+  assert.equal(issueYearFor(stored(1995, 8, 17), d(2026, 8, 14), 3, 7), 2026);
 });
 
 test("годовщина переносит день и месяц в нужный год", () => {
@@ -52,19 +53,45 @@ test("окно скидки: 3 дня до и 7 после", () => {
   assert.equal(w.validUntil.getHours(), 23);
 });
 
-test("день выдачи — ровно за 3 дня до даты", () => {
+test("выдача открывается за 3 дня до даты", () => {
   const src = stored(1990, 5, 17);
-  assert.equal(issueYearFor(src, d(2026, 5, 14), 3), 2026);
-  assert.equal(issueYearFor(src, d(2026, 5, 13), 3), null);
-  assert.equal(issueYearFor(src, d(2026, 5, 15), 3), null);
-  assert.equal(issueYearFor(src, d(2026, 5, 17), 3), null);
+  assert.equal(issueYearFor(src, d(2026, 5, 14), 3, 7), 2026);
+  assert.equal(issueYearFor(src, d(2026, 5, 13), 3, 7), null, "рано");
+});
+
+test("пропущенный день навёрстывается — выдаём в любой день окна", () => {
+  // Сутки простоя задачи не должны стоить клиенту подарка на год: раньше
+  // выдача была привязана строго ко дню открытия окна.
+  const src = stored(1990, 5, 17);
+  for (const day of [15, 16, 17, 20, 24]) {
+    assert.equal(issueYearFor(src, d(2026, 5, day), 3, 7), 2026, `${day} мая`);
+  }
+});
+
+test("после окна выдавать поздно", () => {
+  const src = stored(1990, 5, 17);
+  assert.equal(issueYearFor(src, d(2026, 5, 25), 3, 7), null);
 });
 
 test("дата в начале января: выдаём в конце декабря за следующий год", () => {
   // Ровно тот случай, на котором ломается наивная проверка «в этом году».
   const src = stored(1990, 1, 2);
-  assert.equal(issueYearFor(src, d(2026, 12, 30), 3), 2027);
-  assert.equal(issueYearFor(src, d(2026, 1, 30), 3), null);
+  assert.equal(issueYearFor(src, d(2026, 12, 30), 3, 7), 2027);
+  assert.equal(issueYearFor(src, d(2026, 1, 30), 3, 7), null);
+});
+
+test("дата в конце декабря: хвост окна попадает в следующий год", () => {
+  // 31 декабря + 7 дней = 7 января. Пятого января выдаём за прошедший год,
+  // иначе проверка «этот год и следующий» ничего бы не нашла.
+  const src = stored(1990, 12, 31);
+  assert.equal(issueYearFor(src, d(2027, 1, 5), 3, 7), 2026);
+});
+
+test("формулировка SMS зависит от того, прошла ли дата", () => {
+  const src = stored(1990, 5, 17);
+  assert.equal(anniversaryPassed(src, 2026, d(2026, 5, 15)), false);
+  assert.equal(anniversaryPassed(src, 2026, d(2026, 5, 17)), false, "в сам день ещё не прошла");
+  assert.equal(anniversaryPassed(src, 2026, d(2026, 5, 18)), true);
 });
 
 test("день рождения определяется по дню и месяцу, а не по году", () => {

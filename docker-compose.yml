@@ -66,10 +66,29 @@ services:
     depends_on:
       - crm
       - site
+    # Ответы задач пишутся в лог контейнера, а не в /dev/null. Раньше вывод
+    # глушился целиком, и сломанный планировщик выглядел точно так же, как
+    # работающий: незаполненный CRON_SECRET месяц отбивал каждый вызов, а в
+    # логах было пусто. Смотреть: docker compose logs --tail=50 cron
     command:
       - sh
       - -c
-      - 'while true; do sleep 300; wget -q -O- "http://crm:3000/api/cron/promo-reminders?key=$${CRON_SECRET}" >/dev/null 2>&1 || true; wget -q -O- "http://crm:3000/api/cron/daily-rewards?key=$${CRON_SECRET}" >/dev/null 2>&1 || true; wget -q -O- "http://site:4321/api/cron/reconcile-payments?key=$${CRON_SECRET}" >/dev/null 2>&1 || true; done'
+      - |
+        if [ -z "$${CRON_SECRET}" ]; then
+          echo "[cron] CRON_SECRET не задан — задачи выполняться не будут"
+        fi
+        while true; do
+          sleep 300
+          for task in "crm:3000/api/cron/promo-reminders" "crm:3000/api/cron/daily-rewards" "site:4321/api/cron/reconcile-payments"; do
+            answer=$$(wget -q -O- "http://$${task}?key=$${CRON_SECRET}" 2>&1)
+            code=$$?
+            if [ $$code -eq 0 ]; then
+              echo "[cron] $${task} -> $${answer}"
+            else
+              echo "[cron] $${task} -> НЕ ОТВЕТИЛ (wget $${code}); проверьте CRON_SECRET и логи crm"
+            fi
+          done
+        done
 
   nginx:
     image: nginx:alpine

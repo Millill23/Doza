@@ -5,6 +5,7 @@ import {
   REWARD_SETTINGS,
   rewardWindow,
   issueYearFor,
+  anniversaryPassed,
   isBirthdayToday,
   occasionKey,
   isRewardUsable,
@@ -50,6 +51,8 @@ export interface IssuedReward {
   percent?: number;
   points?: number;
   validUntil?: Date;
+  /** Годовщина уже прошла — подарок выдан вдогонку. */
+  passed?: boolean;
 }
 
 /**
@@ -124,7 +127,7 @@ export async function issueTodayRewards(
   });
 
   for (const dt of dates) {
-    const year = issueYearFor(dt.date, today, cfg.daysBefore);
+    const year = issueYearFor(dt.date, today, cfg.daysBefore, cfg.daysAfter);
     if (year === null) continue;
 
     const w = rewardWindow(dt.date, year, cfg.daysBefore, cfg.daysAfter);
@@ -152,6 +155,9 @@ export async function issueTodayRewards(
       description: dt.description,
       percent: cfg.datePercent,
       validUntil: w.validUntil,
+      // Задача могла отстать (простой, сбой) и выдать подарок уже после самой
+      // даты. Тогда «скоро ваша дата» — неправда, и текст нужен другой.
+      passed: anniversaryPassed(dt.date, year, today),
     });
   }
 

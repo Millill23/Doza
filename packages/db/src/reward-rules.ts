@@ -143,21 +143,42 @@ export function rewardWindow(
 /**
  * За какой год выдавать награду, если задача выполняется сегодня.
  *
- * Возвращает год годовщины или null, если сегодня не день выдачи. Проверяем
- * и текущий год, и следующий: у даты 2 января окно открывается 30 декабря —
- * то есть ещё в прошлом году по календарю.
+ * Возвращает год годовщины, чьё окно накрывает сегодняшний день, или null.
+ *
+ * Раньше выдача была привязана к одному-единственному дню — ровно за
+ * `daysBefore` до даты. Это значило, что сутки простоя задачи стоили клиенту
+ * подарка на целый год: день открытия окна проходил, и повторно к нему уже не
+ * возвращались. Теперь достаточно попасть в окно — от повторов защищает
+ * уникальный ключ повода, а не удачное совпадение дня.
+ *
+ * Проверяем три года: у даты 2 января окно открывается 30 декабря (ещё
+ * в прошлом календарном году), а у даты 31 декабря — тянется до 7 января
+ * (уже в следующем).
  */
 export function issueYearFor(
   source: Date,
   today: Date,
   daysBefore: number,
+  daysAfter: number,
 ): number | null {
-  const day = atMidnight(today);
-  for (const year of [today.getFullYear(), today.getFullYear() + 1]) {
-    const start = atMidnight(addDays(anniversaryIn(source, year), -Math.abs(daysBefore)));
-    if (start.getTime() === day.getTime()) return year;
+  const day = atMidnight(today).getTime();
+  const y = today.getFullYear();
+  for (const year of [y - 1, y, y + 1]) {
+    const anniversary = anniversaryIn(source, year);
+    const from = atMidnight(addDays(anniversary, -Math.abs(daysBefore))).getTime();
+    const to = atMidnight(addDays(anniversary, Math.abs(daysAfter))).getTime();
+    if (day >= from && day <= to) return year;
   }
   return null;
+}
+
+/** Прошла ли уже годовщина — от этого зависит формулировка SMS. */
+export function anniversaryPassed(
+  source: Date,
+  year: number,
+  today: Date,
+): boolean {
+  return atMidnight(today).getTime() > atMidnight(anniversaryIn(source, year)).getTime();
 }
 
 /** Сегодня ли день рождения (с поправкой на 29 февраля). */

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@doza/db";
 import { notifyTelegram, tgEscape } from "@/lib/telegram";
+import { checkCronKey } from "@/lib/cron-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,12 +12,8 @@ export const dynamic = "force-dynamic";
  * Идемпотентно: каждая акция напоминается один раз (флаг reminderSent).
  */
 export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const key = url.searchParams.get("key");
-  const secret = process.env.CRON_SECRET;
-  if (!secret || key !== secret) {
-    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
-  }
+  const denied = checkCronKey(request);
+  if (denied) return denied;
 
   const now = new Date();
   const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
