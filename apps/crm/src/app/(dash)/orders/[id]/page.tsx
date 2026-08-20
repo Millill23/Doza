@@ -2,7 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@doza/db";
 import { formatByn, formatPhone } from "@doza/shared";
-import { ORDER_STATUS_LABEL, ORDER_STATUS_STYLE, DELIVERY_LABEL } from "@/lib/labels";
+import {
+  ORDER_STATUS_LABEL,
+  ORDER_STATUS_STYLE,
+  DELIVERY_LABEL,
+  DELIVERY_SERVICE_LABEL,
+  PAYMENT_STATUS_LABEL,
+} from "@/lib/labels";
+import type { OrderStatusValue } from "@doza/db/order-rules";
 import OrderActions from "@/components/OrderActions";
 import { requireRole } from "@/lib/session";
 
@@ -13,7 +20,7 @@ export default async function OrderDetailPage({
 }: {
   params: { id: string };
 }) {
-  await requireRole(["admin", "seller"]);
+  const session = await requireRole(["admin", "seller"]);
   const id = Number(params.id);
   if (!Number.isFinite(id)) notFound();
 
@@ -26,6 +33,7 @@ export default async function OrderDetailPage({
   if (!order) notFound();
 
   const toPay = Number(order.totalByn) - Number(order.loyaltySpentByn);
+  const paid = order.paymentStatus === "paid";
 
   return (
     <div>
@@ -52,26 +60,60 @@ export default async function OrderDetailPage({
               <dd className="text-ivory">{formatPhone(order.customerPhone)}</dd>
               <dt className="text-ivory-faint">Получение</dt>
               <dd className="text-ivory">{DELIVERY_LABEL[order.deliveryType]}</dd>
-              {order.address && (
-                <>
-                  <dt className="text-ivory-faint">Адрес</dt>
-                  <dd className="text-ivory">{order.address}</dd>
-                </>
-              )}
+              <dt className="text-ivory-faint">Оплата</dt>
+              <dd className={paid ? "text-green-300" : "text-red-300"}>
+                {paid ? "Оплачен" : PAYMENT_STATUS_LABEL[order.paymentStatus]}
+              </dd>
               {order.comment && (
                 <>
                   <dt className="text-ivory-faint">Комментарий</dt>
                   <dd className="text-ivory">{order.comment}</dd>
                 </>
               )}
-              {order.trackingNumber && (
-                <>
-                  <dt className="text-ivory-faint">Трек-номер</dt>
-                  <dd className="text-gold-400">{order.trackingNumber}</dd>
-                </>
-              )}
             </dl>
           </div>
+
+          {/* Данные посылки — их заполняет покупатель при оформлении, и именно
+              они попадают на бланк отправления. */}
+          {order.deliveryType === "post" && (
+            <div className="rounded-2xl border border-ink-600/60 bg-ink-700 p-6">
+              <h2 className="mb-4 font-serif text-xl text-ivory">Доставка</h2>
+              <dl className="grid grid-cols-2 gap-3 text-sm">
+                <dt className="text-ivory-faint">Получатель</dt>
+                <dd className="text-ivory">
+                  {[
+                    order.recipientLastName,
+                    order.recipientFirstName,
+                    order.recipientMiddleName,
+                  ]
+                    .filter(Boolean)
+                    .join(" ") || "—"}
+                </dd>
+                <dt className="text-ivory-faint">Индекс</dt>
+                <dd className="text-ivory">{order.postalCode ?? "—"}</dd>
+                <dt className="text-ivory-faint">Область</dt>
+                <dd className="text-ivory">{order.region ?? "—"}</dd>
+                <dt className="text-ivory-faint">Город</dt>
+                <dd className="text-ivory">{order.city ?? "—"}</dd>
+                <dt className="text-ivory-faint">Адрес</dt>
+                <dd className="text-ivory">{order.address ?? "—"}</dd>
+                {order.deliveryService && (
+                  <>
+                    <dt className="text-ivory-faint">Служба</dt>
+                    <dd className="text-ivory">
+                      {DELIVERY_SERVICE_LABEL[order.deliveryService]}
+                    </dd>
+                  </>
+                )}
+                {order.trackingNumber && (
+                  <>
+                    <dt className="text-ivory-faint">Трек-номер</dt>
+                    <dd className="text-gold-400">{order.trackingNumber}</dd>
+                  </>
+                )}
+              </dl>
+            </div>
+          )}
 
           {/* Состав */}
           <div className="rounded-2xl border border-ink-600/60 bg-ink-700 p-6">
@@ -109,8 +151,12 @@ export default async function OrderDetailPage({
         <div className="rounded-2xl border border-ink-600/60 bg-ink-700 p-6 lg:sticky lg:top-8 lg:self-start">
           <OrderActions
             orderId={order.id}
-            status={order.status}
+            status={order.status as OrderStatusValue}
             tracking={order.trackingNumber}
+            deliveryType={order.deliveryType}
+            deliveryService={order.deliveryService}
+            paid={paid}
+            isAdmin={session.user.role === "admin"}
           />
         </div>
       </div>

@@ -24,6 +24,7 @@
     "./consent": "./src/consent.ts",
     "./consent-rules": "./src/consent-rules.ts",
     "./payments": "./src/payments.ts",
+    "./order-rules": "./src/order-rules.ts",
     "./rewards": "./src/rewards.ts",
     "./reward-rules": "./src/reward-rules.ts",
     "./sms-log": "./src/sms-log.ts",

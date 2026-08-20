@@ -13,6 +13,7 @@ import { toMinorUnits, type GatewayState } from "./bepaid-rules";
 export * from "./bepaid-rules";
 
 const CHECKOUT_URL = "https://checkout.bepaid.by/ctp/api/checkouts";
+const GATEWAY_URL = "https://gateway.bepaid.by";
 
 export interface BepaidConfig {
   shopId: string;
@@ -80,6 +81,13 @@ export interface CreateCheckoutResult {
  *
  * Способы оплаты ограничены картами: ЕРИП требует кода услуги и формата
  * лицевого счёта, которых у нас пока нет, — подключим отдельно.
+ *
+ * Apple Pay сюда добавлять НЕ нужно, хотя соблазн есть: в `types` перечисляются
+ * способы оплаты (`credit_card`, `erip`, `krok`, `halva`), а Apple Pay — это
+ * кошелёк внутри карточной оплаты. Шлюз показывает его сам, если кошелёк
+ * включён магазину и устройство покупателя его поддерживает; спрятать его можно
+ * только через `excluded_brands`, чего мы не делаем. Вписать «apple_pay» в
+ * `types` — значит послать несуществующий способ оплаты и сломать оплату всем.
  */
 export async function createCardCheckout(
   input: CreateCheckoutInput,
@@ -156,6 +164,59 @@ export async function createCardCheckout(
   }
 
   return { token, redirectUrl };
+}
+
+export interface RefundResult {
+  ok: boolean;
+  uid?: string;
+  /** Сообщение шлюза — показываем админу, если возврат не прошёл. */
+  message?: string;
+}
+
+/**
+ * Вернуть деньги покупателю.
+ *
+ * `parentUid` — это UID транзакции оплаты, он сохраняется в попытке платежа
+ * при подтверждении. Шлюз позволяет возвращать частями и несколько раз, пока
+ * сумма возвратов не превысит исходную.
+ *
+ * Отмена авторизации (`voids`) здесь не годится: мы списываем деньги сразу
+ * (`transaction_type: "payment"`), а отменять можно только замороженные
+ * средства.
+ */
+export async function refundPayment(
+  opts: { parentUid: string; amountByn: number; reason: string },
+  cfg = bepaidConfig(),
+): Promise<RefundResult> {
+  const res = await fetch(`${GATEWAY_URL}/transactions/refunds`, {
+    method: "POST",
+    headers: {
+      Authorization: authHeader(cfg),
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "X-API-Version": "2",
+    },
+    body: JSON.stringify({
+      request: {
+        parent_uid: opts.parentUid,
+        amount: toMinorUnits(opts.amountByn),
+        reason: opts.reason.slice(0, 255),
+      },
+    }),
+  });
+
+  const data = (await res.json().catch(() => null)) as {
+    transaction?: { uid?: string; status?: string; message?: string; friendly_message?: string };
+    message?: string;
+  } | null;
+
+  const t = data?.transaction;
+  const ok = res.ok && t?.status === "successful";
+  return {
+    ok,
+    uid: t?.uid,
+    message: t?.friendly_message ?? t?.message ?? data?.message ?? `HTTP ${res.status}`,
+  };
 }
 
 export interface CheckoutStatus extends GatewayState {

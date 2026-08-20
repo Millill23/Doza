@@ -5,6 +5,11 @@ import {
   isValidLocalDigits,
   PHONE_ERROR,
 } from "@doza/shared/phone";
+import { BELARUS_REGIONS, validateDelivery } from "@doza/shared/delivery";
+
+/** Общий вид поля ввода — их в форме доставки восемь. */
+const FIELD =
+  "h-11 w-full rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory placeholder:text-ivory-faint focus:border-gold-500 focus:outline-none";
 
 interface CartItem {
   productId: number;
@@ -41,8 +46,16 @@ export default function CartApp() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [delivery, setDelivery] = useState<"pickup" | "post">("pickup");
-  const [address, setAddress] = useState("");
   const [comment, setComment] = useState("");
+
+  // Данные посылки — только для доставки почтой.
+  const [lastName, setLastName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [middleName, setMiddleName] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+  const [region, setRegion] = useState("");
+  const [city, setCity] = useState("");
+  const [address, setAddress] = useState("");
   const [consent, setConsent] = useState(false);
 
   // лояльность
@@ -111,6 +124,16 @@ export default function CartApp() {
       setError(PHONE_ERROR);
       return;
     }
+    const deliveryData = {
+      lastName, firstName, middleName, postalCode, region, city, address,
+    };
+    if (delivery === "post") {
+      const bad = validateDelivery(deliveryData);
+      if (bad) {
+        setError(bad);
+        return;
+      }
+    }
     setSubmitting(true);
     try {
       const r = await fetch("/api/orders", {
@@ -120,7 +143,7 @@ export default function CartApp() {
           name,
           phone: BELARUS_PREFIX + phone,
           deliveryType: delivery,
-          address,
+          delivery: delivery === "post" ? deliveryData : undefined,
           comment,
           loyaltySpend: effectiveSpend,
           items: cart.map((i) => ({
@@ -311,17 +334,62 @@ export default function CartApp() {
         </div>
 
         {delivery === "post" && (
-          <div>
-            <label htmlFor="f-addr" className="mb-1.5 block text-xs uppercase tracking-luxe text-gold-500">
-              Адрес доставки
-            </label>
+          <div className="space-y-3 rounded-lg border border-ink-600/60 bg-ink-800/40 p-4">
+            <h3 className="text-xs uppercase tracking-luxe text-gold-500">
+              Данные для доставки
+            </h3>
+            <p className="text-xs leading-relaxed text-ivory-faint">
+              ФИО получателя нужно полностью — по нему посылку выдают в
+              отделении.
+            </p>
+
+            <div className="grid gap-2">
+              <input
+                type="text" required value={lastName} autoComplete="family-name"
+                onChange={(e) => setLastName(e.target.value)}
+                className={FIELD} placeholder="Фамилия"
+              />
+              <input
+                type="text" required value={firstName} autoComplete="given-name"
+                onChange={(e) => setFirstName(e.target.value)}
+                className={FIELD} placeholder="Имя"
+              />
+              <input
+                type="text" required value={middleName}
+                onChange={(e) => setMiddleName(e.target.value)}
+                className={FIELD} placeholder="Отчество"
+              />
+            </div>
+
+            <div className="grid grid-cols-[110px_1fr] gap-2">
+              <input
+                type="text" required value={postalCode} inputMode="numeric"
+                maxLength={6} autoComplete="postal-code"
+                onChange={(e) => setPostalCode(e.target.value.replace(/\D/g, ""))}
+                className={FIELD} placeholder="Индекс"
+              />
+              <select
+                required value={region}
+                onChange={(e) => setRegion(e.target.value)}
+                className={`${FIELD} ${region ? "" : "text-ivory-faint"}`}
+              >
+                <option value="">Область</option>
+                {BELARUS_REGIONS.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            </div>
+
+            <input
+              type="text" required value={city}
+              onChange={(e) => setCity(e.target.value)}
+              className={FIELD} placeholder="Населённый пункт"
+            />
             <input
               id="f-addr" type="text" required value={address}
               onChange={(e) => setAddress(e.target.value)}
-              className="h-11 w-full rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory placeholder:text-ivory-faint focus:border-gold-500 focus:outline-none"
-              placeholder="Индекс, город, улица, дом"
+              className={FIELD} placeholder="Улица, дом, квартира"
             />
-            <p className="mt-1 text-xs text-ivory-faint">Наложенный платёж на почте</p>
           </div>
         )}
 

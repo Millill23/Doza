@@ -41,6 +41,11 @@ export const SMS_KINDS = {
     hint: "Сообщение о покупке и начисленных баллах.",
     required: false,
   },
+  order_shipped: {
+    label: "Заказ отправлен",
+    hint: "Служба доставки и трек-номер, когда посылку передали почте.",
+    required: false,
+  },
   vip_welcome: {
     label: "Поздравление с VIP",
     hint: "Отправляется один раз при выдаче VIP-карты.",

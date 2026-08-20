@@ -5,14 +5,7 @@ import { normalizePhone } from "@doza/shared";
 
 export const prerender = false;
 
-const ORDER_STATUS: Record<string, string> = {
-  new: "Новый",
-  confirmed: "Подтверждён",
-  shipped: "Отправлен",
-  closed: "Закрыт",
-  rejected: "Не подтверждён",
-  returned: "Возврат",
-};
+import { ORDER_STATUS_PUBLIC_LABEL as ORDER_STATUS } from "@doza/db/order-rules";
 
 export const GET: APIRoute = async ({ url }) => {
   const phone = normalizePhone(url.searchParams.get("phone") ?? "");

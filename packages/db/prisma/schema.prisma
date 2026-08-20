@@ -39,6 +39,7 @@ model CrmUser {
   preorders    Preorder[]
   certificatesIssued    GiftCertificate[] @relation("CertificateIssuedBy")
   certificatesActivated GiftCertificate[] @relation("CertificateActivatedBy")
+  certificateRedemptions CertificateRedemption[]
   salesSplitsAsSource   SalesSplit[]      @relation("SalesSplitSource")
   salesSplitsCreated    SalesSplit[]      @relation("SalesSplitCreatedBy")
   salesSplitShares      SalesSplitShare[]
@@ -293,16 +294,25 @@ model SalesSplitShare {
 }
 
 enum GiftCertificateStatus {
-  /// Выпущен и оплачен, но ещё не активирован.
+  /// Выпущен и оплачен. Остаток можно тратить в кассе или обменять на баллы.
   new
-  /// Активирован — баллы начислены, повторно использовать нельзя.
+  /// Обменян на баллы — начисление разовое, остаток обнулён.
   activated
+  /// Остаток израсходован в кассе.
+  spent
   /// Аннулирован вручную (ошибка выпуска и т.п.).
   cancelled
 }
 
-/// Подарочный сертификат: выпускается в CRM с уникальным кодом, активируется
-/// продавцом или самим клиентом в личном кабинете — баллы начисляются один раз.
+/// Подарочный сертификат: выпускается в CRM с уникальным кодом.
+///
+/// Использовать можно одним из двух способов — потратить остаток в кассе или
+/// обменять на баллы. Способы не смешиваются: как только по коду прошло
+/// списание в кассе, обменять его на баллы уже нельзя, и наоборот. Иначе одну
+/// и ту же сумму можно получить дважды.
+///
+/// Оплата сертификатом не требует ни номера телефона, ни согласия на обработку
+/// данных: это платёжное средство на предъявителя, а не программа лояльности.
 model GiftCertificate {
   id            Int                   @id @default(autoincrement())
   /// 8 символов, латиница в верхнем регистре + цифры.
@@ -312,6 +322,10 @@ model GiftCertificate {
   /// Сколько реально заплатили при покупке (с учётом VIP-скидки покупателя).
   /// Именно эта сумма начисляется, если активирует VIP-клиент.
   paidByn       Decimal               @map("paid_byn") @db.Decimal(10, 2)
+  /// Неизрасходованный остаток. При выпуске равен номиналу, уменьшается при
+  /// оплате в кассе. Остаток не сгорает после покупки — покупатель донабирает
+  /// его в следующие визиты, пока не кончится срок.
+  balanceByn    Decimal               @map("balance_byn") @db.Decimal(10, 2)
   status        GiftCertificateStatus @default(new)
 
   /// Покупатель (если известен) — нужен для VIP-скидки при покупке.
@@ -320,6 +334,11 @@ model GiftCertificate {
   issuedById    Int                   @map("issued_by_id")
   issuedBy      CrmUser               @relation("CertificateIssuedBy", fields: [issuedById], references: [id])
   issuedAt      DateTime              @default(now()) @map("issued_at")
+  /// Срок жизни — 180 дней от выпуска, а не от активации: иначе сертификат,
+  /// пролежавший в столе два года, пришлось бы принимать по старой цене.
+  expiresAt     DateTime              @map("expires_at")
+
+  redemptions   CertificateRedemption[]
 
   /// Кому начислены баллы при активации.
   customerId    Int?                  @map("customer_id")
@@ -333,6 +352,31 @@ model GiftCertificate {
 
   @@index([status])
   @@map("gift_certificates")
+}
+
+/// Списание с сертификата в кассе.
+///
+/// Отдельная запись на каждое использование: остаток тратится частями, и без
+/// журнала нельзя ни объяснить покупателю, куда делись деньги, ни вернуть их
+/// при отмене чека.
+model CertificateRedemption {
+  id            Int             @id @default(autoincrement())
+  certificateId Int             @map("certificate_id")
+  certificate   GiftCertificate @relation(fields: [certificateId], references: [id])
+  saleId        Int             @map("sale_id")
+  sale          OfflineSale     @relation(fields: [saleId], references: [id])
+  amountByn     Decimal         @map("amount_byn") @db.Decimal(10, 2)
+  /// Остаток после списания — чтобы историю можно было читать, не пересчитывая.
+  balanceAfter  Decimal         @map("balance_after") @db.Decimal(10, 2)
+  /// Отменено вместе с чеком: сумма возвращена на сертификат.
+  revokedAt     DateTime?       @map("revoked_at")
+  userId        Int?            @map("user_id")
+  user          CrmUser?        @relation(fields: [userId], references: [id])
+  createdAt     DateTime        @default(now()) @map("created_at")
+
+  @@index([certificateId])
+  @@index([saleId])
+  @@map("certificate_redemptions")
 }
 
 /// Одноразовые SMS-коды (регистрация, сброс пароля, списание баллов и т.д.)
@@ -480,6 +524,18 @@ model Order {
   customerPhone   String      @map("customer_phone")
   status          OrderStatus @default(new)
   deliveryType    DeliveryType @map("delivery_type")
+
+  /// Данные посылки. Заполняются только при доставке почтой — при самовывозе
+  /// пусты. ФИО получателя хранится отдельно от имени клиента: посылка может
+  /// идти другому человеку (подарок, родственник), и перезаписывать этим имя
+  /// постоянного покупателя нельзя.
+  deliveryService DeliveryService? @map("delivery_service")
+  recipientLastName   String? @map("recipient_last_name")
+  recipientFirstName  String? @map("recipient_first_name")
+  recipientMiddleName String? @map("recipient_middle_name")
+  postalCode      String?      @map("postal_code")
+  region          String?
+  city            String?
   address         String?
   comment         String?
   totalByn        Decimal     @map("total_byn") @db.Decimal(10, 2)
@@ -508,6 +564,8 @@ enum PaymentStatus {
   failed
   /// Покупатель не оплатил в отведённое время.
   expired
+  /// Деньги возвращены покупателю.
+  refunded
 }
 
 /// Способ оплаты. ЕРИП заведён заранее, но пока не подключён.
@@ -546,13 +604,31 @@ model Payment {
   @@map("payments")
 }
 
+/// Путь заказа: new → confirmed → decanted → packed → shipped.
+/// Возврат (`refunded`) возможен с любого шага — это решение админа, а не
+/// очередная ступень.
+///
+/// `closed`, `rejected` и `returned` остались от прежней схемы с оплатой при
+/// получении. Новым заказам они не назначаются, но значения нужны, чтобы не
+/// потерять historical-данные уже закрытых заказов.
 enum OrderStatus {
   new
   confirmed
+  /// Отлит из флакона — здесь списываются остатки.
+  decanted
+  packed
   shipped
+  refunded
+
   closed
   rejected
   returned
+}
+
+/// Служба доставки. Нужна для трек-номера и текста SMS покупателю.
+enum DeliveryService {
+  europochta
+  belpochta
 }
 
 enum DeliveryType {
@@ -597,6 +673,8 @@ model OfflineSale {
   items           OfflineSaleItem[]
   edits           OfflineSaleEdit[]
   certificates    OfflineSaleCertificate[]
+  /// Оплата сертификатом (одним на чек).
+  redemptions     CertificateRedemption[]
 
   @@map("offline_sales")
 }

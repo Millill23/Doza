@@ -6,6 +6,11 @@ import { requestConsent } from "@doza/db/consent";
 import { createPaymentAttempt, refundOrderPoints } from "@doza/db/payments";
 import { assertBelarusPhone } from "@doza/shared/phone";
 import { assertCustomerName } from "@doza/shared/customer-name";
+import {
+  validateDelivery,
+  normalizeDelivery,
+  type DeliveryDetails,
+} from "@doza/shared/delivery";
 import { sendSms } from "@doza/shared/sms";
 import { createCardCheckout } from "@doza/shared/bepaid";
 import { notifyTelegram } from "../../lib/telegram";
@@ -26,7 +31,8 @@ interface OrderBody {
   name: string;
   phone: string;
   deliveryType: "pickup" | "post";
-  address?: string;
+  /** Данные посылки. Присылаются только при доставке почтой. */
+  delivery?: Partial<DeliveryDetails>;
   comment?: string;
   items: IncomingItem[];
   loyaltySpend?: number;
@@ -62,8 +68,14 @@ export const POST: APIRoute = async ({ request }) => {
   }
   if (deliveryType !== "pickup" && deliveryType !== "post")
     return bad("Выберите способ получения");
-  if (deliveryType === "post" && !(body.address ?? "").trim())
-    return bad("Укажите адрес доставки");
+  // Данные посылки проверяем и здесь: браузерная проверка — подсказка, а не
+  // гарантия. Неполный адрес всплывёт только на почте, когда деньги уже взяты.
+  let shipTo: DeliveryDetails | null = null;
+  if (deliveryType === "post") {
+    const bad_ = validateDelivery(body.delivery ?? {});
+    if (bad_) return bad(bad_);
+    shipTo = normalizeDelivery(body.delivery as DeliveryDetails);
+  }
   if (items.length === 0) return bad("Корзина пуста");
 
   // Пересчёт цен на сервере — клиентским ценам не доверяем
@@ -177,7 +189,17 @@ export const POST: APIRoute = async ({ request }) => {
       customerPhone: phone,
       status: "new",
       deliveryType,
-      address: deliveryType === "post" ? (body.address ?? "").trim() : null,
+      ...(shipTo
+        ? {
+            recipientLastName: shipTo.lastName,
+            recipientFirstName: shipTo.firstName,
+            recipientMiddleName: shipTo.middleName,
+            postalCode: shipTo.postalCode,
+            region: shipTo.region,
+            city: shipTo.city,
+            address: shipTo.address,
+          }
+        : {}),
       comment: (body.comment ?? "").trim() || null,
       totalByn: total,
       loyaltySpentByn: loyaltySpent,

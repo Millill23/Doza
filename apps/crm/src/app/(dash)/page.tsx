@@ -1,7 +1,7 @@
 import { prisma } from "@doza/db";
 import { formatByn } from "@doza/shared";
 import { getSession } from "@/lib/session";
-import { myMonthSales, monthSalesBySeller } from "@/lib/analytics-data";
+import { myMonthSales, monthSalesBySeller, SOLD_ORDER } from "@/lib/analytics-data";
 
 export const dynamic = "force-dynamic";
 
@@ -10,12 +10,12 @@ async function getStats() {
 
   // Выручка = онлайн-заказы + оффлайн-продажи. Раньше считались только заказы,
   // из-за чего дашборд показывал 0 BYN, пока трекер продавцов ниже на той же
-  // странице показывал реальные продажи из кассы. Отменённые продажи и
-  // невыкупленные заказы отсекаются фильтром по статусу.
+  // странице показывал реальные продажи из кассы. Отменённые продажи и заказы
+  // с возвратом отсекаются фильтром.
   const [closedOrders, closedSales, newOrders, lowStock, customersCount] =
     await Promise.all([
       prisma.order.findMany({
-        where: { status: "closed", updatedAt: { gte: since } },
+        where: { ...SOLD_ORDER, updatedAt: { gte: since } },
         select: { totalByn: true },
       }),
       prisma.offlineSale.findMany({

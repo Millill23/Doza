@@ -41,6 +41,21 @@ function dateFilter(p: Period) {
 }
 
 /**
+ * Состоявшийся онлайн-заказ — то, что считается выручкой.
+ *
+ * Магазин работает по стопроцентной предоплате, поэтому продажа признаётся по
+ * факту оплаты, а не по доезду посылки: заказ может неделю ехать почтой, но
+ * деньги получены сразу. Возврат переводит заказ в `refunded`, и он из выборки
+ * выпадает сам.
+ *
+ * Второе условие — про заказы времён оплаты при получении: через шлюз они не
+ * проходили и `paid` у них не будет никогда, а выручку за них терять нельзя.
+ */
+export const SOLD_ORDER = {
+  OR: [{ paymentStatus: "paid" as const }, { status: "closed" as const }],
+};
+
+/**
  * Проданные мл по товарам за период.
  *
  * Считаем по позициям ЗАКРЫТЫХ заказов и продаж, а не по журналу остатков.
@@ -54,7 +69,7 @@ async function soldMlByProduct(period: Period): Promise<Map<number, number>> {
   const createdAt = dateFilter(period);
   const [orderItems, saleItems] = await Promise.all([
     prisma.orderItem.findMany({
-      where: { order: { status: "closed", ...(createdAt ? { createdAt } : {}) } },
+      where: { order: { ...SOLD_ORDER, ...(createdAt ? { createdAt } : {}) } },
       select: { productId: true, volumeMl: true, qty: true },
     }),
     prisma.offlineSaleItem.findMany({
@@ -122,7 +137,7 @@ export async function topByRevenue(limit = 10, period: Period = {}) {
   const [orderItems, saleItems] = await Promise.all([
     prisma.orderItem.findMany({
       where: {
-        order: { status: "closed", ...(createdAt ? { createdAt } : {}) },
+        order: { ...SOLD_ORDER, ...(createdAt ? { createdAt } : {}) },
       },
       include: { product: { include: { brand: true } } },
     }),
@@ -162,7 +177,7 @@ export async function topCustomers(limit = 10, period: Period = {}) {
     prisma.order.groupBy({
       by: ["customerId"],
       where: {
-        status: "closed",
+        ...SOLD_ORDER,
         customerId: { not: null },
         ...(createdAt ? { createdAt } : {}),
       },

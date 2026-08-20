@@ -11,6 +11,7 @@
     "./phone": "./src/phone.ts",
     "./bepaid": "./src/bepaid.ts",
     "./bepaid-rules": "./src/bepaid-rules.ts",
-    "./day-range": "./src/day-range.ts"
+    "./day-range": "./src/day-range.ts",
+    "./delivery": "./src/delivery.ts"
   }
 }

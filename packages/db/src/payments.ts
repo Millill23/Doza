@@ -196,6 +196,44 @@ export async function pendingPaymentTokens(withinDays = 3): Promise<string[]> {
   return rows.map((r) => r.token);
 }
 
+/**
+ * Отобрать кешбек, начисленный за заказ. Возвращает снятую сумму.
+ *
+ * Партию не удаляем, а обнуляем: на неё уже ссылается журнал, и история должна
+ * остаться читаемой. Снимаем только остаток — если клиент часть баллов успел
+ * потратить, отнимать их второй раз нельзя, баланс уйдёт в минус.
+ */
+export async function revokeOrderCashback(
+  orderId: number,
+  reason: string,
+): Promise<number> {
+  const batches = await prisma.loyaltyBatch.findMany({
+    where: { refType: "order", refId: orderId, amountByn: { gt: 0 } },
+  });
+
+  let taken = 0;
+  for (const batch of batches) {
+    const left = Number(batch.amountByn);
+    await prisma.loyaltyBatch.update({
+      where: { id: batch.id },
+      data: { amountByn: 0 },
+    });
+    await prisma.loyaltyLog.create({
+      data: {
+        customerId: batch.customerId,
+        batchId: batch.id,
+        deltaByn: -left,
+        opType: "expired",
+        refType: "order_refund",
+        refId: orderId,
+        reason,
+      },
+    });
+    taken += left;
+  }
+  return Math.round(taken * 100) / 100;
+}
+
 /** Заказ с последней попыткой оплаты — для страниц возврата. */
 export async function orderWithPayment(orderId: number) {
   return prisma.order.findUnique({

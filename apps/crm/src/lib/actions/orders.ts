@@ -3,131 +3,273 @@
 import { prisma } from "@doza/db";
 import { earnPoints } from "@doza/db/loyalty";
 import { getCashbackRates } from "@doza/db/promos";
+import { refundOrderPoints, revokeOrderCashback } from "@doza/db/payments";
+import {
+  canTransition,
+  grantsCashback,
+  consumesStock,
+  requiresTracking,
+  shippedSmsText,
+  refundReversal,
+  ORDER_STATUS_LABEL,
+  DELIVERY_SERVICE_LABEL,
+  type OrderStatusValue,
+  type DeliveryServiceValue,
+} from "@doza/db/order-rules";
+import { refundPayment } from "@doza/shared/bepaid";
+import { formatByn } from "@doza/shared";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/session";
-
-type OrderStatus =
-  | "new"
-  | "confirmed"
-  | "shipped"
-  | "closed"
-  | "rejected"
-  | "returned";
-
-// Разрешённые переходы статусов
-const TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  new: ["confirmed", "rejected"],
-  confirmed: ["shipped", "closed", "rejected"],
-  shipped: ["closed", "returned"],
-  closed: [],
-  rejected: [],
-  returned: [],
-};
+import { sendSmsFromCrm } from "@/lib/sms";
+import { notifyTelegram, tgEscape } from "@/lib/telegram";
 
 async function getSetting(key: string, fallback: number): Promise<number> {
   const s = await prisma.setting.findUnique({ where: { key } });
   return s ? Number(s.value) : fallback;
 }
 
-/** Закрытие заказа: списание остатков + начисление баллов на чистую сумму. */
-async function applyClose(orderId: number, userId: number) {
+/** Кешбек за заказ: процент берётся по каждому товару отдельно, как на витрине. */
+async function cashbackFor(
+  items: { productId: number; priceByn: unknown; qty: number }[],
+): Promise<number> {
+  const rates = await getCashbackRates(items.map((i) => i.productId));
+  return (
+    Math.round(
+      items.reduce((sum, i) => {
+        const line = Number(i.priceByn) * i.qty;
+        return sum + line * ((rates[i.productId] ?? 0) / 100);
+      }, 0) * 100,
+    ) / 100
+  );
+}
+
+export interface StatusChangeInput {
+  orderId: number;
+  next: OrderStatusValue;
+  /** Обязательны при переходе в «отправлен» для посылки. */
+  trackingNumber?: string;
+  deliveryService?: DeliveryServiceValue;
+}
+
+/**
+ * Перевести заказ на следующий шаг.
+ *
+ * Побочные эффекты привязаны к шагам, а не свалены в один «закрыт»: кешбек
+ * начисляется на подтверждении, остатки списываются на распиве, SMS уходит
+ * при отправке. Так продавец видит, что именно произошло, и откат при
+ * возврате знает, что откатывать.
+ */
+export async function changeOrderStatus(input: StatusChangeInput) {
+  const session = await requireRole(["admin", "seller"]);
+  const userId = Number(session.user.id);
+  const { orderId, next } = input;
+
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: { items: true },
   });
-  if (!order) return;
+  if (!order) throw new Error("Заказ не найден");
 
-  // Списание остатков
-  for (const item of order.items) {
-    const deltaMl = -(item.volumeMl * item.qty);
-    await prisma.inventory.upsert({
-      where: { productId: item.productId },
-      update: { quantityMl: { increment: deltaMl } },
-      create: { productId: item.productId, quantityMl: 0 },
-    });
-    await prisma.inventoryLog.create({
-      data: {
-        productId: item.productId,
-        deltaMl,
-        reason: "order_closed",
-        refType: "order",
-        refId: order.id,
-        userId,
-      },
-    });
+  const from = order.status as OrderStatusValue;
+  if (!canTransition(from, next))
+    throw new Error(
+      `Нельзя перевести «${ORDER_STATUS_LABEL[from]}» → «${ORDER_STATUS_LABEL[next]}»`,
+    );
+
+  // Магазин работает по стопроцентной предоплате: неоплаченный заказ в работу
+  // не берём. Вернуть деньги за него тоже не потребуется — их и не списывали.
+  if (order.paymentStatus !== "paid")
+    throw new Error("Заказ не оплачен — брать его в работу нельзя");
+
+  const needsTracking = requiresTracking(next, order.deliveryType);
+  const tracking = (input.trackingNumber ?? "").trim();
+  const service = input.deliveryService ?? order.deliveryService ?? null;
+  if (needsTracking) {
+    if (!tracking) throw new Error("Укажите трек-номер");
+    if (!service) throw new Error("Выберите службу доставки");
   }
 
-  // Начисление баллов за заказ.
-  // Процент — по каждому товару отдельно (повышенный кешбек акции), как на витрине.
-  // Кешбек не зависит от способа оплаты: оплата баллами даёт такой же кешбек.
-  if (order.customerId) {
-    const days = await getSetting("loyalty_days", 180);
-    const rates = await getCashbackRates(order.items.map((i) => i.productId));
-    const earn =
-      Math.round(
-        order.items.reduce((sum, i) => {
-          const line = Number(i.priceByn) * i.qty;
-          const pct = rates[i.productId] ?? 0;
-          return sum + line * (pct / 100);
-        }, 0) * 100,
-      ) / 100;
-    if (earn > 0) {
-      // Без согласия на обработку ПД начисления не будет. Закрытие заказа из-за
-      // этого не отменяем и результат не проверяем: товар уже у покупателя, а
-      // никаких обещаний про баллы здесь не показывается и не отправляется.
-      await earnPoints(order.customerId, earn, days, {
-        type: "order",
-        id: order.id,
+  // ─── Эффекты шага ────────────────────────────────────────────────────────
+  if (consumesStock(next)) {
+    for (const item of order.items) {
+      const deltaMl = -(item.volumeMl * item.qty);
+      await prisma.inventory.upsert({
+        where: { productId: item.productId },
+        update: { quantityMl: { increment: deltaMl } },
+        create: { productId: item.productId, quantityMl: 0 },
+      });
+      await prisma.inventoryLog.create({
+        data: {
+          productId: item.productId,
+          deltaMl,
+          reason: "order_decanted",
+          refType: "order",
+          refId: order.id,
+          userId,
+        },
       });
     }
+  }
 
-    // обновляем "последнюю покупку"
+  if (grantsCashback(next) && order.customerId) {
+    const earn = await cashbackFor(order.items);
+    if (earn > 0) {
+      // Без согласия на обработку ПД начисления не будет. Подтверждение заказа
+      // из-за этого не отменяем: деньги уже получены, товар покупатель ждёт.
+      const days = await getSetting("loyalty_days", 180);
+      await earnPoints(order.customerId, earn, days, { type: "order", id: order.id });
+    }
     await prisma.customer.update({
       where: { id: order.customerId },
       data: { lastPurchaseAt: new Date(), lastPurchaseSum: order.totalByn },
     });
   }
-}
-
-export async function changeOrderStatus(orderId: number, next: OrderStatus) {
-  const session = await requireRole(["admin", "seller"]);
-  const userId = Number(session.user.id);
-
-  const order = await prisma.order.findUnique({ where: { id: orderId } });
-  if (!order) throw new Error("Заказ не найден");
-
-  const allowed = TRANSITIONS[order.status as OrderStatus] ?? [];
-  if (!allowed.includes(next)) {
-    throw new Error(`Недопустимый переход: ${order.status} → ${next}`);
-  }
-
-  // Магазин работает по стопроцентной предоплате: неоплаченный заказ нельзя
-  // ни подтвердить, ни собрать, ни отправить. Отклонить — можно.
-  const needsPayment: OrderStatus[] = ["confirmed", "shipped", "closed"];
-  if (needsPayment.includes(next) && order.paymentStatus !== "paid") {
-    throw new Error(
-      "Заказ не оплачен — отправлять его нельзя. Дождитесь оплаты или отклоните заказ.",
-    );
-  }
-
-  if (next === "closed") {
-    await applyClose(orderId, userId);
-  }
 
   await prisma.order.update({
     where: { id: orderId },
-    data: { status: next },
+    data: {
+      status: next,
+      ...(needsTracking
+        ? { trackingNumber: tracking, deliveryService: service }
+        : {}),
+    },
   });
+
+  // SMS об отправке — после сохранения статуса: сбой отправки не должен
+  // откатывать уже упакованную и переданную почте посылку.
+  if (needsTracking && service) {
+    try {
+      await sendSmsFromCrm({
+        kind: "order_shipped",
+        phone: order.customerPhone,
+        text: shippedSmsText(service, tracking),
+        customerId: order.customerId,
+        userId,
+      });
+    } catch (e) {
+      console.error("[orders] SMS об отправке не отправлена:", e);
+    }
+  }
 
   revalidatePath(`/orders/${orderId}`);
   revalidatePath("/orders");
+  return { ok: true };
 }
 
-export async function setTrackingNumber(orderId: number, tracking: string) {
+/**
+ * Вернуть деньги за заказ. Только админ, доступно на любом шаге.
+ *
+ * Откат зависит от того, докуда дошёл заказ: кешбек отбирается, если его уже
+ * начислили, остатки возвращаются, если парфюм уже отлили. Откатывать то,
+ * чего не было, нельзя — иначе возврат подарит баллы или создаст товар из
+ * воздуха.
+ */
+export async function refundOrder(orderId: number, reasonRaw: string) {
+  const session = await requireRole(["admin"]);
+  const userId = Number(session.user.id);
+
+  const reason = (reasonRaw ?? "").trim();
+  if (reason.length < 3) throw new Error("Укажите причину возврата");
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      items: true,
+      payments: { where: { status: "successful" }, orderBy: { createdAt: "desc" } },
+    },
+  });
+  if (!order) throw new Error("Заказ не найден");
+  if (order.paymentStatus === "refunded")
+    throw new Error("Деньги за этот заказ уже возвращены");
+
+  const paid =
+    Math.round((Number(order.totalByn) - Number(order.loyaltySpentByn)) * 100) / 100;
+
+  // ─── Деньги ──────────────────────────────────────────────────────────────
+  // Если платили только баллами, возвращать через шлюз нечего.
+  if (paid > 0) {
+    const payment = order.payments.find((p) => p.uid);
+    if (!payment?.uid)
+      throw new Error(
+        "Не найдена транзакция оплаты — верните деньги вручную в кабинете bePaid",
+      );
+
+    const res = await refundPayment({
+      parentUid: payment.uid,
+      amountByn: paid,
+      reason,
+    });
+    if (!res.ok)
+      throw new Error(`Шлюз отказал в возврате: ${res.message ?? "неизвестная ошибка"}`);
+
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: { status: "refunded", message: `Возврат: ${reason}` },
+    });
+  }
+
+  // ─── Откат баллов и остатков ─────────────────────────────────────────────
+  const undo = refundReversal(order.status as OrderStatusValue);
+
+  if (undo.revokeCashback) await revokeOrderCashback(order.id, reason);
+  if (undo.refundSpentPoints) await refundOrderPoints(order.id);
+
+  if (undo.restoreStock) {
+    for (const item of order.items) {
+      const deltaMl = item.volumeMl * item.qty;
+      await prisma.inventory.upsert({
+        where: { productId: item.productId },
+        update: { quantityMl: { increment: deltaMl } },
+        create: { productId: item.productId, quantityMl: deltaMl },
+      });
+      await prisma.inventoryLog.create({
+        data: {
+          productId: item.productId,
+          deltaMl,
+          reason: "order_refund",
+          refType: "order",
+          refId: order.id,
+          userId,
+        },
+      });
+    }
+  }
+
+  await prisma.order.update({
+    where: { id: orderId },
+    data: { status: "refunded", paymentStatus: "refunded" },
+  });
+
+  try {
+    await notifyTelegram(
+      `↩️ <b>Возврат по заказу #${order.id}</b>\n` +
+        `Клиент: ${tgEscape(order.customerName)} (+${order.customerPhone})\n` +
+        `Возвращено: <b>${formatByn(paid)}</b>\n` +
+        `Причина: ${tgEscape(reason)}\n` +
+        `Вернул: ${tgEscape(session.user.name ?? session.user.id)}`,
+    );
+  } catch (e) {
+    console.error("[orders] TG о возврате не отправлено:", e);
+  }
+
+  revalidatePath(`/orders/${orderId}`);
+  revalidatePath("/orders");
+  return { ok: true, refunded: paid };
+}
+
+/** Служба доставки и трек-номер — можно поправить после отправки. */
+export async function setTracking(
+  orderId: number,
+  tracking: string,
+  service: DeliveryServiceValue | null,
+) {
   await requireRole(["admin", "seller"]);
   await prisma.order.update({
     where: { id: orderId },
-    data: { trackingNumber: tracking.trim() || null },
+    data: {
+      trackingNumber: tracking.trim() || null,
+      ...(service ? { deliveryService: service } : {}),
+    },
   });
   revalidatePath(`/orders/${orderId}`);
 }

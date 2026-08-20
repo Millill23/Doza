@@ -4,6 +4,7 @@ import AccountPanel from "../components/AccountPanel.tsx";
 import { prisma } from "@doza/db";
 import { getBalance } from "@doza/db/loyalty";
 import { getCustomerId } from "../lib/customer-auth";
+import { ORDER_STATUS_PUBLIC_LABEL } from "@doza/db/order-rules";
 import { formatPhone } from "@doza/shared";
 
 const id = getCustomerId(Astro.cookies);
@@ -40,10 +41,7 @@ const birthdayStr = customer.birthday
   ? customer.birthday.toISOString().slice(0, 10)
   : "";
 
-const STATUS: Record<string, string> = {
-  new: "Новый", confirmed: "Подтверждён", shipped: "Отправлен",
-  closed: "Закрыт", rejected: "Не подтверждён", returned: "Возврат",
-};
+const STATUS = ORDER_STATUS_PUBLIC_LABEL;
 ---
 
 <Layout title="Личный кабинет — DOZA" noindex={true}>

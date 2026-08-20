@@ -30,8 +30,20 @@ export async function notifyOrder(orderId: number, note: string): Promise<void> 
     `👤 ${tgEscape(order.customerName)}`,
     `📞 +${order.customerPhone}`,
     `🚚 ${order.deliveryType === "pickup" ? "Самовывоз" : "Доставка почтой"}`,
-    order.deliveryType === "post" && order.address
-      ? `📍 ${tgEscape(order.address)}`
+    // Адрес одной строкой — в таком виде его и переписывают на бланк.
+    order.deliveryType === "post"
+      ? `📍 ${tgEscape(
+          [order.postalCode, order.region, order.city, order.address]
+            .filter(Boolean)
+            .join(", "),
+        )}`
+      : "",
+    order.deliveryType === "post"
+      ? `📦 Получатель: ${tgEscape(
+          [order.recipientLastName, order.recipientFirstName, order.recipientMiddleName]
+            .filter(Boolean)
+            .join(" "),
+        )}`
       : "",
     ``,
     `<b>Состав:</b>`,

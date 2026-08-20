@@ -3,10 +3,21 @@ import { prisma } from "@doza/db";
 import { formatByn, formatPhone } from "@doza/shared";
 import { ORDER_STATUS_LABEL, ORDER_STATUS_STYLE, DELIVERY_LABEL } from "@/lib/labels";
 import { requireRole } from "@/lib/session";
+import type { OrderStatusValue } from "@doza/db/order-rules";
 
 export const dynamic = "force-dynamic";
 
-const STATUSES = ["all", "new", "confirmed", "shipped", "closed", "rejected", "returned"];
+// Только рабочие статусы: `closed`/`rejected`/`returned` остались в базе от
+// прежней схемы, но фильтровать по ним больше нечего — новых таких не будет.
+const STATUSES: (OrderStatusValue | "all")[] = [
+  "all",
+  "new",
+  "confirmed",
+  "decanted",
+  "packed",
+  "shipped",
+  "refunded",
+];
 
 export default async function OrdersPage({
   searchParams,
