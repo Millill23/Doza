@@ -42,6 +42,9 @@ pnpm --filter @doza/db prisma studio
 # Сид тестовыми данными
 pnpm --filter @doza/db seed
 
+# Каталог: завести новые поступления (существующие карточки не трогает)
+node packages/db/prisma/seed-products.mjs
+
 # Разработка
 pnpm --filter @doza/site dev        # :4321
 pnpm --filter @doza/crm dev         # :3000
@@ -133,6 +136,26 @@ orders, order_items
 offline_sales, offline_sale_items, offline_sale_edits
 crm_users
 ```
+
+## Пополнение каталога
+
+Новые поступления заводятся правкой `packages/db/prisma/seed-products.mjs`
+(карточка) и `catalog-prices.mjs` (цены 3/5/10 мл из `doza_prices.xlsx`),
+фото — `apps/site/public/img/products/<slug>.webp`, WebP 997×1333.
+
+```bash
+node packages/db/prisma/seed-products.mjs             # только добавить новое
+node packages/db/prisma/seed-products.mjs --rewrite   # ОПАСНО, см. ниже
+```
+
+Обычный запуск идемпотентен: заводит недостающие товары и не касается тех,
+что уже в каталоге.
+
+⚠️ **`--rewrite` откатывает каталог к состоянию репозитория.** Он переписывает
+описания, ноты, цены и фото у всех позиций из списка и архивирует всё, чего в
+списке нет. Цены и тексты правят руками в CRM, поэтому такой запуск стирает
+работу продавцов молча и разом. Нужен только при первичном наполнении пустой
+базы.
 
 ## Загрузка фото
 

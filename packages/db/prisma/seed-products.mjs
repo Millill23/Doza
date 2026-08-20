@@ -129,8 +129,25 @@ const DATA = [
   ["Zarkoperfume","The Muse","female",100,72,"floral","Хлопковый цветок","Белый мускус, белый уд","—","Фруктово-цветочный мускусный аромат с чувственным характером."],
 ];
 
+/**
+ * Переписать карточки, которые уже есть в каталоге.
+ *
+ * По умолчанию выключено, и это главное правило скрипта: цены, описания и
+ * фотографии в CRM правят руками, а сид знает только то, что записано в этом
+ * файле. Запустить его «просто чтобы добавить поступление» — значит откатить
+ * всю ручную работу к состоянию репозитория, молча и разом по всему каталогу.
+ *
+ * Поэтому обычный запуск только добавляет недостающее, а разрушительный режим
+ * требует явного `--rewrite`.
+ */
+const REWRITE = process.argv.includes("--rewrite");
+
 async function main() {
-  console.log(`🌱 Наполнение каталога: ${DATA.length} позиций`);
+  console.log(
+    REWRITE
+      ? `♻️  ПЕРЕЗАПИСЬ каталога: ${DATA.length} позиций — ручные правки в CRM будут потеряны`
+      : `🌱 Добавление новинок: в списке ${DATA.length} позиций, существующие не трогаем`,
+  );
 
   // Бренды
   const brandNames = [...new Set(DATA.map((d) => d[0]))];
@@ -145,21 +162,38 @@ async function main() {
   }
 
   const keepSlugs = [];
+  const added = [];
+  const archivedButListed = [];
+  let untouched = 0;
+
   for (const [brand, name, gender, bottleMl, usd, , top, mid, base, desc] of DATA) {
     const slug = slugify(`${brand} ${name}`);
     keepSlugs.push(slug);
 
+    const existing = await prisma.product.findUnique({
+      where: { slug },
+      select: { id: true, isArchived: true },
+    });
+
+    if (existing && !REWRITE) {
+      // Товар уже заведён — карточку не трогаем совсем. Лежащий в архиве
+      // называем вслух: он есть в списке поступления, но на витрине не виден,
+      // и решать это должен человек в CRM, а не скрипт.
+      if (existing.isArchived) archivedButListed.push(slug);
+      untouched++;
+      continue;
+    }
+
+    const fields = {
+      brandId: brandMap[brand], name, gender, notesTop: top, notesMid: mid,
+      notesBase: base, description: desc, isArchived: false, lowStockThreshold: 50,
+    };
     const product = await prisma.product.upsert({
       where: { slug },
-      update: {
-        brandId: brandMap[brand], name, gender, notesTop: top, notesMid: mid,
-        notesBase: base, description: desc, isArchived: false, lowStockThreshold: 50,
-      },
-      create: {
-        slug, brandId: brandMap[brand], name, gender, notesTop: top, notesMid: mid,
-        notesBase: base, description: desc, isArchived: false, lowStockThreshold: 50,
-      },
+      update: fields,
+      create: { slug, ...fields },
     });
+    if (!existing) added.push(slug);
 
     // объёмы — пересобрать
     await prisma.productVolume.deleteMany({ where: { productId: product.id } });
@@ -182,13 +216,37 @@ async function main() {
     });
   }
 
-  // Архивируем всё, чего нет в списке (старые демо-товары), не ломая заказы
-  const archived = await prisma.product.updateMany({
-    where: { slug: { notIn: keepSlugs } },
-    data: { isArchived: true },
-  });
+  // Архивация — тоже только по явной команде: товар мог быть заведён прямо
+  // в CRM и в этот файл не попасть, а снимать его с витрины за это нельзя.
+  let archived = 0;
+  if (REWRITE) {
+    const res = await prisma.product.updateMany({
+      where: { slug: { notIn: keepSlugs } },
+      data: { isArchived: true },
+    });
+    archived = res.count;
+  }
 
-  console.log(`✅ Готово. Активных товаров: ${keepSlugs.length}, архивировано старых: ${archived.count}`);
+  if (added.length > 0) {
+    console.log(`\n➕ Добавлено ${added.length}:`);
+    for (const s of added) console.log(`   ${s}`);
+  } else {
+    console.log("\n➕ Новых товаров нет — всё из списка уже в каталоге.");
+  }
+
+  if (archivedButListed.length > 0) {
+    console.log(
+      `\n⚠️  В архиве, хотя есть в списке (${archivedButListed.length}) — вернуть на витрину можно в CRM:`,
+    );
+    for (const s of archivedButListed) console.log(`   ${s}`);
+  }
+
+  const total = await prisma.product.count({ where: { isArchived: false } });
+  console.log(
+    REWRITE
+      ? `\n✅ Перезаписано ${keepSlugs.length}, архивировано лишних: ${archived}. Активных в каталоге: ${total}`
+      : `\n✅ Готово. Не тронуто карточек: ${untouched}. Активных в каталоге: ${total}`,
+  );
 }
 
 main().catch((e) => { console.error(e); process.exit(1); }).finally(() => prisma.$disconnect());
