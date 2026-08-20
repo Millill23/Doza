@@ -151,16 +151,21 @@ export async function getProduct(slug: string): Promise<ProductDetail | null> {
   ]);
   const base = toCard(p as unknown as ProductWithRels, globalPercent, globalPromo);
 
-  // Похожие: тот же бренд или гендер, не сам товар
-  const similarRaw = await prisma.product.findMany({
-    where: {
-      isArchived: false,
-      id: { not: p.id },
-      OR: [{ brandId: p.brandId }, { gender: p.gender }],
-    },
-    include: cardInclude,
-    take: 4,
+  // Похожие берём из подобранных: их считает `seed-similar.mjs` по пирамиде
+  // нот, и админ правит руками в CRM. Прежняя выборка «тот же бренд или пол,
+  // первые четыре» ставила рядом что попало — унисекс за 12 рублей соседствовал
+  // с нишевым за 125 только потому, что их id шли подряд.
+  const links = await prisma.productSimilar.findMany({
+    where: { productId: p.id },
+    select: { similarId: true },
   });
+
+  const similarRaw = links.length
+    ? await prisma.product.findMany({
+        where: { id: { in: links.map((l) => l.similarId) }, isArchived: false },
+        include: cardInclude,
+      })
+    : [];
 
   return {
     ...base,
