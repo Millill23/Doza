@@ -1,7 +1,6 @@
 import type { APIRoute } from "astro";
 import { prisma } from "@doza/db";
 import { getBalance, spendPoints } from "@doza/db/loyalty";
-import { pickActivePromo, getGlobalPromo, mergePromos } from "@doza/db/promos";
 import { requestConsent } from "@doza/db/consent";
 import { createPaymentAttempt, refundOrderPoints } from "@doza/db/payments";
 import { assertBelarusPhone } from "@doza/shared/phone";
@@ -15,6 +14,8 @@ import { sendSms } from "@doza/shared/sms";
 import { createCardCheckout } from "@doza/shared/bepaid";
 import { notifyTelegram } from "../../lib/telegram";
 import { notifyOrder } from "../../lib/order-notify";
+import { currentCustomerId } from "../../lib/customer-auth";
+import { quoteCart, vipPercentFor, CartError } from "../../lib/cart-pricing";
 
 export const prerender = false;
 
@@ -45,7 +46,7 @@ function bad(message: string, status = 400) {
   });
 }
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, cookies }) => {
   let body: OrderBody;
   try {
     body = await request.json();
@@ -56,13 +57,24 @@ export const POST: APIRoute = async ({ request }) => {
   const deliveryType = body.deliveryType;
   const items = Array.isArray(body.items) ? body.items : [];
 
+  // Вошедший в кабинет покупатель опознаётся по сессии. Присланные имя и
+  // телефон для него не значат ничего: карта привязана к аккаунту, и скидку по
+  // ней нельзя получить, просто набрав в форме чужой номер.
+  const sessionCustomerId = await currentCustomerId(cookies);
+  const account = sessionCustomerId
+    ? await prisma.customer.findUnique({
+        where: { id: sessionCustomerId },
+        select: { id: true, name: true, phone: true },
+      })
+    : null;
+
   // Имя уходит в SMS и Telegram, телефон становится идентификатором клиента —
   // проверяем оба, не полагаясь на маску в браузере.
   let name: string;
   let phone: string;
   try {
-    name = assertCustomerName(body.name ?? "");
-    phone = assertBelarusPhone(body.phone ?? "");
+    name = account ? account.name : assertCustomerName(body.name ?? "");
+    phone = account ? account.phone : assertBelarusPhone(body.phone ?? "");
   } catch (e) {
     return bad((e as Error).message);
   }
@@ -78,76 +90,19 @@ export const POST: APIRoute = async ({ request }) => {
   }
   if (items.length === 0) return bad("Корзина пуста");
 
-  // Пересчёт цен на сервере — клиентским ценам не доверяем
-  const volumeRecords = await prisma.productVolume.findMany({
-    where: {
-      isActive: true,
-      OR: items.map((i) => ({
-        productId: i.productId,
-        volumeMl: i.volumeMl,
-      })),
-    },
-    include: {
-      product: {
-        select: {
-          name: true,
-          brand: { select: { name: true } },
-          promos: {
-            select: {
-              discountPercent: true,
-              cashbackPercent: true,
-              startsAt: true,
-              endsAt: true,
-            },
-          },
-        },
-      },
-    },
-  });
-
-  const priceMap = new Map<string, (typeof volumeRecords)[number]>();
-  for (const v of volumeRecords) priceMap.set(`${v.productId}:${v.volumeMl}`, v);
-
-  // Акция «на все товары» не привязана к товару — достаём отдельно.
-  const globalPromo = await getGlobalPromo();
-
-  let total = 0;
-  const orderItems: {
-    productId: number;
-    volumeMl: number;
-    qty: number;
-    priceByn: number;
-    label: string;
-  }[] = [];
-
-  for (const item of items) {
-    const rec = priceMap.get(`${item.productId}:${item.volumeMl}`);
-    const qty = Math.max(1, Math.floor(item.qty || 1));
-    if (!rec) return bad(`Позиция недоступна (товар ${item.productId})`);
-    const promo = mergePromos(
-      pickActivePromo(
-        rec.product.promos.map((pr) => ({
-          discountPercent: pr.discountPercent != null ? Number(pr.discountPercent) : null,
-          cashbackPercent: pr.cashbackPercent != null ? Number(pr.cashbackPercent) : null,
-          startsAt: pr.startsAt,
-          endsAt: pr.endsAt,
-        })),
-      ),
-      globalPromo,
-    );
-    const price =
-      Math.round(Number(rec.priceByn) * (1 - promo.discountPercent / 100) * 100) /
-      100;
-    total += price * qty;
-    orderItems.push({
-      productId: item.productId,
-      volumeMl: item.volumeMl,
-      qty,
-      priceByn: price,
-      label: `${rec.product.brand.name} ${rec.product.name}, ${item.volumeMl} мл ×${qty}`,
-    });
+  // Пересчёт цен на сервере — клиентским ценам не доверяем. Тот же расчёт, что
+  // показывала корзина, поэтому сумма на платёжной странице совпадёт с той,
+  // которую покупатель видел.
+  const vipPercent = await vipPercentFor(sessionCustomerId);
+  let quote;
+  try {
+    quote = await quoteCart(items, { vipPercent });
+  } catch (e) {
+    if (e instanceof CartError) return bad(e.message);
+    throw e;
   }
-  total = Math.round(total * 100) / 100;
+  const orderItems = quote.lines;
+  const total = quote.net;
 
   // Клиент (upsert по телефону)
   const existing = await prisma.customer.findUnique({
@@ -156,7 +111,11 @@ export const POST: APIRoute = async ({ request }) => {
   });
   const customer = await prisma.customer.upsert({
     where: { phone },
-    update: { name },
+    // Имя записываем только при создании. Раньше оно перезаписывалось на
+    // каждом заказе — и любой, кто знал чужой номер, мог переименовать чужую
+    // карточку, просто оформив заказ на этот телефон. Своё имя покупатель
+    // меняет в личном кабинете.
+    update: {},
     create: { phone, name },
   });
 

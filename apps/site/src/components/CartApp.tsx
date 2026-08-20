@@ -3,8 +3,27 @@ import PhoneInput from "./PhoneInput";
 import {
   BELARUS_PREFIX,
   isValidLocalDigits,
+  toLocalDigits,
   PHONE_ERROR,
 } from "@doza/shared/phone";
+
+/** Покупатель, вошедший в кабинет: скидка по карте положена только ему. */
+interface Account {
+  authenticated: true;
+  name: string;
+  phone: string;
+  vipCard: string | null;
+  vipPercent: number;
+  balance: number;
+}
+
+/** Итоги корзины, посчитанные сервером. */
+interface Quote {
+  gross: number;
+  net: number;
+  discount: number;
+  kind: "none" | "vip" | "social" | "date" | "promo" | "super";
+}
 import { BELARUS_REGIONS, validateDelivery } from "@doza/shared/delivery";
 
 /** Общий вид поля ввода — их в форме доставки восемь. */
@@ -23,6 +42,12 @@ interface CartItem {
 
 function formatByn(n: number): string {
   return `${n.toFixed(2)} BYN`;
+}
+
+/** +375 (29) 123-45-67 из хранимых двенадцати цифр. */
+function formatPhone(stored: string): string {
+  const d = stored.replace(/\D/g, "").slice(-9);
+  return `+375 (${d.slice(0, 2)}) ${d.slice(2, 5)}-${d.slice(5, 7)}-${d.slice(7)}`;
 }
 
 function readCart(): CartItem[] {
@@ -64,6 +89,11 @@ export default function CartApp() {
   const [usePoints, setUsePoints] = useState(false);
   const [pointsToSpend, setPointsToSpend] = useState(0);
 
+  /** Аккаунт покупателя, если он вошёл в кабинет. */
+  const [account, setAccount] = useState<Account | null>(null);
+  /** Суммы со скидками — считает сервер, здесь мы их только показываем. */
+  const [quote, setQuote] = useState<Quote | null>(null);
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [doneOrderId, setDoneOrderId] = useState<number | null>(null);
@@ -73,10 +103,57 @@ export default function CartApp() {
     setMounted(true);
   }, []);
 
-  const total = cart.reduce((s, i) => s + i.priceByn * i.qty, 0);
+  // Пересчёт корзины на сервере при каждом изменении состава.
+  //
+  // Считать здесь нельзя: цены лежат в localStorage с того момента, когда товар
+  // положили в корзину, а VIP-скидка вообще не то, что стоит доверять браузеру.
+  // Тот же расчёт применяется при оформлении, поэтому показанное совпадает со
+  // списанным.
+  useEffect(() => {
+    if (!mounted) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/cart/quote", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: cart.map((i) => ({
+              productId: i.productId,
+              volumeMl: i.volumeMl,
+              qty: i.qty,
+            })),
+          }),
+        });
+        const data = await r.json();
+        if (cancelled) return;
+        setQuote(data.cart ?? null);
+        if (data.session?.authenticated) {
+          setAccount(data.session);
+          setBalance(data.session.balance || 0);
+          setCustomerName(data.session.name);
+          setName(data.session.name);
+          setPhone(toLocalDigits(data.session.phone));
+        }
+      } catch {
+        /* показываем цены из корзины — заказ всё равно пересчитает сервер */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [cart, mounted]);
+
+  // Суммы: пока сервер не ответил, показываем цены из корзины.
+  const gross = quote?.gross ?? cart.reduce((s, i) => s + i.priceByn * i.qty, 0);
+  const total = quote?.net ?? gross;
+  const discount = quote?.discount ?? 0;
 
   // Поиск клиента по телефону (баланс баллов)
   useEffect(() => {
+    // Для вошедшего в кабинет искать нечего: и баланс, и карта уже пришли
+    // вместе с сессией, а номер он поменять не может.
+    if (account) return;
     // Ищем, только когда номер дописан целиком: иначе на каждой цифре улетал
     // бы запрос с заведомо неполным номером.
     if (!isValidLocalDigits(phone)) {
@@ -98,7 +175,7 @@ export default function CartApp() {
       }
     }, 500);
     return () => clearTimeout(t);
-  }, [phone]);
+  }, [phone, account]);
 
   const maxSpend = Math.min(balance, total);
   const effectiveSpend = usePoints ? Math.min(pointsToSpend || maxSpend, maxSpend) : 0;
@@ -120,7 +197,8 @@ export default function CartApp() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!isValidLocalDigits(phone)) {
+    // У вошедшего в кабинет номер берётся из аккаунта — проверять поле не нужно.
+    if (!account && !isValidLocalDigits(phone)) {
       setError(PHONE_ERROR);
       return;
     }
@@ -284,29 +362,66 @@ export default function CartApp() {
       >
         <h2 className="font-serif text-2xl text-ivory">Оформление заказа</h2>
 
-        <div>
-          <label htmlFor="f-name" className="mb-1.5 block text-xs uppercase tracking-luxe text-gold-500">
-            Имя
-          </label>
-          <input
-            id="f-name" type="text" required value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="h-11 w-full rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory placeholder:text-ivory-faint focus:border-gold-500 focus:outline-none"
-            placeholder="Как к вам обращаться"
-          />
-        </div>
-
-        <div>
-          <label htmlFor="f-phone" className="mb-1.5 block text-xs uppercase tracking-luxe text-gold-500">
-            Телефон
-          </label>
-          <PhoneInput id="f-phone" value={phone} onChange={setPhone} required />
-          {customerName && (
-            <p className="mt-1.5 text-xs text-botanical-300">
-              С возвращением, {customerName}! Баланс баллов: {formatByn(balance)}
+        {account ? (
+          /* Вошёл в кабинет — имя и телефон берём из аккаунта. Спрашивать их
+             заново незачем, а главное — скидка по карте положена именно этому
+             аккаунту, а не тому номеру, который наберут в поле. */
+          <div className="rounded-lg border border-ink-600/60 bg-ink-800/40 p-4">
+            <p className="text-sm text-ivory">
+              {account.name}
+              {account.vipCard && (
+                <span className="ml-2 rounded-full bg-gold-gradient px-2 py-0.5 text-[10px] font-semibold text-ink-900">
+                  ⭐ VIP −{account.vipPercent}%
+                </span>
+              )}
             </p>
-          )}
-        </div>
+            <p className="mt-0.5 text-xs text-ivory-faint">
+              {formatPhone(account.phone)} ·{" "}
+              <a href="/account" className="text-gold-400 hover:text-gold-300">
+                личный кабинет
+              </a>
+            </p>
+            {balance > 0 && (
+              <p className="mt-1 text-xs text-botanical-300">
+                Баланс баллов: {formatByn(balance)}
+              </p>
+            )}
+          </div>
+        ) : (
+          <>
+            <div>
+              <label htmlFor="f-name" className="mb-1.5 block text-xs uppercase tracking-luxe text-gold-500">
+                Имя
+              </label>
+              <input
+                id="f-name" type="text" required value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="h-11 w-full rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory placeholder:text-ivory-faint focus:border-gold-500 focus:outline-none"
+                placeholder="Как к вам обращаться"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="f-phone" className="mb-1.5 block text-xs uppercase tracking-luxe text-gold-500">
+                Телефон
+              </label>
+              <PhoneInput id="f-phone" value={phone} onChange={setPhone} required />
+              {customerName ? (
+                <p className="mt-1.5 text-xs text-botanical-300">
+                  С возвращением, {customerName}! Баланс баллов: {formatByn(balance)}
+                </p>
+              ) : (
+                <p className="mt-1.5 text-xs text-ivory-faint">
+                  Есть VIP-карта?{" "}
+                  <a href="/login" className="text-gold-400 hover:text-gold-300">
+                    Войдите в кабинет
+                  </a>{" "}
+                  — скидка применится к заказу.
+                </p>
+              )}
+            </div>
+          </>
+        )}
 
         {/* Способ получения */}
         <div>
@@ -431,8 +546,16 @@ export default function CartApp() {
         <div className="space-y-1.5 border-t border-ink-600/60 pt-4 text-sm">
           <div className="flex justify-between text-ivory-muted">
             <span>Сумма</span>
-            <span>{formatByn(total)}</span>
+            <span>{formatByn(gross)}</span>
           </div>
+          {discount > 0 && (
+            <div className="flex justify-between text-gold-400">
+              <span>
+                Скидка{quote?.kind === "vip" ? " по VIP-карте" : ""}
+              </span>
+              <span>−{formatByn(discount)}</span>
+            </div>
+          )}
           {effectiveSpend > 0 && (
             <div className="flex justify-between text-botanical-300">
               <span>Списано баллов</span>
