@@ -58,12 +58,20 @@ export async function offerableProductIds(lines: CartLine[]): Promise<number[]> 
   return [...new Set(links.map((l) => l.similarId))];
 }
 
-/** Что показать покупателю: лучшие из возможных, без того, что уже в корзине. */
+/**
+ * Что показать покупателю.
+ *
+ * Скрываем только то, что он выбрал сам: предлагать второй раз аромат, который
+ * человек уже положил в корзину, — плохое начало разговора. А вот добранное
+ * отсюда остаётся на виду: карточка с ним показывает счётчик, и убрать лишнее
+ * можно там же, где добавил. Иначе после обновления страницы товар пропадал бы
+ * из сетки вместе с единственным способом от него отказаться.
+ */
 export async function offerProductIds(lines: CartLine[]): Promise<number[]> {
   const ids = await offerableProductIds(lines);
   return pickOffers(
     ids.map((productId) => ({ productId })),
-    lines.map((l) => l.productId),
+    baseProductIds(lines),
     UPSELL_LIMIT,
   );
 }

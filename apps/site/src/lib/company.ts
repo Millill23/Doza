@@ -18,8 +18,9 @@ export const COMPANY = {
   registrationDate: "03.02.2025",
   registrationAuthority: "Новополоцкий городской исполнительный комитет",
 
-  // Торговый реестр РБ. null — пока не получены, строка на /legal скрывается.
-  tradeRegisterNumber: null as string | null,
+  // Торговый реестр РБ. Номер обязателен для интернет-магазина и требуется
+  // банком-эквайером. Дата пока не подтверждена — строка на /legal скрывается.
+  tradeRegisterNumber: "782544" as string | null,
   tradeRegisterDate: null as string | null,
 
   // Контакты и режим работы

@@ -36,8 +36,9 @@ const cards = [
         {
           COMPANY.tradeRegisterNumber && (
             <p>
-              В Торговом реестре Республики Беларусь: №{COMPANY.tradeRegisterNumber}
-              {COMPANY.tradeRegisterDate ? ` от ${COMPANY.tradeRegisterDate}` : ""}.
+              {`В Торговом реестре Республики Беларусь: №${COMPANY.tradeRegisterNumber}` +
+                (COMPANY.tradeRegisterDate ? ` от ${COMPANY.tradeRegisterDate}` : "") +
+                "."}
             </p>
           )
         }

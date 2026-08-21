@@ -72,8 +72,8 @@ export default function UpsellApp() {
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** Что уже добавили с этой страницы — чтобы показать «✓ в корзине». */
-  const [added, setAdded] = useState<Record<string, boolean>>({});
+  /** Итог заказа со скидками — считает сервер, показываем над кнопкой оплаты. */
+  const [total, setTotal] = useState<number | null>(null);
 
   useEffect(() => {
     const saved = loadCheckout();
@@ -113,13 +113,54 @@ export default function UpsellApp() {
     })();
   }, []);
 
-  function add(offer: Offer, opt: Option) {
+  // Итог пересчитывает сервер — он же применяет скидку. Показывать сумму,
+  // посчитанную здесь, значило бы обещать цену, которой можем не подтвердить.
+  useEffect(() => {
+    if (cart.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/cart/quote", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: cart.map((i) => ({
+              productId: i.productId,
+              volumeMl: i.volumeMl,
+              qty: i.qty,
+              fromUpsell: i.fromUpsell === true,
+            })),
+          }),
+        });
+        const data = await r.json();
+        if (!cancelled && data.cart) setTotal(data.cart.net);
+      } catch {
+        /* сумму просто не покажем — оплату это не блокирует */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [cart]);
+
+  /** Сколько этого объёма уже в корзине. Счётчик всегда показывает правду. */
+  function qtyOf(productId: number, volumeMl: number): number {
+    return (
+      cart.find((l) => l.productId === productId && l.volumeMl === volumeMl)?.qty ?? 0
+    );
+  }
+
+  /** Задать количество. 0 — убрать позицию из корзины совсем. */
+  function setQty(offer: Offer, opt: Option, qty: number) {
     const next = readCart();
     const i = next.findIndex(
       (l) => l.productId === offer.productId && l.volumeMl === opt.volumeMl,
     );
-    if (i >= 0) {
-      next[i] = { ...next[i], qty: next[i].qty + 1 };
+
+    if (qty <= 0) {
+      if (i >= 0) next.splice(i, 1);
+    } else if (i >= 0) {
+      next[i] = { ...next[i], qty };
     } else {
       next.push({
         productId: offer.productId,
@@ -129,13 +170,13 @@ export default function UpsellApp() {
         volumeMl: opt.volumeMl,
         // Цену всё равно пересчитает сервер — здесь она только для корзины.
         priceByn: opt.discountedByn,
-        qty: 1,
+        qty,
         fromUpsell: true,
       });
     }
+
     writeCart(next);
     setCart(next);
-    setAdded((prev) => ({ ...prev, [`${offer.productId}:${opt.volumeMl}`]: true }));
   }
 
   async function pay() {
@@ -183,27 +224,31 @@ export default function UpsellApp() {
             </p>
           </div>
 
-          <div className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mb-10 grid grid-cols-2 gap-3 sm:gap-5">
             {offers.map((o) => (
               <div
                 key={o.productId}
                 className="flex flex-col overflow-hidden rounded-xl border border-ink-600/60 bg-ink-700"
               >
-                <a href={`/product/${o.slug}`} className="block">
+                <a href={`/product/${o.slug}`} className="relative block">
                   <img
                     src={o.image}
-                    alt={`${o.brand} ${o.name}`}
+                    alt={`${o.brand} — ${o.name}, парфюм на распив`}
                     loading="lazy"
                     className="aspect-[3/4] w-full object-cover"
                   />
+                  <span className="absolute left-2 top-2 rounded-full bg-gold-gradient px-2 py-0.5 text-[10px] font-semibold text-ink-900">
+                    −{percent}%
+                  </span>
                 </a>
-                <div className="flex flex-1 flex-col p-4">
+
+                <div className="flex flex-1 flex-col p-3 sm:p-4">
                   <span className="text-[10px] uppercase tracking-luxe text-gold-500">
                     {o.brand}
                   </span>
                   <a
                     href={`/product/${o.slug}`}
-                    className="font-serif text-lg text-ivory hover:text-gold-400"
+                    className="font-serif text-base leading-tight text-ivory transition-colors hover:text-gold-400 sm:text-lg"
                   >
                     {o.name}
                   </a>
@@ -211,30 +256,65 @@ export default function UpsellApp() {
                     {GENDER[o.gender] ?? ""}
                   </span>
 
-                  <div className="mt-3 space-y-2">
+                  <div className="mt-3 space-y-3">
                     {o.options.map((opt) => {
-                      const key = `${o.productId}:${opt.volumeMl}`;
+                      const qty = qtyOf(o.productId, opt.volumeMl);
+                      const label = `${o.brand} ${o.name}, ${opt.volumeMl} мл`;
                       return (
-                        <button
-                          key={opt.volumeMl}
-                          onClick={() => add(o, opt)}
-                          className="flex w-full cursor-pointer items-center justify-between rounded-lg border border-ink-600 px-3 py-2 text-left text-sm transition-colors hover:border-gold-500"
-                        >
-                          <span className="text-ivory-muted">
-                            {opt.volumeMl} мл
-                          </span>
-                          <span className="flex items-center gap-2">
-                            <s className="text-xs text-ivory-faint">
-                              {opt.priceByn.toFixed(2)}
-                            </s>
-                            <span className="font-medium text-gold-400">
-                              {byn(opt.discountedByn)}
+                        <div key={opt.volumeMl}>
+                          {/* Валюту в строке объёма не повторяем: карточка
+                              узкая, а «BYN» стоит внизу у итоговой суммы. */}
+                          <div className="mb-1.5 flex items-baseline justify-between gap-1 whitespace-nowrap">
+                            <span className="text-sm text-ivory-muted">
+                              {opt.volumeMl} мл
                             </span>
-                            <span className="text-xs text-botanical-300">
-                              {added[key] ? "✓" : "+"}
+                            <span className="flex items-baseline gap-1.5">
+                              <s className="text-[11px] text-ivory-faint">
+                                {opt.priceByn.toFixed(2)}
+                              </s>
+                              <span className="text-sm font-medium text-gold-400">
+                                {opt.discountedByn.toFixed(2)}
+                              </span>
                             </span>
-                          </span>
-                        </button>
+                          </div>
+
+                          {qty === 0 ? (
+                            <button
+                              onClick={() => setQty(o, opt, 1)}
+                              className="flex min-h-[44px] w-full cursor-pointer items-center justify-center rounded-lg border border-gold-600/50 px-2 text-sm text-gold-400 transition-colors hover:bg-gold-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-500"
+                              aria-label={`Добавить в корзину ${label}`}
+                            >
+                              В корзину
+                            </button>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => setQty(o, opt, qty - 1)}
+                                className="flex min-h-[44px] flex-1 cursor-pointer items-center justify-center rounded-lg border border-ink-600 text-lg text-ivory-muted transition-colors hover:border-gold-500 hover:text-gold-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-500"
+                                aria-label={
+                                  qty === 1
+                                    ? `Убрать из корзины ${label}`
+                                    : `Уменьшить количество: ${label}`
+                                }
+                              >
+                                −
+                              </button>
+                              <span
+                                className="min-w-[2rem] shrink-0 text-center text-sm font-medium tabular-nums text-ivory"
+                                aria-live="polite"
+                              >
+                                {qty}
+                              </span>
+                              <button
+                                onClick={() => setQty(o, opt, qty + 1)}
+                                className="flex min-h-[44px] flex-1 cursor-pointer items-center justify-center rounded-lg border border-ink-600 text-lg text-ivory-muted transition-colors hover:border-gold-500 hover:text-gold-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-500"
+                                aria-label={`Увеличить количество: ${label}`}
+                              >
+                                +
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
@@ -247,7 +327,7 @@ export default function UpsellApp() {
 
       {addedCount > 0 && (
         <p className="mb-4 text-center text-sm text-botanical-300">
-          Добавлено к заказу: {addedCount} шт. со скидкой {percent}%
+          Добавлено к заказу: {addedCount} поз. со скидкой {percent}%
         </p>
       )}
 
@@ -258,6 +338,14 @@ export default function UpsellApp() {
       )}
 
       <div className="mx-auto flex max-w-md flex-col gap-3">
+        {total !== null && (
+          <div className="flex items-baseline justify-between border-t border-ink-600/60 pt-4 text-base">
+            <span className="font-medium text-ivory">К оплате</span>
+            <span className="text-lg font-medium text-gold-gradient">
+              {byn(total)}
+            </span>
+          </div>
+        )}
         <button
           onClick={pay}
           disabled={paying}
