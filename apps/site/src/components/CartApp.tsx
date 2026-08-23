@@ -25,7 +25,23 @@ interface Quote {
   kind: "none" | "vip" | "social" | "date" | "promo" | "super";
 }
 import { BELARUS_REGIONS, validateDelivery } from "@doza/shared/delivery";
+import {
+  DELIVERY_CHOICES,
+  DELIVERY_TYPE_LABEL,
+  needsPostalAddress,
+  needsOffice,
+  type DeliveryTypeValue,
+} from "@doza/db/delivery-rules";
 import { saveCheckout, placeOrder, type CheckoutForm } from "../lib/checkout-client";
+import OfficePicker, { type Office } from "./OfficePicker";
+
+/** Стоимость доставки — считает сервер, здесь только показываем. */
+interface DeliveryInfo {
+  fee: number;
+  missingForFree: number;
+  free: boolean;
+  hint: string | null;
+}
 
 /** Общий вид поля ввода — их в форме доставки восемь. */
 const FIELD =
@@ -71,7 +87,7 @@ export default function CartApp() {
   // форма
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [delivery, setDelivery] = useState<"pickup" | "post">("pickup");
+  const [delivery, setDelivery] = useState<DeliveryTypeValue>("pickup");
   const [comment, setComment] = useState("");
 
   // Данные посылки — только для доставки почтой.
@@ -96,6 +112,15 @@ export default function CartApp() {
   const [quote, setQuote] = useState<Quote | null>(null);
   /** Есть ли что предложить добрать: от этого зависит, куда ведёт кнопка. */
   const [hasOffer, setHasOffer] = useState(false);
+  /** Стоимость доставки и подсказка про порог — считает сервер. */
+  const [deliveryInfo, setDeliveryInfo] = useState<DeliveryInfo | null>(null);
+
+  // Получатель для Европочты: посылку выдают по ФИО и телефону в отделении.
+  const [epLastName, setEpLastName] = useState("");
+  const [epFirstName, setEpFirstName] = useState("");
+  const [epMiddleName, setEpMiddleName] = useState("");
+  const [epPhone, setEpPhone] = useState("");
+  const [office, setOffice] = useState<Office | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -121,6 +146,7 @@ export default function CartApp() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            deliveryType: delivery,
             items: cart.map((i) => ({
               productId: i.productId,
               volumeMl: i.volumeMl,
@@ -132,6 +158,7 @@ export default function CartApp() {
         if (cancelled) return;
         setQuote(data.cart ?? null);
         setHasOffer((data.upsellCount ?? 0) > 0);
+        setDeliveryInfo(data.delivery ?? null);
         if (data.session?.authenticated) {
           setAccount(data.session);
           setBalance(data.session.balance || 0);
@@ -146,7 +173,7 @@ export default function CartApp() {
     return () => {
       cancelled = true;
     };
-  }, [cart, mounted]);
+  }, [cart, mounted, delivery]);
 
   // Суммы: пока сервер не ответил, показываем цены из корзины.
   const gross = quote?.gross ?? cart.reduce((s, i) => s + i.priceByn * i.qty, 0);
@@ -181,9 +208,12 @@ export default function CartApp() {
     return () => clearTimeout(t);
   }, [phone, account]);
 
+  const deliveryFee = deliveryInfo?.fee ?? 0;
+  // Баллами платят за товар, но не за доставку: иначе бесплатная доставка
+  // получалась бы за чужой счёт.
   const maxSpend = Math.min(balance, total);
   const effectiveSpend = usePoints ? Math.min(pointsToSpend || maxSpend, maxSpend) : 0;
-  const toPay = Math.max(0, Math.round((total - effectiveSpend) * 100) / 100);
+  const toPay = Math.max(0, Math.round((total + deliveryFee - effectiveSpend) * 100) / 100);
 
   function setQty(idx: number, qty: number) {
     const next = cart.slice();
@@ -209,10 +239,27 @@ export default function CartApp() {
     const deliveryData = {
       lastName, firstName, middleName, postalCode, region, city, address,
     };
-    if (delivery === "post") {
+    if (needsPostalAddress(delivery)) {
       const bad = validateDelivery(deliveryData);
       if (bad) {
         setError(bad);
+        return;
+      }
+    }
+
+    // Европочта: посылку выдают по паспорту и извещению, поэтому ФИО,
+    // телефон получателя и отделение обязательны.
+    if (needsOffice(delivery)) {
+      if (!epLastName.trim() || !epFirstName.trim() || !epMiddleName.trim()) {
+        setError("Укажите фамилию, имя и отчество получателя");
+        return;
+      }
+      if (!isValidLocalDigits(epPhone)) {
+        setError("Проверьте телефон получателя: " + PHONE_ERROR.toLowerCase());
+        return;
+      }
+      if (!office) {
+        setError("Выберите отделение Европочты");
         return;
       }
     }
@@ -222,6 +269,15 @@ export default function CartApp() {
       phone,
       deliveryType: delivery,
       delivery: deliveryData,
+      europost: office
+        ? {
+            lastName: epLastName.trim(),
+            firstName: epFirstName.trim(),
+            middleName: epMiddleName.trim(),
+            phone: BELARUS_PREFIX + epPhone,
+            officeCode: office.code,
+          }
+        : undefined,
       comment,
       loyaltySpend: effectiveSpend,
     };
@@ -427,27 +483,31 @@ export default function CartApp() {
           <span className="mb-1.5 block text-xs uppercase tracking-luxe text-gold-500">
             Способ получения
           </span>
-          <div className="grid grid-cols-2 gap-2">
-            {([
-              { v: "pickup", l: "Самовывоз" },
-              { v: "post", l: "Почтой" },
-            ] as const).map((o) => (
+          <div className="grid grid-cols-3 gap-2">
+            {DELIVERY_CHOICES.map((v) => (
               <button
-                key={o.v} type="button"
-                onClick={() => setDelivery(o.v)}
-                className={`h-11 cursor-pointer rounded-lg border text-sm transition-colors ${
-                  delivery === o.v
+                key={v} type="button"
+                onClick={() => setDelivery(v)}
+                className={`min-h-[44px] cursor-pointer rounded-lg border px-1 text-sm transition-colors ${
+                  delivery === v
                     ? "border-gold-500 bg-gold-500/10 text-gold-300"
                     : "border-ink-600 text-ivory-muted hover:border-gold-600/60"
                 }`}
               >
-                {o.l}
+                {DELIVERY_TYPE_LABEL[v]}
               </button>
             ))}
           </div>
+          {/* Подсказку показываем только когда до бесплатной реально близко —
+              иначе это не помощь, а уговор купить лишнего. */}
+          {deliveryInfo?.hint && (
+            <p className="mt-2 rounded-lg border border-gold-600/30 bg-gold-500/5 p-2.5 text-xs leading-relaxed text-gold-400">
+              {deliveryInfo.hint}
+            </p>
+          )}
         </div>
 
-        {delivery === "post" && (
+        {needsPostalAddress(delivery) && (
           <div className="space-y-3 rounded-lg border border-ink-600/60 bg-ink-800/40 p-4">
             <h3 className="text-xs uppercase tracking-luxe text-gold-500">
               Данные для доставки
@@ -507,6 +567,39 @@ export default function CartApp() {
           </div>
         )}
 
+        {needsOffice(delivery) && (
+          <div className="space-y-3 rounded-lg border border-ink-600/60 bg-ink-800/40 p-4">
+            <h3 className="text-xs uppercase tracking-luxe text-gold-500">
+              Получатель и отделение
+            </h3>
+            <p className="text-xs leading-relaxed text-ivory-faint">
+              Посылку выдают в отделении по паспорту, поэтому ФИО нужно
+              полностью, а телефон — тот, на который придёт извещение.
+            </p>
+
+            <div className="grid gap-2">
+              <input type="text" required value={epLastName} autoComplete="family-name"
+                onChange={(e) => setEpLastName(e.target.value)}
+                className={FIELD} placeholder="Фамилия" />
+              <input type="text" required value={epFirstName} autoComplete="given-name"
+                onChange={(e) => setEpFirstName(e.target.value)}
+                className={FIELD} placeholder="Имя" />
+              <input type="text" required value={epMiddleName}
+                onChange={(e) => setEpMiddleName(e.target.value)}
+                className={FIELD} placeholder="Отчество" />
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs uppercase tracking-luxe text-gold-500">
+                Телефон получателя
+              </label>
+              <PhoneInput value={epPhone} onChange={setEpPhone} required />
+            </div>
+
+            <OfficePicker selected={office} onSelect={setOffice} />
+          </div>
+        )}
+
         <div>
           <label htmlFor="f-comment" className="mb-1.5 block text-xs uppercase tracking-luxe text-gold-500">
             Комментарий
@@ -553,6 +646,18 @@ export default function CartApp() {
                 Скидка{quote?.kind === "vip" ? " по VIP-карте" : ""}
               </span>
               <span>−{formatByn(discount)}</span>
+            </div>
+          )}
+          {deliveryInfo && deliveryInfo.fee > 0 && (
+            <div className="flex justify-between text-ivory-muted">
+              <span>Доставка</span>
+              <span>{formatByn(deliveryInfo.fee)}</span>
+            </div>
+          )}
+          {deliveryInfo?.free && delivery !== "pickup" && (
+            <div className="flex justify-between text-botanical-300">
+              <span>Доставка</span>
+              <span>бесплатно</span>
             </div>
           )}
           {effectiveSpend > 0 && (

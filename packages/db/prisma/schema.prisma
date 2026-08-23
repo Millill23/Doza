@@ -537,8 +537,21 @@ model Order {
   region          String?
   city            String?
   address         String?
+
+  /// Отделение Европочты, куда едет посылка. Заполняется только для europost:
+  /// адрес там не нужен, забирают по номеру отделения.
+  europostOfficeCode String?   @map("europost_office_code")
+  /// Адрес отделения на момент заказа — чтобы он не «поехал», если отделение
+  /// потом переедет или его уберут из справочника.
+  europostOfficeText String?   @map("europost_office_text")
+  /// Телефон получателя. Для Европочты обязателен — по нему выдают посылку.
+  recipientPhone  String?      @map("recipient_phone")
+
   comment         String?
+  /// Сумма товаров со скидками, без доставки.
   totalByn        Decimal     @map("total_byn") @db.Decimal(10, 2)
+  /// Стоимость доставки. 0 — самовывоз или бесплатная доставка от порога.
+  deliveryFeeByn  Decimal     @default(0) @map("delivery_fee_byn") @db.Decimal(10, 2)
   loyaltySpentByn Decimal     @default(0) @map("loyalty_spent_byn") @db.Decimal(10, 2)
   trackingNumber  String?     @map("tracking_number")
 
@@ -611,18 +624,50 @@ model Payment {
 /// `closed`, `rejected` и `returned` остались от прежней схемы с оплатой при
 /// получении. Новым заказам они не назначаются, но значения нужны, чтобы не
 /// потерять historical-данные уже закрытых заказов.
+/// Путь заказа: new → decanted → packed → shipped.
+///
+/// Подтверждения больше нет. Магазин работает по предоплате и не перезванивает
+/// каждому покупателю: как только деньги пришли, заказ считается принятым —
+/// тогда же списываются остатки, начисляется кешбек и уходит SMS. Продавцу
+/// остаётся отлить, упаковать и отправить.
 enum OrderStatus {
   new
-  confirmed
-  /// Отлит из флакона — здесь списываются остатки.
+  /// Отлит из флакона.
   decanted
   packed
   shipped
+  /// Закрыт админом вручную — например, самовывоз состоялся.
+  closed
   refunded
 
-  closed
+  /// Оплата не прошла. Ставится автоматически, руками не выбирается.
   rejected
+  /// Осталось от прежней схемы с оплатой при получении.
+  confirmed
   returned
+}
+
+/// Отделение Европочты для выдачи заказа.
+///
+/// Свой справочник, а не запрос к Европочте на каждый чих: их API требует
+/// ключа и может лежать, а покупатель в этот момент оформляет заказ. Данные
+/// обновляются фоново, а координаты нужны, чтобы показать отделение на карте.
+model EuropostOffice {
+  id           Int      @id @default(autoincrement())
+  /// Номер отделения в системе Европочты — он же попадает в заказ.
+  code         String   @unique
+  city         String
+  address      String
+  /// Часы работы одной строкой, как отдаёт справочник.
+  workingHours String?  @map("working_hours")
+  latitude     Decimal? @db.Decimal(9, 6)
+  longitude    Decimal? @db.Decimal(9, 6)
+  /// Отделение закрыли — из выбора убираем, но в старых заказах оставляем.
+  isActive     Boolean  @default(true) @map("is_active")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([city])
+  @@map("europost_offices")
 }
 
 /// Служба доставки. Нужна для трек-номера и текста SMS покупателю.
@@ -631,8 +676,16 @@ enum DeliveryService {
   belpochta
 }
 
+/// Как покупатель забирает заказ. Выбирается при оформлении.
 enum DeliveryType {
   pickup
+  /// Белпочта — доставка по адресу, нужен полный адрес с индексом.
+  belpochta
+  /// Европочта — выдача в отделении, нужен номер отделения, адрес не нужен.
+  europost
+
+  /// Осталось от времён, когда почта была одна. В новых заказах не
+  /// используется, значение нужно, чтобы не потерять историю.
   post
 }
 

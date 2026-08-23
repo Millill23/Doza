@@ -28,7 +28,4 @@ export const GENDER_LABEL: Record<string, string> = {
   unisex: "Унисекс",
 };
 
-export const DELIVERY_LABEL: Record<string, string> = {
-  pickup: "Самовывоз",
-  post: "Доставка почтой",
-};
+export { DELIVERY_TYPE_LABEL as DELIVERY_LABEL } from "@doza/db/delivery-rules";

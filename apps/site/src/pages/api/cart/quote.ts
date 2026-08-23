@@ -4,6 +4,12 @@ import { prisma } from "@doza/db";
 import { currentCustomerId } from "../../../lib/customer-auth";
 import { quoteCart, vipPercentFor, CartError } from "../../../lib/cart-pricing";
 import { offerProductIds } from "../../../lib/upsell";
+import {
+  DELIVERY_CHOICES,
+  deliveryCost,
+  freeDeliveryHint,
+  type DeliveryTypeValue,
+} from "@doza/db/delivery-rules";
 
 export const prerender = false;
 
@@ -18,6 +24,9 @@ export const prerender = false;
 export const POST: APIRoute = async ({ request, cookies }) => {
   const body = await request.json().catch(() => ({}));
   const items = Array.isArray(body.items) ? body.items : [];
+  const deliveryType: DeliveryTypeValue = DELIVERY_CHOICES.includes(body.deliveryType)
+    ? body.deliveryType
+    : "pickup";
 
   const customerId = await currentCustomerId(cookies);
   const vipPercent = await vipPercentFor(customerId);
@@ -49,7 +58,16 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     // Корзине важно лишь, есть ли предложение: от этого зависит, ведёт кнопка
     // на шаг допродажи или сразу к оплате. Пустой страницы быть не должно.
     const upsellCount = (await offerProductIds(items)).length;
-    return json({ ok: true, session, cart, upsellCount });
+    // Доставку считает сервер по той же формуле, что и приём заказа: иначе
+    // корзина покажет одну сумму, а платёжная страница выставит другую.
+    const delivery = deliveryCost({ type: deliveryType, goodsTotal: cart.net });
+    return json({
+      ok: true,
+      session,
+      cart,
+      upsellCount,
+      delivery: { ...delivery, hint: freeDeliveryHint(delivery) },
+    });
   } catch (e) {
     if (e instanceof CartError)
       return json({ ok: false, error: e.message, session }, 400);

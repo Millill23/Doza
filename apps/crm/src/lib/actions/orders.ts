@@ -6,8 +6,7 @@ import { getCashbackRates } from "@doza/db/promos";
 import { refundOrderPoints, revokeOrderCashback } from "@doza/db/payments";
 import {
   canTransition,
-  grantsCashback,
-  consumesStock,
+  canClose,
   requiresTracking,
   shippedSmsText,
   refundReversal,
@@ -89,41 +88,9 @@ export async function changeOrderStatus(input: StatusChangeInput) {
     if (!service) throw new Error("Выберите службу доставки");
   }
 
-  // ─── Эффекты шага ────────────────────────────────────────────────────────
-  if (consumesStock(next)) {
-    for (const item of order.items) {
-      const deltaMl = -(item.volumeMl * item.qty);
-      await prisma.inventory.upsert({
-        where: { productId: item.productId },
-        update: { quantityMl: { increment: deltaMl } },
-        create: { productId: item.productId, quantityMl: 0 },
-      });
-      await prisma.inventoryLog.create({
-        data: {
-          productId: item.productId,
-          deltaMl,
-          reason: "order_decanted",
-          refType: "order",
-          refId: order.id,
-          userId,
-        },
-      });
-    }
-  }
-
-  if (grantsCashback(next) && order.customerId) {
-    const earn = await cashbackFor(order.items);
-    if (earn > 0) {
-      // Без согласия на обработку ПД начисления не будет. Подтверждение заказа
-      // из-за этого не отменяем: деньги уже получены, товар покупатель ждёт.
-      const days = await getSetting("loyalty_days", 180);
-      await earnPoints(order.customerId, earn, days, { type: "order", id: order.id });
-    }
-    await prisma.customer.update({
-      where: { id: order.customerId },
-      data: { lastPurchaseAt: new Date(), lastPurchaseSum: order.totalByn },
-    });
-  }
+  // Остатки и кешбек здесь не трогаем: и то и другое проводится в момент
+  // оплаты (`settlePaidOrder`). Смена статуса — это про работу продавца, а не
+  // про деньги и склад.
 
   await prisma.order.update({
     where: { id: orderId },
@@ -255,6 +222,32 @@ export async function refundOrder(orderId: number, reasonRaw: string) {
   revalidatePath(`/orders/${orderId}`);
   revalidatePath("/orders");
   return { ok: true, refunded: paid };
+}
+
+/**
+ * Закрыть заказ вручную. Только админ.
+ *
+ * Для случаев, которые не ложатся в цепочку: покупатель забрал самовывозом,
+ * договорились по телефону, заказ доехал и вопрос исчерпан. Ни денег, ни
+ * склада это не трогает — они уже проведены при оплате.
+ */
+export async function closeOrder(orderId: number) {
+  await requireRole(["admin"]);
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { status: true },
+  });
+  if (!order) throw new Error("Заказ не найден");
+
+  if (!canClose(order.status as OrderStatusValue))
+    throw new Error(
+      `Заказ в статусе «${ORDER_STATUS_LABEL[order.status as OrderStatusValue]}» закрывать нечего`,
+    );
+
+  await prisma.order.update({ where: { id: orderId }, data: { status: "closed" } });
+  revalidatePath(`/orders/${orderId}`);
+  revalidatePath("/orders");
 }
 
 /** Служба доставки и трек-номер — можно поправить после отправки. */

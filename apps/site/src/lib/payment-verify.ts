@@ -10,7 +10,7 @@ import {
   orderByPaymentToken,
   type ApplyResult,
 } from "@doza/db/payments";
-import { notifyOrder } from "./order-notify";
+import { onOrderPaid } from "./order-paid";
 
 /**
  * Проверить платёж у шлюза и применить результат к заказу.
@@ -30,8 +30,15 @@ export async function verifyAndApply(token: string): Promise<ApplyResult | null>
   const status = await fetchCheckoutStatus(token, cfg);
   const outcome = paymentOutcome(status);
 
+  // Доставка входит в сумму платежа наравне с товарами: покупателю выставили
+  // счёт с ней, столько же должно прийти от шлюза.
   const expectedMinor = toMinorUnits(
-    Math.round((Number(order.totalByn) - Number(order.loyaltySpentByn)) * 100) / 100,
+    Math.round(
+      (Number(order.totalByn) +
+        Number(order.deliveryFeeByn) -
+        Number(order.loyaltySpentByn)) *
+        100,
+    ) / 100,
   );
   const verdict = canAcceptPayment({
     outcome,
@@ -53,13 +60,14 @@ export async function verifyAndApply(token: string): Promise<ApplyResult | null>
     rejectReason: verdict.ok ? undefined : verdict.reason,
   });
 
-  // Продавцов дёргаем ровно один раз — на переходе заказа в оплаченный.
+  // Всё, что происходит с оплатой, делается ровно один раз — на переходе
+  // заказа в оплаченный. `justPaid` выставляется условным UPDATE, поэтому
+  // повторные уведомления bePaid сюда не попадают.
   if (result?.justPaid) {
-    try {
-      await notifyOrder(result.orderId, status.test ? "ТЕСТОВЫЙ платёж" : "картой");
-    } catch (e) {
-      console.error("[payment] TG об оплате не отправлен:", e);
-    }
+    await onOrderPaid(
+      result.orderId,
+      status.test ? "ТЕСТОВЫЙ платёж" : "картой",
+    );
   }
 
   return result;

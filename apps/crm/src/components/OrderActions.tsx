@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { changeOrderStatus, refundOrder, setTracking } from "@/lib/actions/orders";
+import { changeOrderStatus, closeOrder, refundOrder, setTracking } from "@/lib/actions/orders";
 import {
   ORDER_TRANSITIONS,
+  canClose,
   requiresTracking,
   type OrderStatusValue,
   type DeliveryServiceValue,
@@ -24,7 +25,7 @@ export default function OrderActions({
   orderId: number;
   status: OrderStatusValue;
   tracking: string | null;
-  deliveryType: "pickup" | "post";
+  deliveryType: string;
   deliveryService: DeliveryServiceValue | null;
   paid: boolean;
   isAdmin: boolean;
@@ -150,7 +151,7 @@ export default function OrderActions({
 
       {/* Трек-номер уже отправленного заказа: почта иногда выдаёт новый номер
           при переупаковке. */}
-      {status === "shipped" && deliveryType === "post" && (
+      {status === "shipped" && deliveryType !== "pickup" && (
         <div>
           <h3 className="mb-2 text-xs uppercase tracking-wide text-gold-500">
             Трек-номер
@@ -169,6 +170,29 @@ export default function OrderActions({
               Сохранить
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Закрыть — для случаев вне цепочки: самовывоз состоялся, вопрос
+          исчерпан. Ни денег, ни склада не трогает. */}
+      {isAdmin && canClose(status) && (
+        <div className="border-t border-ink-600/60 pt-5">
+          <button
+            onClick={() =>
+              startTransition(async () => {
+                try {
+                  setErr(null);
+                  await closeOrder(orderId);
+                } catch (e) {
+                  setErr((e as Error).message);
+                }
+              })
+            }
+            disabled={pending}
+            className="w-full rounded-lg border border-ink-600 px-4 py-2 text-sm text-ivory-muted transition-colors hover:border-gold-600/50 hover:text-gold-400 disabled:opacity-50"
+          >
+            Закрыть заказ
+          </button>
         </div>
       )}
 

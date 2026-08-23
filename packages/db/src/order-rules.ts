@@ -59,16 +59,28 @@ export const ORDER_STATUS_PUBLIC_LABEL: Record<OrderStatusValue, string> = {
  * шага, а не очередная ступень цепочки.
  */
 export const ORDER_TRANSITIONS: Record<OrderStatusValue, OrderStatusValue[]> = {
-  new: ["confirmed"],
-  confirmed: ["decanted"],
+  new: ["decanted"],
   decanted: ["packed"],
   packed: ["shipped"],
   shipped: [],
-  refunded: [],
   closed: [],
+  refunded: [],
+  // Тупиковые: остались от прежней схемы либо ставятся автоматически.
+  confirmed: ["decanted"],
   rejected: [],
   returned: [],
 };
+
+/**
+ * Закрыть заказ вручную может только админ и только пока заказ жив.
+ *
+ * Нужно для случаев, которые не ложатся в цепочку: самовывоз состоялся,
+ * покупатель забрал заказ лично, продавец разобрался по телефону. Возвращённый
+ * или уже закрытый трогать нечего.
+ */
+export function canClose(from: OrderStatusValue): boolean {
+  return !["closed", "refunded", "rejected", "returned"].includes(from);
+}
 
 export function canTransition(
   from: OrderStatusValue,
@@ -80,29 +92,41 @@ export function canTransition(
 /**
  * Начислять ли кешбек при переходе.
  *
- * На подтверждении: заказ принят в работу, деньги уже списаны, и покупателю
- * можно обещать баллы.
+ * Никогда: и кешбек, и списание остатков переехали на момент оплаты. Магазин
+ * работает по предоплате и не перезванивает покупателям — как только деньги
+ * пришли, заказ принят, и держать баллы «до подтверждения» не за чем. SMS
+ * покупателю называет начисленную сумму сразу, так что и начислена она должна
+ * быть сразу.
+ *
+ * Функция оставлена, чтобы вызывающий код не гадал: ответ «нет» здесь
+ * осмысленный, а не отсутствие правила.
  */
-export function grantsCashback(to: OrderStatusValue): boolean {
-  return to === "confirmed";
+export function grantsCashback(_to: OrderStatusValue): boolean {
+  return false;
 }
 
 /**
  * Списывать ли остатки при переходе.
  *
- * На распиве: именно тогда парфюм физически уходит из флакона. Раньше — рано
- * (заказ ещё могут отменить), позже — поздно (товар уже не на складе).
+ * Тоже нет — остатки уходят при оплате. Иначе оплаченный, но ещё не отлитый
+ * заказ не виден на складе, и тот же миллилитр можно продать второй раз в
+ * кассе.
  */
-export function consumesStock(to: OrderStatusValue): boolean {
-  return to === "decanted";
+export function consumesStock(_to: OrderStatusValue): boolean {
+  return false;
 }
 
-/** Нужны ли трек-номер и служба доставки для перехода. */
+/**
+ * Нужны ли трек-номер и служба доставки для перехода.
+ *
+ * Только при отправке и только если есть посылка: при самовывозе отслеживать
+ * нечего.
+ */
 export function requiresTracking(
   to: OrderStatusValue,
-  deliveryType: "pickup" | "post",
+  deliveryType: string,
 ): boolean {
-  return to === "shipped" && deliveryType === "post";
+  return to === "shipped" && deliveryType !== "pickup";
 }
 
 /** Текст SMS покупателю об отправке. */
@@ -130,14 +154,16 @@ export interface RefundReversal {
  * нельзя — иначе возврат подарит клиенту баллы или создаст парфюм из воздуха.
  */
 export function refundReversal(status: OrderStatusValue): RefundReversal {
-  const reached = (s: OrderStatusValue) =>
-    ["confirmed", "decanted", "packed", "shipped"].indexOf(status) >=
-    ["confirmed", "decanted", "packed", "shipped"].indexOf(s);
+  // Оплата — единственный момент, когда начисляется кешбек и списываются
+  // остатки. Возврат оплаченного заказа откатывает и то и другое, на каком бы
+  // шаге он ни находился. Неоплаченный (`rejected`) откатывать нечего: там
+  // ничего и не происходило.
+  const paid = status !== "rejected";
 
   return {
     // Списанные при заказе баллы возвращаем всегда: заказ не состоялся.
     refundSpentPoints: true,
-    revokeCashback: status !== "new" && reached("confirmed"),
-    restoreStock: status !== "new" && reached("decanted"),
+    revokeCashback: paid,
+    restoreStock: paid,
   };
 }

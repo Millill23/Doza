@@ -6,6 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   canTransition,
+  canClose,
   grantsCashback,
   consumesStock,
   requiresTracking,
@@ -17,22 +18,34 @@ import {
 } from "./order-rules.ts";
 
 test("цепочка идёт только вперёд и по одному шагу", () => {
-  assert.equal(canTransition("new", "confirmed"), true);
-  assert.equal(canTransition("confirmed", "decanted"), true);
+  // Подтверждения нет: оплаченный заказ сразу можно отливать.
+  assert.equal(canTransition("new", "decanted"), true);
   assert.equal(canTransition("decanted", "packed"), true);
   assert.equal(canTransition("packed", "shipped"), true);
 });
 
 test("шаги нельзя перепрыгнуть", () => {
-  // Иначе можно отправить нераспитый заказ или упаковать неподтверждённый.
   assert.equal(canTransition("new", "shipped"), false);
-  assert.equal(canTransition("new", "decanted"), false);
-  assert.equal(canTransition("confirmed", "packed"), false);
+  assert.equal(canTransition("new", "packed"), false);
+  assert.equal(canTransition("decanted", "shipped"), false);
+});
+
+test("подтверждать больше нечего", () => {
+  assert.equal(canTransition("new", "confirmed"), false);
 });
 
 test("назад вернуться нельзя", () => {
   assert.equal(canTransition("shipped", "packed"), false);
-  assert.equal(canTransition("confirmed", "new"), false);
+  assert.equal(canTransition("decanted", "new"), false);
+});
+
+test("админ закрывает заказ, пока тот жив", () => {
+  for (const s of ["new", "decanted", "packed", "shipped"] as const) {
+    assert.equal(canClose(s), true, s);
+  }
+  for (const s of ["closed", "refunded", "rejected", "returned"] as const) {
+    assert.equal(canClose(s), false, s);
+  }
 });
 
 test("возврат не входит в цепочку — это отдельное действие", () => {
@@ -54,16 +67,12 @@ test("старые статусы сохранены, но тупиковые", 
   }
 });
 
-test("кешбек начисляется на подтверждении, и только там", () => {
-  assert.equal(grantsCashback("confirmed"), true);
-  for (const s of ["new", "decanted", "packed", "shipped"] as const) {
+test("смена статуса ничего не начисляет и не списывает", () => {
+  // И кешбек, и остатки переехали на момент оплаты: заказ считается принятым,
+  // как только пришли деньги. Иначе оплаченный, но не отлитый заказ не виден
+  // на складе, и тот же миллилитр уходит второй раз в кассе.
+  for (const s of ["new", "decanted", "packed", "shipped", "closed"] as const) {
     assert.equal(grantsCashback(s), false, s);
-  }
-});
-
-test("остатки списываются на распиве, и только там", () => {
-  assert.equal(consumesStock("decanted"), true);
-  for (const s of ["new", "confirmed", "packed", "shipped"] as const) {
     assert.equal(consumesStock(s), false, s);
   }
 });
@@ -88,30 +97,26 @@ test("SMS об отправке называет службу и номер", ()
   );
 });
 
-test("возврат нового заказа не трогает баллы за кешбек и склад", () => {
-  // Ни кешбека, ни распива ещё не было — откатывать нечего.
-  const r = refundReversal("new");
-  assert.equal(r.refundSpentPoints, true);
-  assert.equal(r.revokeCashback, false);
-  assert.equal(r.restoreStock, false);
-});
-
-test("возврат подтверждённого отбирает кешбек, но не трогает склад", () => {
-  const r = refundReversal("confirmed");
-  assert.equal(r.revokeCashback, true);
-  assert.equal(r.restoreStock, false, "распива ещё не было");
-});
-
-test("возврат после распива возвращает парфюм на склад", () => {
-  for (const s of ["decanted", "packed", "shipped"] as const) {
+test("возврат оплаченного откатывает кешбек и склад на любом шаге", () => {
+  // Оплата — единственный момент, когда начисляется кешбек и списываются
+  // остатки, поэтому и откатывать их нужно независимо от того, докуда дошёл
+  // заказ. Даже совсем новый уже успел и то и другое.
+  for (const s of ["new", "decanted", "packed", "shipped", "closed"] as const) {
     const r = refundReversal(s);
     assert.equal(r.revokeCashback, true, s);
     assert.equal(r.restoreStock, true, s);
   }
 });
 
+test("у неоплаченного заказа откатывать нечего", () => {
+  // `rejected` ставится, когда платёж не прошёл: ни баллов, ни списаний.
+  const r = refundReversal("rejected");
+  assert.equal(r.revokeCashback, false);
+  assert.equal(r.restoreStock, false);
+});
+
 test("списанные баллы возвращаются на любом шаге", () => {
-  for (const s of ["new", "confirmed", "decanted", "packed", "shipped"] as const) {
+  for (const s of ["new", "decanted", "packed", "shipped", "rejected"] as const) {
     assert.equal(refundReversal(s).refundSpentPoints, true, s);
   }
 });

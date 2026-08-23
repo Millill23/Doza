@@ -13,9 +13,16 @@ import {
 import { sendSms } from "@doza/shared/sms";
 import { createCardCheckout } from "@doza/shared/bepaid";
 import { notifyTelegram } from "../../lib/telegram";
-import { notifyOrder } from "../../lib/order-notify";
+import { onOrderPaid } from "../../lib/order-paid";
 import { currentCustomerId } from "../../lib/customer-auth";
 import { quoteCart, vipPercentFor, CartError } from "../../lib/cart-pricing";
+import {
+  DELIVERY_CHOICES,
+  deliveryCost,
+  needsPostalAddress,
+  needsOffice,
+  type DeliveryTypeValue,
+} from "@doza/db/delivery-rules";
 
 export const prerender = false;
 
@@ -36,9 +43,17 @@ interface IncomingItem {
 interface OrderBody {
   name: string;
   phone: string;
-  deliveryType: "pickup" | "post";
-  /** Данные посылки. Присылаются только при доставке почтой. */
+  deliveryType: DeliveryTypeValue;
+  /** Данные посылки. Присылаются только для Белпочты. */
   delivery?: Partial<DeliveryDetails>;
+  /** Получатель для Европочты: ФИО, телефон и код отделения. */
+  europost?: {
+    lastName?: string;
+    firstName?: string;
+    middleName?: string;
+    phone?: string;
+    officeCode?: string;
+  };
   comment?: string;
   items: IncomingItem[];
   loyaltySpend?: number;
@@ -83,15 +98,54 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   } catch (e) {
     return bad((e as Error).message);
   }
-  if (deliveryType !== "pickup" && deliveryType !== "post")
+  if (!DELIVERY_CHOICES.includes(deliveryType))
     return bad("Выберите способ получения");
+
   // Данные посылки проверяем и здесь: браузерная проверка — подсказка, а не
   // гарантия. Неполный адрес всплывёт только на почте, когда деньги уже взяты.
   let shipTo: DeliveryDetails | null = null;
-  if (deliveryType === "post") {
+  if (needsPostalAddress(deliveryType)) {
     const bad_ = validateDelivery(body.delivery ?? {});
     if (bad_) return bad(bad_);
     shipTo = normalizeDelivery(body.delivery as DeliveryDetails);
+  }
+
+  // Европочта: адрес не нужен, посылку выдают по ФИО и телефону в отделении.
+  let office: { code: string; text: string } | null = null;
+  let recipient: {
+    lastName: string;
+    firstName: string;
+    middleName: string;
+    phone: string;
+  } | null = null;
+  if (needsOffice(deliveryType)) {
+    const e = body.europost ?? {};
+    const fio = [e.lastName, e.firstName, e.middleName]
+      .map((s) => (s ?? "").trim());
+    if (fio.some((s) => !s)) return bad("Укажите фамилию, имя и отчество получателя");
+
+    let recipientPhone: string;
+    try {
+      recipientPhone = assertBelarusPhone(e.phone ?? "");
+    } catch {
+      return bad("Укажите телефон получателя — по нему выдают посылку");
+    }
+
+    const code = (e.officeCode ?? "").trim();
+    if (!code) return bad("Выберите отделение Европочты");
+    // Отделение сверяем со справочником: код из браузера может быть любым, а
+    // посылку повезут по нему.
+    const found = await prisma.europostOffice.findUnique({ where: { code } });
+    if (!found || !found.isActive)
+      return bad("Такого отделения нет в списке — выберите другое");
+
+    office = { code: found.code, text: `${found.city}, ${found.address}` };
+    recipient = {
+      lastName: fio[0],
+      firstName: fio[1],
+      middleName: fio[2],
+      phone: recipientPhone,
+    };
   }
   if (items.length === 0) return bad("Корзина пуста");
 
@@ -108,6 +162,10 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   }
   const orderItems = quote.lines;
   const total = quote.net;
+
+  // Доставка. Порог считается по сумме товаров до списания баллов: баллы —
+  // способ оплаты, а не уменьшение заказа.
+  const delivery = deliveryCost({ type: deliveryType, goodsTotal: total });
 
   // Клиент (upsert по телефону)
   const existing = await prisma.customer.findUnique({
@@ -164,8 +222,19 @@ export const POST: APIRoute = async ({ request, cookies }) => {
             address: shipTo.address,
           }
         : {}),
+      ...(office && recipient
+        ? {
+            europostOfficeCode: office.code,
+            europostOfficeText: office.text,
+            recipientPhone: recipient.phone,
+            recipientLastName: recipient.lastName,
+            recipientFirstName: recipient.firstName,
+            recipientMiddleName: recipient.middleName,
+          }
+        : {}),
       comment: (body.comment ?? "").trim() || null,
       totalByn: total,
+      deliveryFeeByn: delivery.fee,
       loyaltySpentByn: loyaltySpent,
       items: {
         create: orderItems.map((i) => ({
@@ -186,7 +255,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     });
   }
 
-  const toPay = Math.round((total - loyaltySpent) * 100) / 100;
+  const toPay =
+    Math.round((total + delivery.fee - loyaltySpent) * 100) / 100;
 
   // Заказ бесплатным быть не может: если баллы покрыли всё, платить нечем и
   // платёжную страницу создавать не за что.
@@ -195,7 +265,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       where: { id: order.id },
       data: { paymentStatus: "paid", paidAt: new Date() },
     });
-    await notifyOrder(order.id, "оплачен баллами");
+    // Тот же путь, что и у оплаченного картой: остатки списываются, кешбек
+    // начисляется, продавцам и покупателю уходят уведомления.
+    await onOrderPaid(order.id, "оплачен баллами");
     return json({ ok: true, orderId: order.id, total, toPay, paid: true }, 201);
   }
 

@@ -1,5 +1,6 @@
 import { prisma } from "./index";
 import { earnPoints } from "./loyalty";
+import { getCashbackRates } from "./promos";
 
 /**
  * Оплата заказов через bePaid.
@@ -79,11 +80,20 @@ export async function applyPaymentResult(v: VerifiedPayment): Promise<ApplyResul
   }
 
   if (v.accepted) {
-    await prisma.order.update({
-      where: { id: order.id },
+    // Условный UPDATE, а не проверка выше: уведомление bePaid приходит до
+    // 25 раз и может обогнать возврат покупателя на сайт. Прочитали оба
+    // «не оплачен» — и оба начислили бы кешбек и списали остатки. Пометить
+    // оплаченным должен ровно один.
+    const claimed = await prisma.order.updateMany({
+      where: { id: order.id, paymentStatus: { not: "paid" } },
       data: { paymentStatus: "paid", paidAt: new Date() },
     });
-    return { orderId: order.id, paymentStatus: "paid", justPaid: true, pointsRefunded: 0 };
+    return {
+      orderId: order.id,
+      paymentStatus: "paid",
+      justPaid: claimed.count === 1,
+      pointsRefunded: 0,
+    };
   }
 
   if (v.outcome === "pending") {
@@ -194,6 +204,88 @@ export async function pendingPaymentTokens(withinDays = 3): Promise<string[]> {
     select: { token: true },
   });
   return rows.map((r) => r.token);
+}
+
+export interface SettleResult {
+  /** Начислено баллов. 0 — клиент без согласия либо кешбек нулевой. */
+  earned: number;
+  /** Списано миллилитров суммарно — для журнала. */
+  consumedMl: number;
+}
+
+/**
+ * Провести оплаченный заказ по складу и лояльности.
+ *
+ * Вызывается ровно один раз — в момент, когда заказ стал оплаченным. Раньше
+ * это делалось на подтверждении продавцом, но магазин работает по предоплате и
+ * никому не перезванивает: пришли деньги — заказ принят. Держать остатки
+ * несписанными до распива нельзя, иначе оплаченный миллилитр ещё числится на
+ * складе и его продают второй раз в кассе.
+ *
+ * Повторный вызов защищён вызывающим кодом (`justPaid`), а начисление баллов —
+ * ещё и согласием клиента: без него `earnPoints` откажет, и SMS не должна
+ * обещать несуществующие баллы.
+ */
+export async function settlePaidOrder(
+  orderId: number,
+  loyaltyDays: number,
+): Promise<SettleResult> {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { items: true },
+  });
+  if (!order) return { earned: 0, consumedMl: 0 };
+
+  let consumedMl = 0;
+  for (const item of order.items) {
+    const deltaMl = -(item.volumeMl * item.qty);
+    await prisma.inventory.upsert({
+      where: { productId: item.productId },
+      update: { quantityMl: { increment: deltaMl } },
+      create: { productId: item.productId, quantityMl: 0 },
+    });
+    await prisma.inventoryLog.create({
+      data: {
+        productId: item.productId,
+        deltaMl,
+        reason: "order_paid",
+        refType: "order",
+        refId: order.id,
+        // Списал не сотрудник, а факт оплаты.
+        userId: null,
+      },
+    });
+    consumedMl += -deltaMl;
+  }
+
+  let earned = 0;
+  if (order.customerId) {
+    const rates = await getCashbackRates(order.items.map((i) => i.productId));
+    // Процент — по каждому товару отдельно, включая повышенный кешбек акции,
+    // как обещает витрина. Доставка кешбека не даёт: это не покупка.
+    const cashback =
+      Math.round(
+        order.items.reduce((sum, i) => {
+          const line = Number(i.priceByn) * i.qty;
+          return sum + line * ((rates[i.productId] ?? 0) / 100);
+        }, 0) * 100,
+      ) / 100;
+
+    if (cashback > 0) {
+      const ok = await earnPoints(order.customerId, cashback, loyaltyDays, {
+        type: "order",
+        id: order.id,
+      });
+      if (ok) earned = cashback;
+    }
+
+    await prisma.customer.update({
+      where: { id: order.customerId },
+      data: { lastPurchaseAt: new Date(), lastPurchaseSum: order.totalByn },
+    });
+  }
+
+  return { earned, consumedMl };
 }
 
 /**

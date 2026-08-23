@@ -13,7 +13,7 @@ export interface CheckoutForm {
   name: string;
   /** Локальные девять цифр, без префикса. */
   phone: string;
-  deliveryType: "pickup" | "post";
+  deliveryType: string;
   delivery: {
     lastName: string;
     firstName: string;
@@ -22,6 +22,14 @@ export interface CheckoutForm {
     region: string;
     city: string;
     address: string;
+  };
+  /** Получатель и отделение — только для Европочты. */
+  europost?: {
+    lastName: string;
+    firstName: string;
+    middleName: string;
+    phone: string;
+    officeCode: string;
   };
   comment: string;
   loyaltySpend: number;
@@ -74,7 +82,8 @@ export async function placeOrder(
         name: form.name,
         phone: "375" + form.phone,
         deliveryType: form.deliveryType,
-        delivery: form.deliveryType === "post" ? form.delivery : undefined,
+        delivery: form.delivery,
+        europost: form.europost,
         comment: form.comment,
         loyaltySpend: form.loyaltySpend,
         items: items.map((i) => ({
