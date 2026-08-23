@@ -36,9 +36,16 @@ async function main() {
   let added = 0;
   let updated = 0;
 
-  for (const [code, address] of rows) {
+  for (const [code, address, lat, lng] of rows) {
     codes.push(code);
-    const data = { city: cityOf(address), address, isActive: true };
+    const data = {
+      city: cityOf(address),
+      address,
+      isActive: true,
+      // Координаты приходят из geocode-europost.mjs. Их отсутствие не мешает
+      // выбрать отделение — просто не будет булавки на карте.
+      ...(lat != null && lng != null ? { latitude: lat, longitude: lng } : {}),
+    };
     const existing = await prisma.europostOffice.findUnique({ where: { code } });
     if (existing) {
       await prisma.europostOffice.update({ where: { code }, data });

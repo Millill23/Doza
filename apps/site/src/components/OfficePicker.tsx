@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import OfficeMap from "./OfficeMap";
 
 /**
  * Выбор отделения Европочты.
@@ -100,6 +101,21 @@ export default function OfficePicker({
         autoFocus
         className="h-11 w-full rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory placeholder:text-ivory-faint focus:border-gold-500 focus:outline-none"
       />
+
+      {/* Карта и список показывают одно и то же и работают вместе: поиск сужает
+          оба, выбрать можно и булавкой, и строкой. */}
+      {offices.length > 0 && (
+        <div className="mt-2">
+          <OfficeMap
+            offices={offices}
+            selectedCode={null}
+            onSelect={(o) => {
+              onSelect(o);
+              setOpen(false);
+            }}
+          />
+        </div>
+      )}
 
       <div className="mt-2 max-h-64 overflow-y-auto">
         {loading && (

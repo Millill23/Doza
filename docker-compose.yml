@@ -77,8 +77,22 @@ services:
         if [ -z "$${CRON_SECRET}" ]; then
           echo "[cron] CRON_SECRET не задан — задачи выполняться не будут"
         fi
+        # Раз в сутки — задачи, которым чаще не нужно. Считаем витки цикла:
+        # 288 витков по 300 секунд как раз сутки. Отдельного планировщика ради
+        # одной задачи заводить не стали.
+        daily=288
         while true; do
           sleep 300
+          daily=$$((daily + 1))
+          if [ $$daily -ge 288 ]; then
+            daily=0
+            answer=$$(wget -q -O- "http://site:4321/api/cron/geocode-offices?key=$${CRON_SECRET}" 2>&1)
+            if [ $$? -eq 0 ]; then
+              echo "[cron] geocode-offices -> $${answer}"
+            else
+              echo "[cron] geocode-offices -> НЕ ОТВЕТИЛ"
+            fi
+          fi
           for task in "crm:3000/api/cron/promo-reminders" "crm:3000/api/cron/daily-rewards" "site:4321/api/cron/reconcile-payments"; do
             answer=$$(wget -q -O- "http://$${task}?key=$${CRON_SECRET}" 2>&1)
             code=$$?
