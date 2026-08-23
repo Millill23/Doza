@@ -61,7 +61,7 @@ export default function OfficePicker({
           Отделение №{selected.code}
         </p>
         <p className="mt-0.5 text-xs text-ivory-muted">
-          {selected.city}, {selected.address}
+          {selected.address}
         </p>
         {selected.workingHours && (
           <p className="mt-0.5 text-[11px] text-ivory-faint">
@@ -126,7 +126,7 @@ export default function OfficePicker({
                 className="w-full cursor-pointer rounded-lg border border-transparent px-2 py-2 text-left transition-colors hover:border-gold-600/50 hover:bg-gold-500/5"
               >
                 <span className="block text-sm text-ivory">
-                  №{o.code} · {o.city}
+                  Отделение №{o.code}
                 </span>
                 <span className="block text-xs text-ivory-muted">{o.address}</span>
                 {o.workingHours && (

@@ -139,7 +139,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     if (!found || !found.isActive)
       return bad("Такого отделения нет в списке — выберите другое");
 
-    office = { code: found.code, text: `${found.city}, ${found.address}` };
+    office = { code: found.code, text: found.address };
     recipient = {
       lastName: fio[0],
       firstName: fio[1],
