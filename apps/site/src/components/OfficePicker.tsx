@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import OfficeMap from "./OfficeMap";
+import { distanceKm, formatDistance } from "@doza/shared/geo";
 
 /**
  * Выбор отделения Европочты.
@@ -31,6 +32,21 @@ export default function OfficePicker({
   const [query, setQuery] = useState("");
   const [offices, setOffices] = useState<Office[]>([]);
   const [loading, setLoading] = useState(false);
+  /** Где покупатель, если разрешил геолокацию. */
+  const [here, setHere] = useState<{ lat: number; lng: number } | null>(null);
+
+  // Когда знаем, где человек, ближайшие отделения идут первыми — иначе от
+  // геолокации толк только на карте, а в списке по-прежнему алфавит.
+  const sorted = here
+    ? [...offices]
+        .map((o) => ({
+          o,
+          km: o.lat != null && o.lng != null
+            ? distanceKm(here, { lat: o.lat, lng: o.lng })
+            : Infinity,
+        }))
+        .sort((a, b) => a.km - b.km)
+    : offices.map((o) => ({ o, km: Infinity }));
 
   useEffect(() => {
     if (!open) return;
@@ -38,8 +54,14 @@ export default function OfficePicker({
     setLoading(true);
     const t = setTimeout(async () => {
       try {
+        // Координаты округляем до сотых — это около километра, для сортировки
+        // отделений хватает с запасом, а точное местоположение покупателя не
+        // оседает в журналах сервера.
+        const around = here
+          ? `&lat=${here.lat.toFixed(2)}&lng=${here.lng.toFixed(2)}`
+          : "";
         const r = await fetch(
-          `/api/europost/offices?q=${encodeURIComponent(query.trim())}`,
+          `/api/europost/offices?q=${encodeURIComponent(query.trim())}${around}`,
         );
         const data = await r.json();
         if (!cancelled) setOffices(data.offices ?? []);
@@ -53,7 +75,7 @@ export default function OfficePicker({
       cancelled = true;
       clearTimeout(t);
     };
-  }, [open, query]);
+  }, [open, query, here]);
 
   if (selected) {
     return (
@@ -109,6 +131,7 @@ export default function OfficePicker({
           <OfficeMap
             offices={offices}
             selectedCode={null}
+            onLocate={setHere}
             onSelect={(o) => {
               onSelect(o);
               setOpen(false);
@@ -130,8 +153,14 @@ export default function OfficePicker({
           </p>
         )}
 
+        {here && (
+          <p className="pb-1 text-[11px] text-botanical-300">
+            Ближайшие к вам — сверху
+          </p>
+        )}
+
         <ul className="space-y-1">
-          {offices.map((o) => (
+          {sorted.map(({ o, km }) => (
             <li key={o.code}>
               <button
                 type="button"
@@ -141,8 +170,13 @@ export default function OfficePicker({
                 }}
                 className="w-full cursor-pointer rounded-lg border border-transparent px-2 py-2 text-left transition-colors hover:border-gold-600/50 hover:bg-gold-500/5"
               >
-                <span className="block text-sm text-ivory">
-                  Отделение №{o.code}
+                <span className="flex items-baseline justify-between gap-2 text-sm text-ivory">
+                  <span>Отделение №{o.code}</span>
+                  {Number.isFinite(km) && (
+                    <span className="shrink-0 text-xs text-botanical-300">
+                      {formatDistance(km)}
+                    </span>
+                  )}
                 </span>
                 <span className="block text-xs text-ivory-muted">{o.address}</span>
                 {o.workingHours && (
