@@ -1,5 +1,6 @@
 import type { APIRoute } from "astro";
 import { prisma } from "@doza/db";
+import { officeQueries, precisionOf } from "@doza/shared/europost-address";
 
 export const prerender = false;
 
@@ -18,29 +19,16 @@ export const prerender = false;
  * Nominatim просит не чаще запроса в секунду и требует представляться. Отсюда
  * пауза и потолок на запуск: даже если размечать нужно всё, мы растянем это на
  * несколько дней, а не устроим чужому бесплатному сервису нашествие.
+ *
+ * Разбор адреса и оценка точности — общие с разовым скриптом
+ * `geocode-europost.mjs` (`@doza/shared/europost-address`). Раньше здесь лежала
+ * своя копия того же кода, и ошибка в ней жила своей жизнью.
  */
 const UA = "DOZA-parfum-shop/1.0 (https://doza-parfum.by; aclassaliance@gmail.com)";
 const PAUSE_MS = 1200;
 const MAX_PER_RUN = 40;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-/** «г. Новополоцк, ул. Еронько, 7а» → запросы от точного к общему. */
-function queries(address: string): string[] {
-  const clean = address.replace(/\s*\([^)]*\)/g, "").trim();
-  const parts = clean.split(",").map((s) => s.trim());
-  const city = parts[0].replace(/^(г\.|аг\.|гп\.|пгт\.|п\.|д\.)\s*/i, "").trim();
-  const street = (parts[1] ?? "")
-    .replace(/^(ул\.|пр-т\.|пр-т|пр\.|б-р\.|пер\.|ш\.|тр-т\.|мкр\.|пл\.|пр-д)\s*/i, "")
-    .trim();
-  const house = ((parts[2] ?? "").match(/^\d+[а-яa-z]?/i) ?? [""])[0];
-
-  return [
-    house && street ? `${city}, ${street} ${house}` : "",
-    street ? `${city}, ${street}` : "",
-    city,
-  ].filter(Boolean);
-}
 
 export const GET: APIRoute = async ({ request }) => {
   const secret = process.env.CRON_SECRET;
@@ -66,7 +54,7 @@ export const GET: APIRoute = async ({ request }) => {
   for (const office of todo) {
     let found: { lat: number; lng: number } | null = null;
 
-    for (const q of queries(office.address)) {
+    for (const { q } of officeQueries(office.address)) {
       try {
         const res = await fetch(
           "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=by&q=" +
@@ -74,8 +62,17 @@ export const GET: APIRoute = async ({ request }) => {
           { headers: { "User-Agent": UA } },
         );
         if (res.ok) {
-          const data = (await res.json()) as { lat: string; lon: string }[];
-          if (data[0]) found = { lat: Number(data[0].lat), lng: Number(data[0].lon) };
+          const data = (await res.json()) as {
+            lat: string;
+            lon: string;
+            addresstype?: string;
+          }[];
+          // Ответ уровня города отбрасываем: он выглядит как обычная точка, но
+          // означает «улицу найти не удалось, вот вам центр». Такая точка не
+          // просто бесполезна — она врёт покупателю про расстояние.
+          if (data[0] && precisionOf(data[0].addresstype) !== "locality") {
+            found = { lat: Number(data[0].lat), lng: Number(data[0].lon) };
+          }
         }
       } catch (e) {
         console.error(`[geocode] сбой запроса для «${q}»:`, e);

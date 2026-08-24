@@ -13,6 +13,7 @@
     "./bepaid-rules": "./src/bepaid-rules.ts",
     "./day-range": "./src/day-range.ts",
     "./delivery": "./src/delivery.ts",
-    "./geo": "./src/geo.ts"
+    "./geo": "./src/geo.ts",
+    "./europost-address": "./src/europost-address.ts"
   }
 }

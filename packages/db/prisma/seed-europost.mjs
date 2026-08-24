@@ -44,7 +44,14 @@ async function main() {
       isActive: true,
       // Координаты приходят из geocode-europost.mjs. Их отсутствие не мешает
       // выбрать отделение — просто не будет булавки на карте.
-      ...(lat != null && lng != null ? { latitude: lat, longitude: lng } : {}),
+      //
+      // Пустое значение записываем явно, а не пропускаем: справочник в репо —
+      // единственный источник правды по координатам. Пропуская null, мы
+      // оставляли бы в базе прежнюю точку, даже когда выяснилось, что она
+      // ошибочна. Отделения, размеченные ночной задачей, она же и восстановит
+      // в ближайшие сутки.
+      latitude: lat ?? null,
+      longitude: lng ?? null,
     };
     const existing = await prisma.europostOffice.findUnique({ where: { code } });
     if (existing) {
