@@ -5,7 +5,7 @@ import { normalizePhone } from "@doza/shared";
 
 export const prerender = false;
 
-import { ORDER_STATUS_PUBLIC_LABEL as ORDER_STATUS } from "@doza/db/order-rules";
+import { orderStatusPublicLabel } from "@doza/db/order-rules";
 
 export const GET: APIRoute = async ({ url }) => {
   const phone = normalizePhone(url.searchParams.get("phone") ?? "");
@@ -44,7 +44,7 @@ export const GET: APIRoute = async ({ url }) => {
       where: { customerId: customer.id },
       orderBy: { createdAt: "desc" },
       take: 20,
-      select: { id: true, createdAt: true, totalByn: true, status: true },
+      select: { id: true, createdAt: true, totalByn: true, status: true, deliveryType: true },
     }),
   ]);
 
@@ -62,7 +62,7 @@ export const GET: APIRoute = async ({ url }) => {
         id: o.id,
         date: o.createdAt.toISOString(),
         total: Number(o.totalByn),
-        status: ORDER_STATUS[o.status] ?? o.status,
+        status: orderStatusPublicLabel(o.status, o.deliveryType),
       })),
     }),
     { headers: { "Content-Type": "application/json" } },

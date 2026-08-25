@@ -4,7 +4,7 @@ import AccountPanel from "../components/AccountPanel.tsx";
 import { prisma } from "@doza/db";
 import { getBalance } from "@doza/db/loyalty";
 import { getCustomerId, clearSession } from "../lib/customer-auth";
-import { ORDER_STATUS_PUBLIC_LABEL } from "@doza/db/order-rules";
+import { orderStatusPublicLabel } from "@doza/db/order-rules";
 import { formatPhone } from "@doza/shared";
 
 const id = getCustomerId(Astro.cookies);
@@ -34,7 +34,7 @@ const [balance, batches, orders, dates] = await Promise.all([
     where: { customerId: id },
     orderBy: { createdAt: "desc" },
     take: 20,
-    select: { id: true, createdAt: true, totalByn: true, status: true },
+    select: { id: true, createdAt: true, totalByn: true, status: true, deliveryType: true },
   }),
   prisma.customerDate.findMany({
     where: { customerId: id },
@@ -46,7 +46,7 @@ const birthdayStr = customer.birthday
   ? customer.birthday.toISOString().slice(0, 10)
   : "";
 
-const STATUS = ORDER_STATUS_PUBLIC_LABEL;
+
 ---
 
 <Layout title="Личный кабинет — DOZA" noindex={true}>
@@ -60,7 +60,7 @@ const STATUS = ORDER_STATUS_PUBLIC_LABEL;
       phone={formatPhone(customer.phone)}
       balance={balance}
       batches={batches.map((b) => ({ amount: Number(b.amountByn), expiresAt: b.expiresAt?.toISOString() ?? null }))}
-      orders={orders.map((o) => ({ id: o.id, date: o.createdAt.toISOString(), total: Number(o.totalByn), status: STATUS[o.status] ?? o.status }))}
+      orders={orders.map((o) => ({ id: o.id, date: o.createdAt.toISOString(), total: Number(o.totalByn), status: orderStatusPublicLabel(o.status, o.deliveryType) }))}
       birthday={birthdayStr}
       dates={dates.map((d) => ({ id: d.id, date: d.date.toISOString(), description: d.description }))}
     />

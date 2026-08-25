@@ -85,7 +85,7 @@ export async function grantPoints(input: {
     await sendSmsFromCrm({
       kind: "points_manual",
       phone,
-      text: `Вам начислено ${fmt(amount)} бонусов: ${reason}. Всего бонусов: ${fmt(balance)}`,
+      text: `Вам начислено ${fmt(amount)} баллов: ${reason}. Всего баллов: ${fmt(balance)}`,
       customerId: customer.id,
       userId: Number(session.user.id),
     });

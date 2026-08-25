@@ -10,7 +10,13 @@ import {
   grantsCashback,
   consumesStock,
   requiresTracking,
+  notifiesReady,
   shippedSmsText,
+  shippedFixSmsText,
+  paidSmsText,
+  readySmsText,
+  orderStatusLabel,
+  orderStatusPublicLabel,
   refundReversal,
   ORDER_TRANSITIONS,
   ORDER_STATUS_LABEL,
@@ -95,6 +101,56 @@ test("SMS об отправке называет службу и номер", ()
     shippedSmsText("belpochta", "BY1").includes("Белпочта"),
     true,
   );
+});
+
+test("исправление отправки не выдаёт себя за новую отправку", () => {
+  // Случай из практики: продавец поправил службу в карточке уже после того,
+  // как ушла SMS. Повтор прежнего текста покупатель прочтёт как второй заказ.
+  const fix = shippedFixSmsText("belpochta", "BQ002520057BY");
+  assert.match(fix, /Белпочта/);
+  assert.match(fix, /BQ002520057BY/);
+  assert.ok(!fix.includes("уже отправлен"), fix);
+});
+
+// ── Самовывоз ───────────────────────────────────────────────────────────────
+
+test("самовывоз зовут за заказом, доставку — нет", () => {
+  assert.equal(notifiesReady("packed", "pickup"), true);
+  assert.equal(notifiesReady("packed", "europost"), false);
+  // Звать нужно на упаковке, а не раньше: собранного заказа ещё нет.
+  assert.equal(notifiesReady("decanted", "pickup"), false);
+});
+
+test("покупателю на самовывозе не обещают отправку", () => {
+  // Обещание «отправим в течение 2 рабочих дней» тому, кто придёт сам, —
+  // не мелкая неточность, а прямая дезинформация.
+  const самовывоз = paidSmsText("pickup", 0);
+  assert.ok(!самовывоз.includes("отправлен"), самовывоз);
+  assert.match(самовывоз, /забрать/);
+
+  assert.match(paidSmsText("europost", 0), /отправлен/);
+});
+
+test("начисленные баллы называются, только если они есть", () => {
+  assert.match(paidSmsText("post", 12), /начислено 12 баллов/);
+  assert.ok(!paidSmsText("post", 0).includes("начислено"));
+  // Дробные — без хвоста нулей: «12.5», а не «12.50».
+  assert.match(paidSmsText("post", 12.5), /начислено 12\.5 баллов/);
+});
+
+test("SMS о готовности зовёт по адресу", () => {
+  const t = readySmsText("г. Новополоцк, ул. Нефтяников, 6");
+  assert.match(t, /готов к выдаче/);
+  assert.match(t, /Нефтяников/);
+});
+
+test("при самовывозе шаги называются выдачей, а не отправкой", () => {
+  // Продавец не должен нажимать «Отправлен» на том, что человек забрал руками.
+  assert.equal(orderStatusLabel("packed", "pickup"), "Готов к выдаче");
+  assert.equal(orderStatusLabel("shipped", "pickup"), "Выдан");
+  assert.equal(orderStatusLabel("shipped", "europost"), "Отправлен");
+  assert.equal(orderStatusPublicLabel("packed", "pickup"), "Готов к выдаче");
+  assert.equal(orderStatusPublicLabel("decanted", "pickup"), "Собираем");
 });
 
 test("возврат оплаченного откатывает кешбек и склад на любом шаге", () => {

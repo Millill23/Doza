@@ -116,6 +116,11 @@ export function consumesStock(_to: OrderStatusValue): boolean {
   return false;
 }
 
+/** Заказ забирают сами — посылки, а значит и отслеживания, не будет. */
+export function isPickup(deliveryType: string): boolean {
+  return deliveryType === "pickup";
+}
+
 /**
  * Нужны ли трек-номер и служба доставки для перехода.
  *
@@ -126,7 +131,73 @@ export function requiresTracking(
   to: OrderStatusValue,
   deliveryType: string,
 ): boolean {
-  return to === "shipped" && deliveryType !== "pickup";
+  return to === "shipped" && !isPickup(deliveryType);
+}
+
+/**
+ * Пора ли звать покупателя за заказом.
+ *
+ * Для самовывоза «упакован» и означает «готов к выдаче»: отдельного статуса
+ * заводить не нужно, а вот сказать человеку, что можно приходить, — нужно.
+ * Раньше самовывоз не получал ни одной SMS после оплаты: покупателю обещали
+ * отправку, которой не будет, и молчали до последнего.
+ */
+export function notifiesReady(to: OrderStatusValue, deliveryType: string): boolean {
+  return to === "packed" && isPickup(deliveryType);
+}
+
+/**
+ * Самовывоз меняет смысл двух последних шагов: заказ не отправляют, а выдают.
+ * Продавец не должен нажимать «Отправлен» на том, что человек забрал руками.
+ */
+const PICKUP_LABEL: Partial<Record<OrderStatusValue, string>> = {
+  packed: "Готов к выдаче",
+  shipped: "Выдан",
+};
+
+export function orderStatusLabel(
+  status: OrderStatusValue,
+  deliveryType: string,
+): string {
+  if (isPickup(deliveryType) && PICKUP_LABEL[status]) return PICKUP_LABEL[status]!;
+  return ORDER_STATUS_LABEL[status];
+}
+
+export function orderStatusPublicLabel(
+  status: OrderStatusValue,
+  deliveryType: string,
+): string {
+  if (isPickup(deliveryType) && PICKUP_LABEL[status]) return PICKUP_LABEL[status]!;
+  return ORDER_STATUS_PUBLIC_LABEL[status];
+}
+
+// ── Тексты SMS ──────────────────────────────────────────────────────────────
+// Живут рядом с правилами, а не в местах отправки: текст зависит от способа
+// получения, и держать эту развилку под тестами дешевле, чем узнавать о ней
+// от покупателя.
+
+/** Баллы без лишних нулей: 12 вместо 12.00, но 12.5 — как есть. */
+function points(n: number): string {
+  return Number.isInteger(n) ? String(n) : String(Number(n.toFixed(2)));
+}
+
+/**
+ * SMS сразу после оплаты.
+ *
+ * Про отправку говорим только тем, кому действительно отправляют: обещание
+ * «отправим в течение 2 рабочих дней» человеку, который придёт в магазин
+ * сам, — не мелкая неточность, а прямая дезинформация.
+ */
+export function paidSmsText(deliveryType: string, earned: number): string {
+  const head = isPickup(deliveryType)
+    ? "Здравствуйте! Спасибо за покупку. Ваш заказ будет укомплектован в ближайшее время — мы сообщим, когда его можно забрать."
+    : "Здравствуйте! Спасибо за покупку. Ваш заказ будет укомплектован и отправлен в течение 2 рабочих дней.";
+  return head + (earned > 0 ? ` За покупку вам начислено ${points(earned)} баллов.` : "");
+}
+
+/** SMS покупателю, когда заказ на самовывоз готов. */
+export function readySmsText(address: string): string {
+  return `Здравствуйте! Ваш заказ готов к выдаче. Ждём вас: ${address}`;
 }
 
 /** Текст SMS покупателю об отправке. */
@@ -135,6 +206,21 @@ export function shippedSmsText(
   tracking: string,
 ): string {
   return `Здравствуйте, ваш заказ уже отправлен! Способ доставки - ${DELIVERY_SERVICE_LABEL[service]}. Трек номер для отслеживания - ${tracking}`;
+}
+
+/**
+ * SMS об исправлении данных отправки.
+ *
+ * Отдельный текст, а не повтор прежнего: у покупателя на руках уже лежит
+ * сообщение с другой службой или другим номером, и второе «ваш заказ уже
+ * отправлен!» он прочтёт как второй заказ. Именно так и вышло однажды —
+ * продавец поправил службу в карточке, а человек остался с неверной SMS.
+ */
+export function shippedFixSmsText(
+  service: DeliveryServiceValue,
+  tracking: string,
+): string {
+  return `Уточнение по вашему заказу: способ доставки - ${DELIVERY_SERVICE_LABEL[service]}, трек номер - ${tracking}. Извините за неточность в предыдущем сообщении.`;
 }
 
 export interface RefundReversal {

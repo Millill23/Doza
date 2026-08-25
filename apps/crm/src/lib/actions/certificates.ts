@@ -188,7 +188,7 @@ export async function activateCertificateInCrm(input: {
     await sendSmsFromCrm({
       kind: "certificate",
       phone,
-      text: `Сертификат активирован! Вам начислено ${fmt(result.awarded)} бонусов. Всего бонусов: ${fmt(result.balance)}`,
+      text: `Сертификат активирован! Вам начислено ${fmt(result.awarded)} баллов. Всего баллов: ${fmt(result.balance)}`,
       customerId: result.customerId,
       userId: activatedById,
     });

@@ -3,13 +3,12 @@ import { notFound } from "next/navigation";
 import { prisma } from "@doza/db";
 import { formatByn, formatPhone } from "@doza/shared";
 import {
-  ORDER_STATUS_LABEL,
   ORDER_STATUS_STYLE,
   DELIVERY_LABEL,
   DELIVERY_SERVICE_LABEL,
   PAYMENT_STATUS_LABEL,
 } from "@/lib/labels";
-import type { OrderStatusValue } from "@doza/db/order-rules";
+import { orderStatusLabel, type OrderStatusValue } from "@doza/db/order-rules";
 import OrderActions from "@/components/OrderActions";
 import { requireRole } from "@/lib/session";
 
@@ -44,7 +43,7 @@ export default async function OrderDetailPage({
       <div className="mb-6 flex items-center gap-4">
         <h1 className="font-serif text-3xl text-ivory">Заказ #{order.id}</h1>
         <span className={`rounded-full border px-3 py-1 text-xs ${ORDER_STATUS_STYLE[order.status]}`}>
-          {ORDER_STATUS_LABEL[order.status]}
+          {orderStatusLabel(order.status, order.deliveryType)}
         </span>
       </div>
 

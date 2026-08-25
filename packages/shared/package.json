@@ -14,6 +14,7 @@
     "./day-range": "./src/day-range.ts",
     "./delivery": "./src/delivery.ts",
     "./geo": "./src/geo.ts",
-    "./europost-address": "./src/europost-address.ts"
+    "./europost-address": "./src/europost-address.ts",
+    "./company": "./src/company.ts"
   }
 }

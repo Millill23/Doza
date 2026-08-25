@@ -432,8 +432,8 @@ export async function createOfflineSale(input: CreateSaleInput) {
       const text = cashbackBlocked
         ? `Спасибо за покупку! Баллы не начислены: подтвердите согласие на обработку данных по ссылке из SMS.`
         : earned > 0
-          ? `Спасибо за покупку! Вам начислено ${fmtPoints(earned)} бонусов. Всего бонусов: ${fmtPoints(balance)}`
-          : `Спасибо за покупку! Всего бонусов: ${fmtPoints(balance)}`;
+          ? `Спасибо за покупку! Вам начислено ${fmtPoints(earned)} баллов. Всего баллов: ${fmtPoints(balance)}`
+          : `Спасибо за покупку! Всего баллов: ${fmtPoints(balance)}`;
       await sendSmsFromCrm({
         kind: "purchase",
         phone: toStoredPhone(input.phone),

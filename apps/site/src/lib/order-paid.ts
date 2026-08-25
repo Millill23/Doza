@@ -1,5 +1,6 @@
 import { prisma } from "@doza/db";
 import { settlePaidOrder } from "@doza/db/payments";
+import { paidSmsText } from "@doza/db/order-rules";
 import { notifyOrder } from "./order-notify";
 import { notifyTelegram } from "./telegram";
 import { sendSmsFromSite } from "./sms";
@@ -64,28 +65,21 @@ async function loyaltyDays(): Promise<number> {
  * Про баллы пишем, только если они действительно начислены. Без согласия на
  * обработку данных начисления не будет, и называть сумму в SMS значило бы
  * соврать — тем более что человек по этой SMS пойдёт её искать.
+ *
+ * Текст зависит от способа получения: самовывозу не обещаем отправку. Сам
+ * текст лежит в `order-rules` под тестами — развилку легко потерять.
  */
 async function sendPaidSms(orderId: number, earned: number): Promise<void> {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { customerPhone: true, customerId: true },
+    select: { customerPhone: true, customerId: true, deliveryType: true },
   });
   if (!order) return;
-
-  const text =
-    "Здравствуйте! Спасибо за покупку. Ваш заказ будет укомплектован и " +
-    "отправлен в течение 2 рабочих дней." +
-    (earned > 0 ? ` За покупку вам начислено ${fmtPoints(earned)} баллов.` : "");
 
   await sendSmsFromSite({
     kind: "order_paid",
     phone: order.customerPhone,
-    text,
+    text: paidSmsText(order.deliveryType, earned),
     customerId: order.customerId,
   });
-}
-
-/** Баллы без лишних нулей: 12 вместо 12.00, но 12.5 — как есть. */
-function fmtPoints(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/, "");
 }

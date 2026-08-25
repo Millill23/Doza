@@ -3,7 +3,7 @@ import { prisma } from "@doza/db";
 import { formatByn, formatPhone } from "@doza/shared";
 import { ORDER_STATUS_LABEL, ORDER_STATUS_STYLE, DELIVERY_LABEL } from "@/lib/labels";
 import { requireRole } from "@/lib/session";
-import type { OrderStatusValue } from "@doza/db/order-rules";
+import { orderStatusLabel, type OrderStatusValue } from "@doza/db/order-rules";
 
 export const dynamic = "force-dynamic";
 
@@ -96,7 +96,7 @@ export default async function OrdersPage({
                   <td className="px-4 py-3 text-gold-400">{formatByn(Number(o.totalByn))}</td>
                   <td className="px-4 py-3">
                     <span className={`rounded-full border px-2.5 py-1 text-xs ${ORDER_STATUS_STYLE[o.status]}`}>
-                      {ORDER_STATUS_LABEL[o.status]}
+                      {orderStatusLabel(o.status, o.deliveryType)}
                     </span>
                     {/* Неоплаченный заказ собирать нельзя — видно сразу в списке. */}
                     {o.paymentStatus !== "paid" && (

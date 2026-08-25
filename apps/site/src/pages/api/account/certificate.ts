@@ -72,7 +72,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     await sendSmsFromSite({
       kind: "certificate",
       phone: result.customerPhone,
-      text: `Сертификат активирован! Вам начислено ${fmt(result.awarded)} бонусов. Всего бонусов: ${fmt(result.balance)}`,
+      text: `Сертификат активирован! Вам начислено ${fmt(result.awarded)} баллов. Всего баллов: ${fmt(result.balance)}`,
       customerId: result.customerId,
     });
   } catch (e) {

@@ -8,7 +8,10 @@ import {
   canTransition,
   canClose,
   requiresTracking,
+  notifiesReady,
   shippedSmsText,
+  shippedFixSmsText,
+  readySmsText,
   refundReversal,
   ORDER_STATUS_LABEL,
   DELIVERY_SERVICE_LABEL,
@@ -16,6 +19,7 @@ import {
   type DeliveryServiceValue,
 } from "@doza/db/order-rules";
 import { refundPayment } from "@doza/shared/bepaid";
+import { COMPANY } from "@doza/shared/company";
 import { formatByn } from "@doza/shared";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/session";
@@ -47,7 +51,11 @@ export interface StatusChangeInput {
   next: OrderStatusValue;
   /** Обязательны при переходе в «отправлен» для посылки. */
   trackingNumber?: string;
-  deliveryService?: DeliveryServiceValue;
+  /**
+   * null — продавец ещё не выбрал службу. Это разрешённое состояние: угадывать
+   * за него нельзя, название службы уходит покупателю в SMS.
+   */
+  deliveryService?: DeliveryServiceValue | null;
 }
 
 /**
@@ -102,8 +110,8 @@ export async function changeOrderStatus(input: StatusChangeInput) {
     },
   });
 
-  // SMS об отправке — после сохранения статуса: сбой отправки не должен
-  // откатывать уже упакованную и переданную почте посылку.
+  // SMS — после сохранения статуса: сбой отправки не должен откатывать уже
+  // упакованную и переданную почте посылку.
   if (needsTracking && service) {
     try {
       await sendSmsFromCrm({
@@ -115,6 +123,22 @@ export async function changeOrderStatus(input: StatusChangeInput) {
       });
     } catch (e) {
       console.error("[orders] SMS об отправке не отправлена:", e);
+    }
+  }
+
+  // Самовывоз: посылки нет, но человека надо позвать — иначе он не узнает,
+  // что заказ собран, вообще ниоткуда.
+  if (notifiesReady(next, order.deliveryType)) {
+    try {
+      await sendSmsFromCrm({
+        kind: "order_ready",
+        phone: order.customerPhone,
+        text: readySmsText(COMPANY.actualAddress),
+        customerId: order.customerId,
+        userId,
+      });
+    } catch (e) {
+      console.error("[orders] SMS о готовности не отправлена:", e);
     }
   }
 
@@ -250,19 +274,65 @@ export async function closeOrder(orderId: number) {
   revalidatePath("/orders");
 }
 
-/** Служба доставки и трек-номер — можно поправить после отправки. */
+/**
+ * Служба доставки и трек-номер — можно поправить после отправки.
+ *
+ * Если заказ уже отправлен и данные действительно изменились, покупателю
+ * уходит уточняющая SMS. Раньше правка была молчаливой, и получалось худшее из
+ * возможного: в CRM одна служба доставки, у человека на руках SMS с другой, и
+ * увидеть это расхождение было неоткуда. Так и случилось — заказ ушёл
+ * Белпочтой, а покупателю сообщили про Европочту.
+ */
 export async function setTracking(
   orderId: number,
   tracking: string,
   service: DeliveryServiceValue | null,
 ) {
-  await requireRole(["admin", "seller"]);
+  const session = await requireRole(["admin", "seller"]);
+  const userId = Number(session.user.id);
+
+  const before = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: {
+      status: true,
+      trackingNumber: true,
+      deliveryService: true,
+      customerPhone: true,
+      customerId: true,
+    },
+  });
+  if (!before) throw new Error("Заказ не найден");
+
+  const nextTracking = tracking.trim() || null;
+  const nextService = service ?? (before.deliveryService as DeliveryServiceValue | null);
+
   await prisma.order.update({
     where: { id: orderId },
     data: {
-      trackingNumber: tracking.trim() || null,
+      trackingNumber: nextTracking,
       ...(service ? { deliveryService: service } : {}),
     },
   });
+
+  // Молчим, пока заказ не отправлен: до этого покупателю ещё ничего не
+  // обещали, и уточнять нечего.
+  const changed =
+    before.trackingNumber !== nextTracking ||
+    before.deliveryService !== nextService;
+
+  if (before.status === "shipped" && changed && nextService && nextTracking) {
+    try {
+      await sendSmsFromCrm({
+        kind: "order_shipped_fix",
+        phone: before.customerPhone,
+        text: shippedFixSmsText(nextService, nextTracking),
+        customerId: before.customerId,
+        userId,
+      });
+    } catch (e) {
+      console.error("[orders] SMS с уточнением не отправлена:", e);
+    }
+  }
+
   revalidatePath(`/orders/${orderId}`);
 }
