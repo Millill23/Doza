@@ -66,6 +66,7 @@ const DISCOUNT_LABEL: Record<string, string> = {
   vip: "VIP",
   social: "за подписки",
   date: "по памятной дате",
+  remnant: "остаток во флаконе",
   promo: "акция",
   super: "супер-акция",
   none: "",
@@ -142,6 +143,8 @@ interface CreateSaleInput {
   socialSubscribe?: boolean;
   /** Скидка 5% за отметку в сторис. */
   socialStory?: boolean;
+  /** Скидка за остаток во флаконе — продавец ставит вручную. */
+  remnant?: boolean;
   /** Применить разовую скидку по памятной дате (покупатель согласился). */
   useDateReward?: boolean;
   /**
@@ -229,6 +232,10 @@ export async function createOfflineSale(input: CreateSaleInput) {
   // Подписка и сторис — одна механика, поэтому суммируются между собой.
   const socialPct = subscribePct + storyPct;
 
+  // Остаток во флаконе — своя механика: с соцскидками не складывается,
+  // движок возьмёт то, что выгоднее покупателю.
+  const remnantPct = input.remnant ? await getSetting("remnant_percent", 20) : 0;
+
   const [globalPromo, superPromo, promoRows] = await Promise.all([
     getGlobalPromo(),
     getActiveSuperPromo(),
@@ -280,6 +287,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
     vipPercent: vipPct,
     socialPercent: socialPct,
     datePercent: dateReward?.percent ?? 0,
+    remnantPercent: remnantPct,
     productPromoPercent,
     allProductsPromoPercent: globalPromo.discountPercent,
     superPromo,

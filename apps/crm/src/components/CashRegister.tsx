@@ -82,6 +82,7 @@ export default function CashRegister({
   currentUserId,
   subscribePercent = 5,
   storyPercent = 5,
+  remnantPercent = 20,
 }: {
   products: ProductOpt[];
   atomizers: AtomizerOpt[];
@@ -91,6 +92,7 @@ export default function CashRegister({
   currentUserId: number;
   subscribePercent?: number;
   storyPercent?: number;
+  remnantPercent?: number;
 }) {
   const [query, setQuery] = useState("");
   const [brandFilter, setBrandFilter] = useState<string | null>(null);
@@ -116,6 +118,8 @@ export default function CashRegister({
   const [vipPercent, setVipPercent] = useState(0);
   const [subscribe, setSubscribe] = useState(false);
   const [story, setStory] = useState(false);
+  /** Флакон почти пуст — продавец отдаёт остаток дешевле. */
+  const [remnant, setRemnant] = useState(false);
   const [sellerId, setSellerId] = useState<number>(currentUserId);
   const [usePoints, setUsePoints] = useState(false);
   const [spend, setSpend] = useState(0);
@@ -182,6 +186,7 @@ export default function CashRegister({
       vipPercent,
       socialPercent,
       datePercent: useDate ? (dateReward?.percent ?? 0) : 0,
+      remnantPercent: remnant ? remnantPercent : 0,
       productPromoPercent: promoMap,
       superPromo: superPromo
         ? {
@@ -190,7 +195,16 @@ export default function CashRegister({
           }
         : null,
     });
-  }, [cart, vipPercent, socialPercent, useDate, dateReward, superPromo]);
+  }, [
+    cart,
+    vipPercent,
+    socialPercent,
+    useDate,
+    dateReward,
+    superPromo,
+    remnant,
+    remnantPercent,
+  ]);
 
   const total = priced.gross;
   const netTotal = priced.net;
@@ -305,6 +319,7 @@ export default function CashRegister({
     setVipPercent(0);
     setSubscribe(false);
     setStory(false);
+    setRemnant(false);
     setUsePoints(false);
     setSpend(0);
     setOtp("");
@@ -348,6 +363,7 @@ export default function CashRegister({
           phone: foundName ? BELARUS_PREFIX + phone : undefined,
           loyaltySpend: effSpend,
           loyaltyOtp: otp || undefined,
+          remnant,
           socialSubscribe: subscribe,
           socialStory: story,
           useDateReward: useDate,
@@ -606,10 +622,10 @@ export default function CashRegister({
           )}
         </div>
 
-        {/* Скидки за соцсети */}
+        {/* Скидки, которые ставит продавец */}
         <div className="border-t border-ink-600/60 pt-4">
           <label className="mb-1.5 block text-xs uppercase tracking-wide text-gold-500">
-            Скидка за соцсети
+            Скидки продавца
           </label>
           <div className="flex flex-wrap gap-2">
             <button
@@ -626,7 +642,22 @@ export default function CashRegister({
             >
               −{storyPercent}% сторис
             </button>
+            {/* Своя механика: с подписками не складывается, поэтому и стоит
+                отдельно, а не третьей кнопкой соцсетей. */}
+            <button
+              type="button"
+              onClick={() => setRemnant((v) => !v)}
+              className={chipCls(remnant)}
+            >
+              −{remnantPercent}% остаток во флаконе
+            </button>
           </div>
+          {remnant && socialPercent > 0 && (
+            <p className="mt-1.5 text-xs text-ivory-faint">
+              Остаток не складывается с подписками — применится то, что выгоднее
+              клиенту.
+            </p>
+          )}
           {socialPercent > 0 && vipPercent > 0 && (
             <p className="mt-1.5 text-xs text-ivory-faint">
               Не суммируется с VIP — применится то, что выгоднее клиенту.

@@ -370,3 +370,83 @@ test("акция выгоднее скидки по дате — дата не �
   assert.equal(r.net, 70);
   assert.equal(r.kind, "promo");
 });
+
+// ── Остаток во флаконе ──────────────────────────────────────────────────────
+// Продавец ставит её вручную, когда флакон почти пуст. Своя механика, а не
+// разновидность соцскидки: та даётся за действие покупателя и суммируется
+// сама с собой, эта — за состояние товара.
+
+test("скидка за остаток применяется ко всему чеку", () => {
+  const r = priceCart({
+    lines: [
+      { productId: 1, qty: 1, unitPrice: 100 },
+      { productId: 2, qty: 2, unitPrice: 50 },
+    ],
+    remnantPercent: 20,
+  });
+  assert.equal(r.net, 160); // 80 + 40*2
+  assert.equal(r.kind, "remnant");
+});
+
+test("остаток не складывается с подписками", () => {
+  const r = priceCart({
+    lines: [{ productId: 1, qty: 1, unitPrice: 100 }],
+    remnantPercent: 20,
+    socialPercent: 10,
+  });
+  // 20%, а не 30%: иначе остаток у подписчика уходил бы за треть цены.
+  assert.equal(r.net, 80);
+  assert.equal(r.kind, "remnant");
+});
+
+test("остаток не складывается с VIP, но и не отменяет его", () => {
+  // VIP даёт те же 20% — покупатель платит столько же, а не вдвое меньше.
+  const равные = priceCart({
+    lines: [{ productId: 1, qty: 1, unitPrice: 100 }],
+    remnantPercent: 20,
+    vipPercent: 20,
+  });
+  assert.equal(равные.net, 80);
+  assert.equal(равные.kind, "vip", "при равенстве отчитываемся о праве клиента");
+
+  // А если остаток щедрее — выигрывает он.
+  const щедрее = priceCart({
+    lines: [{ productId: 1, qty: 1, unitPrice: 100 }],
+    remnantPercent: 30,
+    vipPercent: 20,
+  });
+  assert.equal(щедрее.net, 70);
+  assert.equal(щедрее.kind, "remnant");
+});
+
+test("остаток не складывается с акцией товара", () => {
+  const r = priceCart({
+    lines: [{ productId: 1, qty: 1, unitPrice: 100 }],
+    productPromoPercent: { 1: 15 },
+    remnantPercent: 20,
+  });
+  assert.equal(r.net, 80, "берётся максимум, а не 15% + 20%");
+  assert.equal(r.kind, "remnant");
+});
+
+test("акция выгоднее остатка — остаток не всплывает в отчёте", () => {
+  const r = priceCart({
+    lines: [{ productId: 1, qty: 1, unitPrice: 100 }],
+    productPromoPercent: { 1: 40 },
+    remnantPercent: 20,
+  });
+  assert.equal(r.net, 60);
+  assert.equal(r.kind, "promo");
+});
+
+test("остаток вместе с датой: дата не тратится впустую", () => {
+  // Одноразовую скидку по дате нельзя списывать ради результата, который уже
+  // даёт остаток, — это молча отнимает у покупателя подарок.
+  const r = priceCart({
+    lines: [{ productId: 1, qty: 1, unitPrice: 100 }],
+    remnantPercent: 20,
+    datePercent: 20,
+  });
+  assert.equal(r.net, 80);
+  assert.equal(r.kind, "remnant");
+});

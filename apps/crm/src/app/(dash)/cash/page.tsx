@@ -46,7 +46,15 @@ export default async function CashPage() {
         })
       : Promise.resolve([]),
     prisma.setting.findMany({
-      where: { key: { in: ["social_subscribe_percent", "social_story_percent"] } },
+      where: {
+        key: {
+          in: [
+            "social_subscribe_percent",
+            "social_story_percent",
+            "remnant_percent",
+          ],
+        },
+      },
     }),
   ]);
 
@@ -113,6 +121,7 @@ export default async function CashPage() {
         currentUserId={Number(session.user.id)}
         subscribePercent={settingNum("social_subscribe_percent", 5)}
         storyPercent={settingNum("social_story_percent", 5)}
+        remnantPercent={settingNum("remnant_percent", 20)}
       />
     </div>
   );
