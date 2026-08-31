@@ -341,14 +341,7 @@ export default function CatalogApp({
           >
             <path d="M20 12v9H4v-9M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
           </svg>
-          <span>
-            <span className="block text-sm text-ivory">
-              Подарочный сертификат
-            </span>
-            <span className="mt-0.5 block text-xs font-light text-ivory-faint">
-              Когда не угадать с ароматом — пусть выберет сам
-            </span>
-          </span>
+          <span className="text-sm text-ivory">Подарочный сертификат</span>
         </span>
         <span className="shrink-0 text-sm text-gold-400">Выбрать →</span>
       </a>
