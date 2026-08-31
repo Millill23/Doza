@@ -109,7 +109,13 @@ export async function quoteCart(
 
   // Сертификаты проверяем до всего остального: ошибка в номинале не должна
   // всплывать после того, как посчитаны цены и проверены остатки.
-  const certVerdict = validateCertificateLines(certLines);
+  //
+  // Номер получателя требуем только при оформлении (`checkStock`): в
+  // предпросмотре корзины его нет — телефон незачем гонять на сервер при
+  // каждом пересчёте.
+  const certVerdict = validateCertificateLines(certLines, {
+    requireRecipient: opts.checkStock === true,
+  });
   if (!certVerdict.ok) throw new CartError(certVerdict.error);
 
   // Скидки на сертификат не действуют — кроме VIP, ровно как в кассе.

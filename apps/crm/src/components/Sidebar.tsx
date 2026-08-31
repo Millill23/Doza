@@ -27,6 +27,7 @@ const NAV: { href: string; label: string; roles: Role[] }[] = [
   { href: "/sms", label: "SMS-рассылки", roles: ["admin"] },
   { href: "/settings", label: "Настройки", roles: ["admin"] },
   { href: "/users", label: "Пользователи", roles: ["admin"] },
+  { href: "/tests", label: "Тесты", roles: ["admin"] },
 ];
 
 const ROLE_LABEL: Record<Role, string> = {

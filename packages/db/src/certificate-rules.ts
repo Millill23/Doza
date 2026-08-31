@@ -238,19 +238,24 @@ export type CertificateLineError =
 /**
  * Проверить строку сертификата.
  *
- * Телефон получателя проверяет вызывающий код — формат номера живёт в
- * `@doza/shared/phone`, а сюда его тянуть нельзя: `@doza/db` от `@doza/shared`
- * не зависит.
+ * `requireRecipient` — нужен ли уже номер получателя. При расчёте корзины его
+ * нет и быть не должно: телефон получателя незачем гонять на сервер при каждом
+ * пересчёте, и подарок не должен «дорожать» из-за того, что покупатель ещё не
+ * дошёл до формы. Проверяем его при оформлении.
+ *
+ * Сам формат номера проверяет вызывающий код: он живёт в `@doza/shared/phone`,
+ * а сюда его тянуть нельзя — `@doza/db` от `@doza/shared` не зависит.
  */
 export function validateCertificateLine(
   line: CertificateOrderLine,
+  opts: { requireRecipient?: boolean } = {},
 ): CertificateLineError {
   if (!isValidDenomination(Number(line.denomination))) {
     return { ok: false, error: "Выберите номинал сертификата из списка" };
   }
 
   if (line.sendBySms) {
-    if (!(line.recipientPhone ?? "").trim()) {
+    if (opts.requireRecipient && !(line.recipientPhone ?? "").trim()) {
       return {
         ok: false,
         error: "Укажите номер, на который отправить сертификат",
@@ -270,6 +275,7 @@ export function validateCertificateLine(
 /** Проверить весь набор сертификатов в заказе. */
 export function validateCertificateLines(
   lines: CertificateOrderLine[],
+  opts: { requireRecipient?: boolean } = {},
 ): CertificateLineError {
   if (lines.length > MAX_CERTIFICATES_PER_ORDER) {
     return {
@@ -278,7 +284,7 @@ export function validateCertificateLines(
     };
   }
   for (const line of lines) {
-    const verdict = validateCertificateLine(line);
+    const verdict = validateCertificateLine(line, opts);
     if (!verdict.ok) return verdict;
   }
   return { ok: true };

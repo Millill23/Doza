@@ -48,6 +48,8 @@ interface DeliveryInfo {
   missingForFree: number;
   free: boolean;
   hint: string | null;
+  /** Есть ли что везти. false — в заказе только электронные сертификаты. */
+  needed?: boolean;
 }
 
 /** Общий вид поля ввода — их в форме доставки восемь. */
@@ -210,6 +212,8 @@ export default function CartApp() {
   const discount = quote?.discount ?? 0;
 
 
+  // Везти нечего — только электронные сертификаты. Сервер считает так же.
+  const shipping = deliveryInfo?.needed ?? true;
   const deliveryFee = deliveryInfo?.fee ?? 0;
   // Баллами платят за товар, но не за доставку: иначе бесплатная доставка
   // получалась бы за чужой счёт.
@@ -241,7 +245,7 @@ export default function CartApp() {
     const deliveryData = {
       lastName, firstName, middleName, postalCode, region, city, address,
     };
-    if (needsPostalAddress(delivery)) {
+    if (shipping && needsPostalAddress(delivery)) {
       const bad = validateDelivery(deliveryData);
       if (bad) {
         setError(bad);
@@ -251,7 +255,7 @@ export default function CartApp() {
 
     // Европочта: посылку выдают по паспорту и извещению, поэтому ФИО,
     // телефон получателя и отделение обязательны.
-    if (needsOffice(delivery)) {
+    if (shipping && needsOffice(delivery)) {
       if (!epLastName.trim() || !epFirstName.trim() || !epMiddleName.trim()) {
         setError("Укажите фамилию, имя и отчество получателя");
         return;
@@ -524,7 +528,10 @@ export default function CartApp() {
           </>
         )}
 
-        {/* Способ получения */}
+        {/* Способ получения. Прячем целиком, когда везти нечего: заказ из
+            одних электронных сертификатов уходит ссылкой в SMS, и спрашивать
+            адрес или отделение не за что. */}
+        {shipping && (
         <div>
           <span className="mb-1.5 block text-xs uppercase tracking-luxe text-gold-500">
             Способ получения
@@ -552,8 +559,9 @@ export default function CartApp() {
             </p>
           )}
         </div>
+        )}
 
-        {needsPostalAddress(delivery) && (
+        {shipping && needsPostalAddress(delivery) && (
           <div className="space-y-3 rounded-lg border border-ink-600/60 bg-ink-800/40 p-4">
             <h3 className="text-xs uppercase tracking-luxe text-gold-500">
               Данные для доставки
@@ -613,7 +621,7 @@ export default function CartApp() {
           </div>
         )}
 
-        {needsOffice(delivery) && (
+        {shipping && needsOffice(delivery) && (
           <div className="space-y-3 rounded-lg border border-ink-600/60 bg-ink-800/40 p-4">
             <h3 className="text-xs uppercase tracking-luxe text-gold-500">
               Получатель и отделение

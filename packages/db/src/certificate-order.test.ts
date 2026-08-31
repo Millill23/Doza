@@ -81,10 +81,20 @@ test("смешанный заказ: один электронный, один �
 
 // ── Проверка строки ─────────────────────────────────────────────────────────
 
-test("для электронного нужен номер получателя", () => {
-  const v = validateCertificateLine({ denomination: 100, sendBySms: true });
+test("при оформлении для электронного нужен номер получателя", () => {
+  const v = validateCertificateLine(
+    { denomination: 100, sendBySms: true },
+    { requireRecipient: true },
+  );
   assert.equal(v.ok, false);
   assert.ok(!v.ok && /номер/.test(v.error));
+});
+
+test("в предпросмотре корзины номер не требуется", () => {
+  // Телефон получателя незачем гонять на сервер при каждом пересчёте, и
+  // подарок не должен «дорожать» из-за того, что до формы ещё не дошли.
+  const v = validateCertificateLine({ denomination: 100, sendBySms: true });
+  assert.equal(v.ok, true);
 });
 
 test("бумажному номер получателя не нужен", () => {
@@ -92,12 +102,15 @@ test("бумажному номер получателя не нужен", () =>
 });
 
 test("поздравление ограничено по длине", () => {
-  const v = validateCertificateLine({
-    denomination: 100,
-    sendBySms: true,
-    recipientPhone: "375291234567",
-    message: "я".repeat(GIFT_MESSAGE_MAX + 1),
-  });
+  const v = validateCertificateLine(
+    {
+      denomination: 100,
+      sendBySms: true,
+      recipientPhone: "375291234567",
+      message: "я".repeat(GIFT_MESSAGE_MAX + 1),
+    },
+    { requireRecipient: true },
+  );
   assert.equal(v.ok, false);
   assert.ok(!v.ok && /длиннее/.test(v.error));
 });

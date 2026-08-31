@@ -433,3 +433,43 @@ export async function findCertificateByToken(token: string) {
     },
   });
 }
+
+/**
+ * Выдать сертификату публичную ссылку, если её ещё нет.
+ *
+ * Сертификаты, выпущенные продавцом в CRM до появления онлайн-продажи, живут
+ * без токена: их код передавали из рук в руки. Чтобы отправить такой ссылкой,
+ * токен нужно завести — но только один раз, иначе прежняя ссылка перестанет
+ * работать у того, кому её уже отправили.
+ */
+export async function ensureGiftToken(certificateId: number): Promise<string> {
+  const cert = await prisma.giftCertificate.findUnique({
+    where: { id: certificateId },
+    select: { publicToken: true },
+  });
+  if (!cert) throw new CertificateError("Сертификат не найден");
+  if (cert.publicToken) return cert.publicToken;
+
+  const publicToken = crypto.randomBytes(16).toString("hex");
+  await prisma.giftCertificate.update({
+    where: { id: certificateId },
+    data: { publicToken },
+  });
+  return publicToken;
+}
+
+/**
+ * Записать поздравление на сертификат.
+ *
+ * Нужно, когда ссылку отправляют вручную из CRM: покупатель мог попросить
+ * подписать подарок уже после покупки.
+ */
+export async function setGiftMessage(
+  certificateId: number,
+  message: string | null,
+): Promise<void> {
+  await prisma.giftCertificate.update({
+    where: { id: certificateId },
+    data: { giftMessage: (message ?? "").trim() || null },
+  });
+}

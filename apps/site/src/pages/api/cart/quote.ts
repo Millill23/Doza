@@ -6,6 +6,10 @@ import { quoteCart, vipPercentFor, CartError } from "../../../lib/cart-pricing";
 import { offerProductIds } from "../../../lib/upsell";
 import { findUsablePromoCode } from "@doza/db/promo-codes";
 import {
+  needsShipping,
+  type CertificateOrderLine,
+} from "@doza/db/certificate-rules";
+import {
   DELIVERY_CHOICES,
   deliveryCost,
   freeDeliveryHint,
@@ -25,6 +29,9 @@ export const prerender = false;
 export const POST: APIRoute = async ({ request, cookies }) => {
   const body = await request.json().catch(() => ({}));
   const items = Array.isArray(body.items) ? body.items : [];
+  const certificates: CertificateOrderLine[] = Array.isArray(body.certificates)
+    ? body.certificates
+    : [];
   const deliveryType: DeliveryTypeValue = DELIVERY_CHOICES.includes(body.deliveryType)
     ? body.deliveryType
     : "pickup";
@@ -52,7 +59,12 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
   // Пустую корзину считать нечего, но данные аккаунта отдать всё равно нужно:
   // по ним корзина решает, показывать ли поля телефона и имени.
-  if (items.length === 0) return json({ ok: true, session, cart: null });
+  //
+  // Проверяем оба списка. Раньше здесь стояло только `items`, и корзина из
+  // одних сертификатов уходила без расчёта: покупатель видел «к оплате 0.00»
+  // при сертификате на 300 рублей.
+  if (items.length === 0 && certificates.length === 0)
+    return json({ ok: true, session, cart: null });
 
   // Промокод проверяем и здесь, чтобы покупатель увидел скидку сразу, а не
   // узнал о неверном коде уже на кнопке оплаты.
@@ -64,19 +76,28 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     const cart = await quoteCart(items, {
       vipPercent,
       promoCodePercent: promo?.discountPercent ?? 0,
+      certificates,
     });
     // Корзине важно лишь, есть ли предложение: от этого зависит, ведёт кнопка
     // на шаг допродажи или сразу к оплате. Пустой страницы быть не должно.
     const upsellCount = (await offerProductIds(items)).length;
     // Доставку считает сервер по той же формуле, что и приём заказа: иначе
     // корзина покажет одну сумму, а платёжная страница выставит другую.
-    const delivery = deliveryCost({ type: deliveryType, goodsTotal: cart.net });
+    // Электронный сертификат везти некуда: если в корзине только такие,
+    // доставка не нужна и плата за неё не берётся — как и при оформлении.
+    const shipping = needsShipping({
+      hasProducts: items.length > 0,
+      certificates,
+    });
+    const delivery = shipping
+      ? deliveryCost({ type: deliveryType, goodsTotal: cart.net })
+      : { fee: 0, missingForFree: 0, free: true };
     return json({
       ok: true,
       session,
       cart,
       upsellCount,
-      delivery: { ...delivery, hint: freeDeliveryHint(delivery) },
+      delivery: { ...delivery, hint: freeDeliveryHint(delivery), needed: shipping },
       promo: promo ? { code: promo.code, percent: promo.discountPercent } : null,
       promoError,
     });
