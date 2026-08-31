@@ -5,6 +5,8 @@ import {
   SMS_KINDS,
   smsKindSettingKey,
   canSendConsentSms,
+  canSendThrottledSms,
+  isThrottledKind,
   type SmsKind,
   type ConsentSendState,
 } from "./sms-rules";
@@ -82,6 +84,26 @@ export async function sendTrackedSms(opts: {
     return { ok: false, skipped: true, error };
   }
 
+  // Частота — здесь же, в единой точке отправки: проверка в самом запросе
+  // обходится любым другим путём к тому же коду.
+  if (isThrottledKind(opts.kind)) {
+    const verdict = canSendThrottledSms(await throttleState(opts.phone, opts.kind));
+    if (!verdict.allowed) {
+      await prisma.smsLog.create({
+        data: {
+          phone: opts.phone,
+          kind: opts.kind,
+          text: opts.text,
+          ok: false,
+          error: verdict.reason,
+          customerId: opts.customerId ?? null,
+          userId: opts.userId ?? null,
+        },
+      });
+      return { ok: false, skipped: true, error: verdict.reason };
+    }
+  }
+
   let ok = false;
   let error: string | undefined;
   try {
@@ -121,6 +143,44 @@ export async function sendTrackedSms(opts: {
   }
 
   return { ok, error };
+}
+
+/**
+ * Разрешит ли ограничитель отправку прямо сейчас.
+ *
+ * Нужна там, где перед отправкой меняется состояние: сброс пароля сначала
+ * спрашивает разрешение и только потом переписывает пароль. Иначе частые
+ * запросы меняли бы владельцу пароль снова и снова, а SMS с новым не уходила
+ * бы — и человек оказывался заперт снаружи собственного кабинета.
+ */
+export async function checkSmsAllowed(
+  kind: SmsKind,
+  phone: string,
+): Promise<{ allowed: boolean; reason?: string }> {
+  if (!isThrottledKind(kind)) return { allowed: true };
+  const verdict = canSendThrottledSms(await throttleState(phone, kind));
+  return verdict.allowed
+    ? { allowed: true }
+    : { allowed: false, reason: verdict.reason };
+}
+
+/**
+ * Сколько служебных сообщений этой категории ушло на номер и когда последнее.
+ *
+ * Считаем и неудачные попытки тоже: иначе сломанный шлюз превращается в дыру —
+ * сообщения не уходят, счётчик стоит, а запросы летят без счёта.
+ */
+async function throttleState(phone: string, kind: SmsKind) {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const [last, sentToday] = await Promise.all([
+    prisma.smsLog.findFirst({
+      where: { phone, kind },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true },
+    }),
+    prisma.smsLog.count({ where: { phone, kind, createdAt: { gte: since } } }),
+  ]);
+  return { lastSentAt: last?.createdAt ?? null, sentToday };
 }
 
 /** Сколько сообщений о согласии уже ушло на номер и когда последнее. */

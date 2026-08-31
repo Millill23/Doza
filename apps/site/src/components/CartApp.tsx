@@ -102,7 +102,6 @@ export default function CartApp() {
 
   // лояльность
   const [balance, setBalance] = useState(0);
-  const [customerName, setCustomerName] = useState<string | null>(null);
   const [usePoints, setUsePoints] = useState(false);
   const [pointsToSpend, setPointsToSpend] = useState(0);
 
@@ -162,7 +161,6 @@ export default function CartApp() {
         if (data.session?.authenticated) {
           setAccount(data.session);
           setBalance(data.session.balance || 0);
-          setCustomerName(data.session.name);
           setName(data.session.name);
           setPhone(toLocalDigits(data.session.phone));
         }
@@ -180,33 +178,6 @@ export default function CartApp() {
   const total = quote?.net ?? gross;
   const discount = quote?.discount ?? 0;
 
-  // Поиск клиента по телефону (баланс баллов)
-  useEffect(() => {
-    // Для вошедшего в кабинет искать нечего: и баланс, и карта уже пришли
-    // вместе с сессией, а номер он поменять не может.
-    if (account) return;
-    // Ищем, только когда номер дописан целиком: иначе на каждой цифре улетал
-    // бы запрос с заведомо неполным номером.
-    if (!isValidLocalDigits(phone)) {
-      setBalance(0);
-      setCustomerName(null);
-      return;
-    }
-    const t = setTimeout(async () => {
-      try {
-        const r = await fetch(
-          `/api/customer?phone=${encodeURIComponent(BELARUS_PREFIX + phone)}`,
-        );
-        const data = await r.json();
-        setBalance(data.balance || 0);
-        setCustomerName(data.found ? data.name : null);
-        if (data.found && data.name && !name) setName(data.name);
-      } catch {
-        /* ignore */
-      }
-    }, 500);
-    return () => clearTimeout(t);
-  }, [phone, account]);
 
   const deliveryFee = deliveryInfo?.fee ?? 0;
   // Баллами платят за товар, но не за доставку: иначе бесплатная доставка
@@ -461,19 +432,19 @@ export default function CartApp() {
                 Телефон
               </label>
               <PhoneInput id="f-phone" value={phone} onChange={setPhone} required />
-              {customerName ? (
-                <p className="mt-1.5 text-xs text-botanical-300">
-                  С возвращением, {customerName}! Баланс баллов: {formatByn(balance)}
-                </p>
-              ) : (
-                <p className="mt-1.5 text-xs text-ivory-faint">
-                  Есть VIP-карта?{" "}
-                  <a href="/login" className="text-gold-400 hover:text-gold-300">
-                    Войдите в кабинет
-                  </a>{" "}
-                  — скидка применится к заказу.
-                </p>
-              )}
+              {/*
+                По набранному номеру мы больше ничего не показываем. Раньше
+                здесь появлялось «С возвращением, имя! Баланс баллов…» — то
+                есть имя и баланс владельца номера видел любой, кто этот номер
+                набрал. И баллы с него же и списывались.
+              */}
+              <p className="mt-1.5 text-xs text-ivory-faint">
+                Есть VIP-карта или баллы?{" "}
+                <a href="/login" className="text-gold-400 hover:text-gold-300">
+                  Войдите в кабинет
+                </a>{" "}
+                — скидка и баллы применятся к заказу.
+              </p>
             </div>
           </>
         )}
@@ -612,8 +583,8 @@ export default function CartApp() {
           />
         </div>
 
-        {/* Баллы */}
-        {balance > 0 && (
+        {/* Баллы — только вошедшему в кабинет: сервер спишет их лишь по сессии. */}
+        {account && balance > 0 && (
           <div className="rounded-lg border border-botanical-500/40 bg-botanical-700/20 p-3">
             <label className="flex cursor-pointer items-center gap-2.5 text-sm text-ivory">
               <input

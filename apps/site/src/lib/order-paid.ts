@@ -23,7 +23,7 @@ export async function onOrderPaid(
   let earned = 0;
 
   try {
-    const settled = await settlePaidOrder(orderId, await loyaltyDays());
+    const settled = await settlePaidOrder(orderId, await loyaltyDays(), notifyTelegram);
     earned = settled.earned;
   } catch (e) {
     // Деньги уже у нас — откатывать оплату из-за сбоя склада нельзя. Кричим,

@@ -1,5 +1,6 @@
 import type { APIRoute } from "astro";
 import { prisma } from "@doza/db";
+import { checkSmsAllowed } from "@doza/db/sms-log";
 import { normalizePhone } from "@doza/shared";
 import { sendSmsFromSite } from "../../../lib/sms";
 import { hashPassword } from "../../../lib/customer-auth";
@@ -26,17 +27,23 @@ export const POST: APIRoute = async ({ request }) => {
   // (phoneVerified: VIP/офлайн-регистрация) — так VIP получает первый вход.
   // Случайные покупатели из кассы (phoneVerified=false) сюда не попадают.
   if (customer && (customer.passwordHash || customer.phoneVerified)) {
-    const newPass = genPassword();
-    await prisma.customer.update({
-      where: { id: customer.id },
-      data: { passwordHash: await hashPassword(newPass) },
-    });
-    await sendSmsFromSite({
-      kind: "password_reset",
-      phone,
-      text: `Новый пароль для входа в DOZA: ${newPass}`,
-      customerId: customer.id,
-    });
+    // Сначала спрашиваем разрешение у ограничителя и только потом меняем
+    // пароль. Иначе частые запросы меняли бы владельцу пароль снова и снова,
+    // а SMS с новым не уходила бы — человек оказывался бы заперт снаружи.
+    const allowed = await checkSmsAllowed("password_reset", phone);
+    if (allowed.allowed) {
+      const newPass = genPassword();
+      await prisma.customer.update({
+        where: { id: customer.id },
+        data: { passwordHash: await hashPassword(newPass) },
+      });
+      await sendSmsFromSite({
+        kind: "password_reset",
+        phone,
+        text: `Новый пароль для входа в DOZA: ${newPass}`,
+        customerId: customer.id,
+      });
+    }
   }
 
   return new Response(

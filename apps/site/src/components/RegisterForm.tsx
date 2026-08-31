@@ -1,5 +1,6 @@
 import { useState } from "react";
 import PhoneInput from "./PhoneInput";
+import PasswordInput from "./PasswordInput";
 import { BELARUS_PREFIX, isValidLocalDigits, PHONE_ERROR } from "@doza/shared/phone";
 
 const inputCls =
@@ -105,7 +106,8 @@ export default function RegisterForm() {
           </div>
           <div>
             <label htmlFor="r-pass" className={labelCls}>Придумайте пароль</label>
-            <input id="r-pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} className={inputCls} placeholder="минимум 6 символов" />
+            <PasswordInput id="r-pass" value={password} onChange={setPassword} required minLength={6}
+              autoComplete="new-password" placeholder="минимум 6 символов" />
           </div>
           {/*
             Личный кабинет — это и есть программа лояльности, поэтому согласие

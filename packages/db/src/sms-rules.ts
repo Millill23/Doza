@@ -158,3 +158,73 @@ export function canSendConsentSms(
   }
   return { allowed: true };
 }
+
+// ── Частота служебных SMS ───────────────────────────────────────────────────
+
+/**
+ * Код регистрации и новый пароль отправляются по чужой просьбе: достаточно
+ * знать номер. Без ограничения это и счёт за сообщения, и способ завалить
+ * человека SMS, а сброс пароля вдобавок каждый раз меняет пароль владельцу —
+ * прочитать его чужой не сможет, а выкинуть человека из кабинета сможет.
+ *
+ * Ограничиваем только эти две категории. Уведомления о заказе, баллах и
+ * поздравления шлёт магазин по своей воле, и держать их незачем.
+ */
+export const THROTTLED_SMS_KINDS = ["otp_register", "password_reset"] as const;
+
+export type ThrottledSmsKind = (typeof THROTTLED_SMS_KINDS)[number];
+
+export function isThrottledKind(kind: string): kind is ThrottledSmsKind {
+  return (THROTTLED_SMS_KINDS as readonly string[]).includes(kind);
+}
+
+/** Минимальная пауза между двумя сообщениями на один номер, секунд. */
+export const SMS_MIN_INTERVAL_SEC = 60;
+
+/** Сколько таких сообщений можно отправить на номер за сутки. */
+export const SMS_DAILY_LIMIT = 20;
+
+export interface ThrottleState {
+  /** Когда на этот номер уходило последнее сообщение такой категории. */
+  lastSentAt: Date | null;
+  /** Сколько уже ушло за последние сутки. */
+  sentToday: number;
+}
+
+export type ThrottleVerdict =
+  | { allowed: true }
+  | { allowed: false; reason: string; retryAfterSec: number };
+
+/**
+ * Можно ли отправить служебное SMS на этот номер.
+ *
+ * Считаем и удачные, и неудачные попытки: иначе сломанный шлюз превращается в
+ * дыру — сообщения не уходят, счётчик стоит, а запросы к нему летят без счёта.
+ */
+export function canSendThrottledSms(
+  state: ThrottleState,
+  now = new Date(),
+): ThrottleVerdict {
+  if (state.sentToday >= SMS_DAILY_LIMIT) {
+    return {
+      allowed: false,
+      reason:
+        "Слишком много запросов на этот номер за сутки. Попробуйте завтра или позвоните нам.",
+      retryAfterSec: 3600,
+    };
+  }
+
+  if (state.lastSentAt) {
+    const passed = Math.floor((now.getTime() - state.lastSentAt.getTime()) / 1000);
+    if (passed < SMS_MIN_INTERVAL_SEC) {
+      const left = SMS_MIN_INTERVAL_SEC - passed;
+      return {
+        allowed: false,
+        reason: `Сообщение уже отправлено. Следующее можно запросить через ${left} с.`,
+        retryAfterSec: left,
+      };
+    }
+  }
+
+  return { allowed: true };
+}

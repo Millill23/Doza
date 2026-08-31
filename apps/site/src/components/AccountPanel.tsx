@@ -1,4 +1,5 @@
 import { useState } from "react";
+import PasswordInput from "./PasswordInput";
 
 interface Batch {
   amount: number;
@@ -343,10 +344,9 @@ export default function AccountPanel({ name, phone, balance, batches, orders, bi
         {msg && <p className="mt-2 text-sm text-botanical-300">{msg}</p>}
         {showPass && (
           <form onSubmit={changePassword} className="mt-4 space-y-3">
-            <input type="password" value={oldPassword} onChange={(e) => setOld(e.target.value)} required placeholder="Текущий пароль"
-              className="h-11 w-full rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory focus:border-gold-500 focus:outline-none" />
-            <input type="password" value={newPassword} onChange={(e) => setNew(e.target.value)} required minLength={6} placeholder="Новый пароль (мин. 6)"
-              className="h-11 w-full rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory focus:border-gold-500 focus:outline-none" />
+            <PasswordInput value={oldPassword} onChange={setOld} required placeholder="Текущий пароль" />
+            <PasswordInput value={newPassword} onChange={setNew} required minLength={6}
+              autoComplete="new-password" placeholder="Новый пароль (мин. 6)" />
             {err && <p className="text-sm text-red-300">{err}</p>}
             <button type="submit" disabled={busy} className="h-11 w-full rounded-full bg-gold-gradient text-sm font-medium text-ink-900 disabled:opacity-60">
               {busy ? "…" : "Сохранить пароль"}

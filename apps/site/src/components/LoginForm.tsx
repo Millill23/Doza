@@ -1,5 +1,6 @@
 import { useState } from "react";
 import PhoneInput from "./PhoneInput";
+import PasswordInput from "./PasswordInput";
 import { BELARUS_PREFIX } from "@doza/shared/phone";
 
 const inputCls =
@@ -44,7 +45,7 @@ export default function LoginForm() {
         </div>
         <div>
           <label htmlFor="l-pass" className={labelCls}>Пароль</label>
-          <input id="l-pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required className={inputCls} placeholder="••••••••" />
+          <PasswordInput id="l-pass" value={password} onChange={setPassword} required />
         </div>
         {error && <p className="text-sm text-red-300">{error}</p>}
         <button type="submit" disabled={loading} className="h-11 w-full rounded-full bg-gold-gradient text-sm font-medium text-ink-900 disabled:opacity-60">

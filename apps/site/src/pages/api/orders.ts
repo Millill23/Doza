@@ -155,7 +155,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   const vipPercent = await vipPercentFor(sessionCustomerId);
   let quote;
   try {
-    quote = await quoteCart(items, { vipPercent });
+    quote = await quoteCart(items, { vipPercent, checkStock: true });
   } catch (e) {
     if (e instanceof CartError) return bad(e.message);
     throw e;
@@ -191,10 +191,15 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     );
   }
 
-  // Списание баллов (FIFO), не больше баланса и суммы заказа
+  // Списание баллов (FIFO), не больше баланса и суммы заказа.
+  //
+  // Только вошедшему в кабинет. Раньше баллы списывались с того, чей номер
+  // набран в форме, — и любой, кто знал чужой телефон, оплачивал свой заказ
+  // чужими баллами. Проверять телефон бессмысленно: это просто цифры в поле.
+  // Ровно так же закрыта скидка по VIP-карте.
   let loyaltySpent = 0;
   const requested = Math.max(0, Number(body.loyaltySpend || 0));
-  if (requested > 0) {
+  if (requested > 0 && account) {
     const balance = await getBalance(customer.id);
     const allowed = Math.min(requested, balance, total);
     if (allowed > 0) {

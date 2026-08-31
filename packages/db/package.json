@@ -37,6 +37,7 @@
     "./sales-split": "./src/sales-split.ts",
     "./similar-rules": "./src/similar-rules.ts",
     "./upsell-rules": "./src/upsell-rules.ts",
-    "./delivery-rules": "./src/delivery-rules.ts"
+    "./delivery-rules": "./src/delivery-rules.ts",
+    "./stock-rules": "./src/stock-rules.ts"
   }
 }

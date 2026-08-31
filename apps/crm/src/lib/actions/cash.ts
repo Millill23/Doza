@@ -11,6 +11,10 @@ import {
 import { priceCart } from "@doza/db/pricing";
 import { createSmsCode, verifySmsCode } from "@doza/db/sms-codes";
 import { lookupCertificate, redeemCertificate } from "@doza/db/certificates";
+import { justRanLow, lowStockMessage } from "@doza/db/stock-rules";
+
+/** Перенос строки в тексте уведомления. */
+const BR = String.fromCharCode(10);
 import { requestConsent } from "@doza/db/consent";
 import { activeDateReward, consumeDateReward } from "@doza/db/rewards";
 import { sendSmsFromCrm } from "@/lib/sms";
@@ -371,18 +375,33 @@ export async function createOfflineSale(input: CreateSaleInput) {
     dateRewardUsed = await consumeDateReward(dateReward.id, sale.id);
   }
 
-  // Списание остатков
+  // Списание остатков. По товару целиком: две позиции одного аромата льются
+  // из одного флакона, и порознь порог «заканчивается» они бы не пересекли.
+  const mlPerProduct = new Map<number, number>();
   for (const r of resolved) {
-    const delta = -(r.volumeMl * r.qty);
-    await prisma.inventory.upsert({
-      where: { productId: r.productId },
-      update: { quantityMl: { increment: delta } },
-      create: { productId: r.productId, quantityMl: 0 },
+    mlPerProduct.set(
+      r.productId,
+      (mlPerProduct.get(r.productId) ?? 0) + r.volumeMl * r.qty,
+    );
+  }
+
+  const ranLow: { name: string; afterMl: number }[] = [];
+  for (const [productId, ml] of mlPerProduct) {
+    const before = await prisma.inventory.findUnique({
+      where: { productId },
+      select: { quantityMl: true },
+    });
+    const beforeMl = before?.quantityMl ?? 0;
+    const after = await prisma.inventory.upsert({
+      where: { productId },
+      update: { quantityMl: { increment: -ml } },
+      create: { productId, quantityMl: -ml },
+      select: { quantityMl: true },
     });
     await prisma.inventoryLog.create({
       data: {
-        productId: r.productId,
-        deltaMl: delta,
+        productId,
+        deltaMl: -ml,
         reason: "offline_sale",
         refType: "offline_sale",
         refId: sale.id,
@@ -390,6 +409,29 @@ export async function createOfflineSale(input: CreateSaleInput) {
         userId: actorId,
       },
     });
+    if (justRanLow(beforeMl, after.quantityMl)) {
+      const p = await prisma.product.findUnique({
+        where: { id: productId },
+        select: { name: true, brand: { select: { name: true } } },
+      });
+      ranLow.push({
+        name: p ? `${p.brand.name} ${p.name}` : `товар ${productId}`,
+        afterMl: after.quantityMl,
+      });
+    }
+  }
+
+  // Продажу это не держит: деньги уже взяты, чек закрыт.
+  if (ranLow.length > 0) {
+    try {
+      await notifyTelegram(
+        "⚠️ <b>Заканчивается на складе</b>" +
+          BR +
+          ranLow.map((r) => tgEscape(lowStockMessage(r.name, r.afterMl))).join(BR),
+      );
+    } catch (e) {
+      console.error("[cash] уведомление об остатке не отправлено:", e);
+    }
   }
 
   // Баллы: списание и начисление

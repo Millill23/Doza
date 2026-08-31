@@ -1,6 +1,7 @@
 import { prisma } from "./index";
 import { earnPoints } from "./loyalty";
 import { getCashbackRates } from "./promos";
+import { justRanLow, lowStockMessage } from "./stock-rules";
 
 /**
  * Оплата заказов через bePaid.
@@ -214,6 +215,41 @@ export interface SettleResult {
 }
 
 /**
+ * Сказать продавцам, что флакон заканчивается.
+ *
+ * Нужно именно продавцу за прилавком: онлайн-заказ уже забрал миллилитры, но
+ * флакон физически ещё стоит в зале, и его могут распить второй раз — тому,
+ * кто пришёл ногами. Сбой уведомления не должен ронять проведение оплаты:
+ * деньги уже списаны, заказ обязан пройти.
+ */
+/** Перенос строки в тексте уведомления. */
+const BR = String.fromCharCode(10);
+
+async function warnLowStock(
+  ranLow: { productId: number; afterMl: number }[],
+  notify?: (text: string) => Promise<unknown>,
+): Promise<void> {
+  if (!notify || ranLow.length === 0) return;
+  try {
+    const products = await prisma.product.findMany({
+      where: { id: { in: ranLow.map((r) => r.productId) } },
+      select: { id: true, name: true, brand: { select: { name: true } } },
+    });
+    const nameOf = new Map(
+      products.map((p) => [p.id, `${p.brand.name} ${p.name}`]),
+    );
+    const lines = ranLow.map((r) =>
+      lowStockMessage(nameOf.get(r.productId) ?? `товар ${r.productId}`, r.afterMl),
+    );
+    await notify(
+      "⚠️ Заканчивается на складе" + BR + lines.join(BR),
+    );
+  } catch (e) {
+    console.error("[stock] уведомление об остатке не отправлено:", e);
+  }
+}
+
+/**
  * Провести оплаченный заказ по складу и лояльности.
  *
  * Вызывается ровно один раз — в момент, когда заказ стал оплаченным. Раньше
@@ -229,6 +265,8 @@ export interface SettleResult {
 export async function settlePaidOrder(
   orderId: number,
   loyaltyDays: number,
+  /** Куда сообщить, что флакон заканчивается. Без него просто молчим. */
+  notify?: (text: string) => Promise<unknown>,
 ): Promise<SettleResult> {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
@@ -236,18 +274,34 @@ export async function settlePaidOrder(
   });
   if (!order) return { earned: 0, consumedMl: 0 };
 
-  let consumedMl = 0;
+  // Списываем по товару целиком: две позиции одного аромата льются из одного
+  // флакона, и по отдельности порог «заканчивается» они бы не пересекли.
+  const perProduct = new Map<number, number>();
   for (const item of order.items) {
-    const deltaMl = -(item.volumeMl * item.qty);
-    await prisma.inventory.upsert({
-      where: { productId: item.productId },
-      update: { quantityMl: { increment: deltaMl } },
-      create: { productId: item.productId, quantityMl: 0 },
+    const ml = item.volumeMl * item.qty;
+    perProduct.set(item.productId, (perProduct.get(item.productId) ?? 0) + ml);
+  }
+
+  let consumedMl = 0;
+  const ranLow: { productId: number; afterMl: number }[] = [];
+
+  for (const [productId, ml] of perProduct) {
+    const before = await prisma.inventory.findUnique({
+      where: { productId },
+      select: { quantityMl: true },
+    });
+    const beforeMl = before?.quantityMl ?? 0;
+
+    const updated = await prisma.inventory.upsert({
+      where: { productId },
+      update: { quantityMl: { increment: -ml } },
+      create: { productId, quantityMl: -ml },
+      select: { quantityMl: true },
     });
     await prisma.inventoryLog.create({
       data: {
-        productId: item.productId,
-        deltaMl,
+        productId,
+        deltaMl: -ml,
         reason: "order_paid",
         refType: "order",
         refId: order.id,
@@ -255,8 +309,13 @@ export async function settlePaidOrder(
         userId: null,
       },
     });
-    consumedMl += -deltaMl;
+    consumedMl += ml;
+    if (justRanLow(beforeMl, updated.quantityMl)) {
+      ranLow.push({ productId, afterMl: updated.quantityMl });
+    }
   }
+
+  await warnLowStock(ranLow, notify);
 
   let earned = 0;
   if (order.customerId) {

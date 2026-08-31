@@ -3,6 +3,7 @@ import { priceCart, type DiscountKind } from "@doza/db/pricing";
 import { pickActivePromo, getGlobalPromo, mergePromos } from "@doza/db/promos";
 import { upsellPercentFor } from "@doza/db/upsell-rules";
 import { offerableProductIds } from "./upsell";
+import { shortages, shortageMessage, type StockLine } from "@doza/db/stock-rules";
 
 /**
  * Расчёт корзины на сайте.
@@ -77,7 +78,7 @@ export async function vipPercentFor(customerId: number | null): Promise<number> 
  */
 export async function quoteCart(
   items: QuoteItem[],
-  opts: { vipPercent?: number } = {},
+  opts: { vipPercent?: number; checkStock?: boolean } = {},
 ): Promise<CartQuote> {
   if (items.length === 0) throw new CartError("Корзина пуста");
 
@@ -152,6 +153,25 @@ export async function quoteCart(
       volumeMl: item.volumeMl,
       label: `${rec.product.brand.name} ${rec.product.name}, ${item.volumeMl} мл ×${qty}`,
     });
+  }
+
+  // Наличие. Проверяем перед тем, как вести человека на страницу банка:
+  // оплаченный заказ на аромат, которого нет, — это возврат денег, объяснения
+  // и подорванное доверие вместо продажи.
+  if (opts.checkStock) {
+    const stockLines: StockLine[] = lines.map((l, i) => ({
+      productId: l.productId,
+      volumeMl: meta[i].volumeMl,
+      qty: l.qty,
+      label: meta[i].label.replace(/, \d+ мл ×\d+$/, ""),
+    }));
+    const rows = await prisma.inventory.findMany({
+      where: { productId: { in: [...new Set(lines.map((l) => l.productId))] } },
+      select: { productId: true, quantityMl: true },
+    });
+    const have = new Map(rows.map((r) => [r.productId, r.quantityMl]));
+    const missing = shortages(stockLines, have);
+    if (missing.length > 0) throw new CartError(shortageMessage(missing));
   }
 
   const priced = priceCart({

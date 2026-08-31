@@ -33,6 +33,10 @@ export const POST: APIRoute = async ({ request }) => {
     text: `${code} — код подтверждения регистрации DOZA`,
   });
 
+  // Отбито ограничением частоты — говорим об этом прямо. Молчаливое «ок» здесь
+  // хуже отказа: человек ждёт SMS, которой не будет, и жмёт кнопку снова.
+  if (sms.skipped) return json({ ok: false, error: sms.error }, 429);
+
   return json({ ok: true, smsSent: sms.ok });
 };
 
