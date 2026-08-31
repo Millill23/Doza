@@ -4,6 +4,11 @@ import { pickActivePromo, getGlobalPromo, mergePromos } from "@doza/db/promos";
 import { upsellPercentFor } from "@doza/db/upsell-rules";
 import { offerableProductIds } from "./upsell";
 import { shortages, shortageMessage, type StockLine } from "@doza/db/stock-rules";
+import {
+  certificatePrice,
+  validateCertificateLines,
+  type CertificateOrderLine,
+} from "@doza/db/certificate-rules";
 
 /**
  * Расчёт корзины на сайте.
@@ -33,8 +38,20 @@ export interface QuotedLine {
   label: string;
 }
 
+export interface QuotedCertificate {
+  denomination: number;
+  /** Цена для покупателя — с VIP-скидкой, если она есть. */
+  priceByn: number;
+  sendBySms: boolean;
+  recipientPhone: string | null;
+  recipientName: string | null;
+  message: string | null;
+}
+
 export interface CartQuote {
   lines: QuotedLine[];
+  /** Сертификаты в заказе. Скидки на них не действуют, кроме VIP. */
+  certificates: QuotedCertificate[];
   /** Сумма без скидок. */
   gross: number;
   /** Сумма к оплате. */
@@ -78,9 +95,48 @@ export async function vipPercentFor(customerId: number | null): Promise<number> 
  */
 export async function quoteCart(
   items: QuoteItem[],
-  opts: { vipPercent?: number; promoCodePercent?: number; checkStock?: boolean } = {},
+  opts: {
+    vipPercent?: number;
+    promoCodePercent?: number;
+    checkStock?: boolean;
+    /** Сертификаты в корзине — считаются отдельно от товаров. */
+    certificates?: CertificateOrderLine[];
+  } = {},
 ): Promise<CartQuote> {
-  if (items.length === 0) throw new CartError("Корзина пуста");
+  const certLines = opts.certificates ?? [];
+  if (items.length === 0 && certLines.length === 0)
+    throw new CartError("Корзина пуста");
+
+  // Сертификаты проверяем до всего остального: ошибка в номинале не должна
+  // всплывать после того, как посчитаны цены и проверены остатки.
+  const certVerdict = validateCertificateLines(certLines);
+  if (!certVerdict.ok) throw new CartError(certVerdict.error);
+
+  // Скидки на сертификат не действуют — кроме VIP, ровно как в кассе.
+  // Иначе промокод превращал бы сертификат в способ печатать деньги: купил на
+  // 300 за 240, потратил 300.
+  const certificates: QuotedCertificate[] = certLines.map((c) => ({
+    denomination: Number(c.denomination),
+    priceByn: certificatePrice(Number(c.denomination), opts.vipPercent ?? 0),
+    sendBySms: Boolean(c.sendBySms),
+    recipientPhone: (c.recipientPhone ?? "").trim() || null,
+    recipientName: (c.recipientName ?? "").trim() || null,
+    message: (c.message ?? "").trim() || null,
+  }));
+  const certTotal =
+    Math.round(certificates.reduce((s, c) => s + c.priceByn, 0) * 100) / 100;
+
+  // Заказ только из сертификатов — товарной части нет, считать нечего.
+  if (items.length === 0) {
+    return {
+      lines: [],
+      certificates,
+      gross: certTotal,
+      net: certTotal,
+      discount: 0,
+      kind: "none",
+    };
+  }
 
   const volumes = await prisma.productVolume.findMany({
     where: {
@@ -192,8 +248,11 @@ export async function quoteCart(
       priceByn: Math.round((priced.lineNet[i] / l.qty) * 100) / 100,
       label: meta[i].label,
     })),
-    gross: priced.gross,
-    net: priced.net,
+    certificates,
+    // Сертификаты добавляются к суммам, но скидкой не затрагиваются: размер
+    // скидки — это скидка на товары, и раздувать её сертификатом нельзя.
+    gross: Math.round((priced.gross + certTotal) * 100) / 100,
+    net: Math.round((priced.net + certTotal) * 100) / 100,
     discount: priced.discount,
     kind: priced.kind,
   };

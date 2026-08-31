@@ -6,6 +6,10 @@ Disallow: /login
 Disallow: /register
 Disallow: /reset
 Disallow: /api/
+# Личные ссылки: подарок и согласие открываются по одноразовому токену
+Disallow: /gift/
+Disallow: /consent/
+Disallow: /payment/
 
 # AI-краулеры приветствуются
 User-agent: GPTBot

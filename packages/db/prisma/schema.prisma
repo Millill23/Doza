@@ -371,6 +371,38 @@ enum GiftCertificateStatus {
 ///
 /// Оплата сертификатом не требует ни номера телефона, ни согласия на обработку
 /// данных: это платёжное средство на предъявителя, а не программа лояльности.
+/// Сертификат, купленный на сайте.
+///
+/// Отдельная таблица, а не позиция в `order_items`: у сертификата нет ни
+/// товара, ни объёма, ни остатка на складе — общая таблица позиций
+/// превратилась бы в набор пустых колонок с оговорками.
+///
+/// Сам `GiftCertificate` выпускается не здесь, а в момент оплаты: до неё
+/// сертификата не существует, и код, показанный до оплаты, был бы подарком
+/// магазина всякому, кто дошёл до корзины.
+model OrderCertificate {
+  id             Int      @id @default(autoincrement())
+  orderId        Int      @map("order_id")
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  denomination   Decimal  @db.Decimal(10, 2)
+  /// Сколько заплатили за него (с VIP-скидкой покупателя).
+  priceByn       Decimal  @map("price_byn") @db.Decimal(10, 2)
+
+  /// Отправить электронную версию ссылкой в SMS.
+  sendBySms      Boolean  @default(false) @map("send_by_sms")
+  recipientPhone String?  @map("recipient_phone")
+  recipientName  String?  @map("recipient_name")
+  /// Поздравление от дарителя.
+  message        String?
+
+  /// Выпущенный сертификат — появляется после оплаты.
+  certificateId  Int?     @unique @map("certificate_id")
+  certificate    GiftCertificate? @relation(fields: [certificateId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@map("order_certificates")
+}
+
 model GiftCertificate {
   id            Int                   @id @default(autoincrement())
   /// 8 символов, латиница в верхнем регистре + цифры.
@@ -389,8 +421,16 @@ model GiftCertificate {
   /// Покупатель (если известен) — нужен для VIP-скидки при покупке.
   buyerId       Int?                  @map("buyer_id")
   buyer         Customer?             @relation("CertificateBuyer", fields: [buyerId], references: [id])
-  issuedById    Int                   @map("issued_by_id")
-  issuedBy      CrmUser               @relation("CertificateIssuedBy", fields: [issuedById], references: [id])
+  /// Кто выпустил. Пусто — покупка на сайте: там продавца нет.
+  issuedById    Int?                  @map("issued_by_id")
+  issuedBy      CrmUser?              @relation("CertificateIssuedBy", fields: [issuedById], references: [id])
+
+  /// Ссылка на страницу подарка. Отдельная от кода: адрес попадает в SMS, в
+  /// историю браузера и в пересланное сообщение, а код должен открываться
+  /// только на самой странице.
+  publicToken   String?               @unique @map("public_token")
+  /// Поздравление от дарителя — показывается на странице подарка.
+  giftMessage   String?               @map("gift_message")
   issuedAt      DateTime              @default(now()) @map("issued_at")
   /// Срок жизни — 180 дней от выпуска, а не от активации: иначе сертификат,
   /// пролежавший в столе два года, пришлось бы принимать по старой цене.
@@ -410,6 +450,7 @@ model GiftCertificate {
 
   @@index([status])
   @@map("gift_certificates")
+  orderCertificate OrderCertificate?
 }
 
 /// Списание с сертификата в кассе.
@@ -624,6 +665,8 @@ model Order {
   items           OrderItem[]
 
   @@map("orders")
+  certificates      OrderCertificate[]
+
   /// Промокод, применённый к заказу.
   promoCodeId       Int?       @map("promo_code_id")
   promoCode         PromoCode? @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)

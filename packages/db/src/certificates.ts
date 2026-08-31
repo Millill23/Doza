@@ -6,6 +6,7 @@
  * разъехались. Чистые правила (коды, размер начисления) — в `certificate-rules.ts`.
  */
 
+import crypto from "node:crypto";
 import { prisma } from "./index";
 import { earnPoints, getBalance } from "./loyalty";
 import {
@@ -17,6 +18,7 @@ import {
   canRedeem,
   canActivate,
   applyCertificate,
+  giftSmsText,
   type CertificateState,
 } from "./certificate-rules";
 
@@ -319,4 +321,115 @@ export async function revokeSaleRedemptions(
     returned += amount;
   }
   return Math.round(returned * 100) / 100;
+}
+
+/**
+ * Выпустить сертификаты, купленные на сайте.
+ *
+ * Вызывается один раз — когда заказ стал оплаченным. До оплаты сертификата не
+ * существует: код, показанный раньше, был бы подарком всякому, кто дошёл до
+ * корзины и закрыл вкладку.
+ *
+ * Отправку SMS передаём аргументом: `@doza/db` не зависит от `@doza/shared`,
+ * а в тестах это позволяет подменить шлюз.
+ */
+export async function issueOrderCertificates(opts: {
+  orderId: number;
+  /** Адрес сайта без слеша на конце — для ссылки на страницу подарка. */
+  siteUrl: string;
+  sendGiftSms?: (opts: {
+    phone: string;
+    text: string;
+    certificateId: number;
+  }) => Promise<unknown>;
+  notify?: (text: string) => Promise<unknown>;
+}): Promise<{ issued: number }> {
+  const rows = await prisma.orderCertificate.findMany({
+    where: { orderId: opts.orderId, certificateId: null },
+    include: { order: { select: { customerId: true, customerName: true } } },
+  });
+  if (rows.length === 0) return { issued: 0 };
+
+  let issued = 0;
+
+  for (const row of rows) {
+    const code = await reserveUniqueCode();
+    const publicToken = crypto.randomBytes(16).toString("hex");
+
+    const cert = await prisma.giftCertificate.create({
+      data: {
+        code,
+        denomination: row.denomination,
+        paidByn: row.priceByn,
+        // Тратить можно весь номинал, а не уплаченную сумму: VIP-скидка —
+        // это скидка на покупку сертификата, а не уменьшение его ценности.
+        balanceByn: row.denomination,
+        expiresAt: newCertificateExpiry(),
+        buyerId: row.order.customerId,
+        // Продавца нет: покупка на сайте.
+        issuedById: null,
+        publicToken,
+        giftMessage: (row.message ?? "").trim() || null,
+      },
+    });
+
+    await prisma.orderCertificate.update({
+      where: { id: row.id },
+      data: { certificateId: cert.id },
+    });
+    issued++;
+
+    if (row.sendBySms && row.recipientPhone && opts.sendGiftSms) {
+      const link = giftLink(opts.siteUrl, publicToken);
+      try {
+        await opts.sendGiftSms({
+          phone: row.recipientPhone,
+          text: giftSmsText({
+            link,
+            fromName: row.order.customerName,
+            recipientName: row.recipientName,
+          }),
+          certificateId: cert.id,
+        });
+      } catch (e) {
+        // Сертификат уже выпущен и оплачен — сбой SMS его не отменяет.
+        // Ссылку всегда можно переслать из CRM.
+        console.error("[certificates] SMS с подарком не отправлена:", e);
+      }
+    }
+  }
+
+  if (opts.notify && issued > 0) {
+    try {
+      await opts.notify(
+        `Выпущено сертификатов по заказу #${opts.orderId}: ${issued}`,
+      );
+    } catch {
+      /* уведомление не критично */
+    }
+  }
+
+  return { issued };
+}
+
+/** Адрес страницы подарка. */
+export function giftLink(base: string, token: string): string {
+  return `${base.replace(/\/+$/, "")}/gift/${token}`;
+}
+
+/** Найти сертификат по публичной ссылке. */
+export async function findCertificateByToken(token: string) {
+  if (!token) return null;
+  return prisma.giftCertificate.findUnique({
+    where: { publicToken: token },
+    select: {
+      code: true,
+      denomination: true,
+      balanceByn: true,
+      status: true,
+      expiresAt: true,
+      giftMessage: true,
+      orderCertificate: { select: { recipientName: true } },
+    },
+  });
 }

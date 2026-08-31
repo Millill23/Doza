@@ -132,7 +132,7 @@ export default async function CertificatesPage() {
                         : "—"}
                     </td>
                     <td className="px-4 py-3 text-xs text-ivory-faint">
-                      {fmt(c.issuedAt)} · {c.issuedBy.name}
+                      {fmt(c.issuedAt)} · {c.issuedBy?.name ?? "куплен на сайте"}
                     </td>
                   </tr>
                 );

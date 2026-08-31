@@ -176,3 +176,126 @@ export function applyCertificate(opts: {
     toPay: Math.round((due - applied) * 100) / 100,
   };
 }
+
+// ── Покупка сертификата на сайте ────────────────────────────────────────────
+//
+// Живёт здесь же, рядом с номиналами и сроком: отдельный модуль пришлось бы
+// импортировать из этого, а кросс-импорт между чистыми правилами ломает
+// прямой запуск тестов через `node --test`.
+
+
+/** Сколько сертификатов можно взять за один заказ. */
+export const MAX_CERTIFICATES_PER_ORDER = 10;
+
+/** Длина поздравления: SMS и страница подарка, а не открытка. */
+export const GIFT_MESSAGE_MAX = 200;
+
+export function isValidDenomination(value: number): boolean {
+  return (CERTIFICATE_DENOMINATIONS as readonly number[]).includes(value);
+}
+
+/** Строка корзины с сертификатом — то, что присылает браузер. */
+export interface CertificateOrderLine {
+  denomination: number;
+  /** Отправить электронную версию ссылкой в SMS. */
+  sendBySms?: boolean;
+  recipientPhone?: string;
+  recipientName?: string;
+  message?: string;
+}
+
+/**
+ * Цена сертификата для покупателя.
+ *
+ * VIP покупает дешевле, но тратить может полный номинал: скидка касается
+ * покупки сертификата, а не его ценности. Так же считает и офлайн-касса —
+ * иначе один и тот же сертификат стоил бы по-разному в зале и на сайте.
+ */
+export function certificatePrice(denomination: number, vipPercent: number): number {
+  const pct = Number.isFinite(vipPercent) ? Math.min(100, Math.max(0, vipPercent)) : 0;
+  return Math.round(denomination * (1 - pct / 100) * 100) / 100;
+}
+
+/**
+ * Нужна ли посылка.
+ *
+ * Электронный сертификат уходит ссылкой в SMS — везти нечего. Если в заказе
+ * только такие, доставка не нужна вовсе, и спрашивать адрес значит требовать
+ * его без причины.
+ */
+export function needsShipping(opts: {
+  hasProducts: boolean;
+  certificates: CertificateOrderLine[];
+}): boolean {
+  if (opts.hasProducts) return true;
+  return opts.certificates.some((c) => !c.sendBySms);
+}
+
+export type CertificateLineError =
+  | { ok: true }
+  | { ok: false; error: string };
+
+/**
+ * Проверить строку сертификата.
+ *
+ * Телефон получателя проверяет вызывающий код — формат номера живёт в
+ * `@doza/shared/phone`, а сюда его тянуть нельзя: `@doza/db` от `@doza/shared`
+ * не зависит.
+ */
+export function validateCertificateLine(
+  line: CertificateOrderLine,
+): CertificateLineError {
+  if (!isValidDenomination(Number(line.denomination))) {
+    return { ok: false, error: "Выберите номинал сертификата из списка" };
+  }
+
+  if (line.sendBySms) {
+    if (!(line.recipientPhone ?? "").trim()) {
+      return {
+        ok: false,
+        error: "Укажите номер, на который отправить сертификат",
+      };
+    }
+    if ((line.message ?? "").length > GIFT_MESSAGE_MAX) {
+      return {
+        ok: false,
+        error: `Поздравление — не длиннее ${GIFT_MESSAGE_MAX} символов`,
+      };
+    }
+  }
+
+  return { ok: true };
+}
+
+/** Проверить весь набор сертификатов в заказе. */
+export function validateCertificateLines(
+  lines: CertificateOrderLine[],
+): CertificateLineError {
+  if (lines.length > MAX_CERTIFICATES_PER_ORDER) {
+    return {
+      ok: false,
+      error: `За один заказ можно купить не больше ${MAX_CERTIFICATES_PER_ORDER} сертификатов`,
+    };
+  }
+  for (const line of lines) {
+    const verdict = validateCertificateLine(line);
+    if (!verdict.ok) return verdict;
+  }
+  return { ok: true };
+}
+
+/** Текст SMS получателю подарка. */
+export function giftSmsText(opts: {
+  link: string;
+  fromName?: string | null;
+  recipientName?: string | null;
+}): string {
+  const to = (opts.recipientName ?? "").trim();
+  const from = (opts.fromName ?? "").trim();
+  const hello = to ? `${to}, вам` : "Вам";
+  // Имя дарителя ставим после двоеточия, а не в оборот «от ...»: русские имена
+  // там требуют родительного падежа, а склонять чужое имя автоматически —
+  // верный способ поздравить человека с ошибкой в собственном имени.
+  const who = from ? ` Отправитель: ${from}.` : "";
+  return `${hello} подарочный сертификат DOZA.${who} Открыть: ${opts.link}`;
+}

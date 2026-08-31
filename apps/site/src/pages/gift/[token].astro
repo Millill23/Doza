@@ -1,0 +1,149 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { findCertificateByToken } from "@doza/db/certificates";
+import { daysLeft } from "@doza/db/certificate-rules";
+import { COMPANY } from "../../lib/company";
+
+export const prerender = false;
+
+/**
+ * Страница подарочного сертификата.
+ *
+ * Открывается по ссылке из SMS. Адрес намеренно не совпадает с кодом: он
+ * попадает в историю браузера и в пересланное сообщение, а код должен
+ * появляться только здесь.
+ *
+ * Страница не требует входа: получатель подарка может вообще не быть нашим
+ * клиентом, и упереться в форму входа вместо поздравления — худшее, что может
+ * случиться с подарком. Вход понадобится только для обмена на баллы.
+ */
+const { token } = Astro.params;
+const cert = await findCertificateByToken(token ?? "");
+
+const left = cert ? daysLeft(cert.expiresAt) : 0;
+const expired = cert ? left <= 0 : false;
+const spent = cert ? Number(cert.balanceByn) <= 0 : false;
+const balance = cert ? Number(cert.balanceByn) : 0;
+const nominal = cert ? Number(cert.denomination) : 0;
+const partly = cert ? balance > 0 && balance < nominal : false;
+const to = cert?.orderCertificate?.recipientName ?? null;
+---
+
+<Layout title="Подарочный сертификат — DOZA" noindex={true}>
+  <section class="container-luxe max-w-2xl py-12">
+    {!cert ? (
+      <div class="rounded-2xl border border-ink-600 bg-ink-800/60 p-8 text-center">
+        <h1 class="font-serif text-2xl text-ivory">Ссылка не найдена</h1>
+        <p class="mt-3 text-sm leading-relaxed text-ivory-muted">
+          Возможно, адрес скопирован не целиком. Проверьте ссылку из сообщения
+          или напишите нам — поможем разобраться.
+        </p>
+        <p class="mt-4 text-sm text-ivory-faint">
+          {COMPANY.phones.join(", ")} · {COMPANY.email}
+        </p>
+      </div>
+    ) : (
+      <>
+        <p class="mb-6 text-center text-xs font-light uppercase tracking-[0.25em] text-gold-500">
+          Подарочный сертификат
+        </p>
+
+        {/* Сам сертификат. Рамка, вензель и крупный номинал — это подарок, а
+            не квитанция: человек может показать его с телефона. */}
+        <div
+          class="relative overflow-hidden rounded-3xl border border-gold-600/50 bg-gradient-to-br from-ink-700 via-ink-800 to-ink-900 p-8 shadow-gold sm:p-10"
+        >
+          <div
+            class="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-gold-500/10 blur-3xl"
+          >
+          </div>
+
+          <div class="relative">
+            <div class="text-center">
+              <span class="font-serif text-3xl font-semibold tracking-[0.2em] text-gold-gradient">
+                DOZA
+              </span>
+              <p class="mt-1 text-[10px] uppercase tracking-[0.3em] text-ivory-faint">
+                Парфюмерия на распив
+              </p>
+            </div>
+
+            {to && (
+              <p class="mt-8 text-center text-lg font-light text-ivory">
+                {to}, это вам
+              </p>
+            )}
+
+            {cert.giftMessage && (
+              <p
+                class="mx-auto mt-4 max-w-md text-center text-sm font-light italic leading-relaxed text-ivory-muted"
+              >
+                «{cert.giftMessage}»
+              </p>
+            )}
+
+            <div class="mt-8 text-center">
+              <div class="font-serif text-6xl font-semibold text-gold-gradient">
+                {balance.toFixed(0)}
+                <span class="ml-2 text-2xl">BYN</span>
+              </div>
+              {partly && (
+                <p class="mt-1 text-xs text-ivory-faint">
+                  из {nominal.toFixed(0)} BYN — часть уже потрачена
+                </p>
+              )}
+            </div>
+
+            <div class="mt-8 rounded-xl border border-ink-600 bg-ink-900/60 p-4 text-center">
+              <p class="text-[10px] uppercase tracking-[0.25em] text-gold-500">
+                Код активации
+              </p>
+              <p class="mt-1 font-mono text-2xl tracking-[0.3em] text-ivory">
+                {cert.code}
+              </p>
+            </div>
+
+            <p class="mt-6 text-center text-xs text-ivory-faint">
+              {expired
+                ? "Срок действия истёк"
+                : left === 1
+                  ? "Действует ещё 1 день"
+                  : `Действует ещё ${left} дн.`}
+            </p>
+          </div>
+        </div>
+
+        {/* Что делать дальше */}
+        {expired || spent ? (
+          <p
+            class="mt-6 rounded-xl border border-ink-600 bg-ink-800/60 p-4 text-center text-sm text-ivory-muted"
+          >
+            {spent
+              ? "Сертификат уже использован полностью."
+              : "Срок действия сертификата истёк. Напишите нам — посмотрим, что можно сделать."}
+          </p>
+        ) : (
+          <>
+            <a
+              href="/account?activate=1"
+              class="mt-6 flex h-12 w-full items-center justify-center rounded-full bg-gold-gradient text-base font-medium text-ink-900 shadow-gold transition-all hover:shadow-gold-lg"
+            >
+              Активировать сейчас
+            </a>
+            <p class="mt-3 text-center text-xs leading-relaxed text-ivory-faint">
+              Активация превратит сертификат в баллы на вашем счёте — ими можно
+              оплатить заказ на сайте. Понадобится вход в личный кабинет.
+              <br />
+              Можно и не активировать: просто назовите код в магазине по адресу{" "}
+              {COMPANY.actualAddress}.
+            </p>
+          </>
+        )}
+
+        <p class="mt-8 text-center text-xs text-ivory-faint">
+          Вопросы: {COMPANY.phones.join(", ")} · {COMPANY.email}
+        </p>
+      </>
+    )}
+  </section>
+</Layout>

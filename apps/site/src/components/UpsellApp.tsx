@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { clearGiftCart } from "../lib/gift-cart";
 import {
   loadCheckout,
   clearCheckout,
@@ -192,6 +193,7 @@ export default function UpsellApp() {
     }
     writeCart([]);
     clearCheckout();
+    clearGiftCart();
     if ("redirectUrl" in res) {
       window.location.href = res.redirectUrl;
       return;

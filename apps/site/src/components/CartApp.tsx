@@ -33,6 +33,13 @@ import {
   type DeliveryTypeValue,
 } from "@doza/db/delivery-rules";
 import { saveCheckout, placeOrder, type CheckoutForm } from "../lib/checkout-client";
+import {
+  readGiftCart,
+  removeGift,
+  clearGiftCart,
+  type GiftCartItem,
+} from "../lib/gift-cart";
+import { BELARUS_PREFIX as PREFIX } from "@doza/shared/phone";
 import OfficePicker, { type Office } from "./OfficePicker";
 
 /** Стоимость доставки — считает сервер, здесь только показываем. */
@@ -82,6 +89,8 @@ function writeCart(cart: CartItem[]) {
 
 export default function CartApp() {
   const [cart, setCart] = useState<CartItem[]>([]);
+  /** Сертификаты — отдельным списком: у них нет ни объёма, ни остатка. */
+  const [gifts, setGifts] = useState<GiftCartItem[]>([]);
   const [mounted, setMounted] = useState(false);
 
   // форма
@@ -136,6 +145,7 @@ export default function CartApp() {
 
   useEffect(() => {
     setCart(readCart());
+    setGifts(readGiftCart());
     setMounted(true);
   }, []);
 
@@ -156,6 +166,10 @@ export default function CartApp() {
           body: JSON.stringify({
             deliveryType: delivery,
             promoCode,
+            certificates: gifts.map((g) => ({
+              denomination: g.denomination,
+              sendBySms: g.sendBySms,
+            })),
             items: cart.map((i) => ({
               productId: i.productId,
               volumeMl: i.volumeMl,
@@ -183,7 +197,7 @@ export default function CartApp() {
     return () => {
       cancelled = true;
     };
-  }, [cart, mounted, delivery, promoCodeDebounced]);
+  }, [cart, gifts, mounted, delivery, promoCodeDebounced]);
 
   useEffect(() => {
     const t = setTimeout(() => setPromoCodeDebounced(promoCode.trim()), 500);
@@ -268,6 +282,13 @@ export default function CartApp() {
         : undefined,
       comment,
       promoCode,
+      certificates: gifts.map((g) => ({
+        denomination: g.denomination,
+        sendBySms: g.sendBySms,
+        recipientPhone: g.recipientPhone ? PREFIX + g.recipientPhone : undefined,
+        recipientName: g.recipientName,
+        message: g.message,
+      })),
       loyaltySpend: effectiveSpend,
     };
 
@@ -291,6 +312,8 @@ export default function CartApp() {
     // покупатель вернётся на /payment/fail и захочет попробовать снова.
     writeCart([]);
     setCart([]);
+    clearGiftCart();
+    setGifts([]);
     if ("redirectUrl" in res) {
       window.location.href = res.redirectUrl;
       return;
@@ -329,7 +352,7 @@ export default function CartApp() {
   }
 
   // Пустая корзина
-  if (cart.length === 0) {
+  if (cart.length === 0 && gifts.length === 0) {
     return (
       <div className="mx-auto max-w-md rounded-2xl border border-ink-600/60 bg-ink-700 p-10 text-center">
         <p className="mb-6 text-ivory-muted">Ваша корзина пуста.</p>
@@ -347,6 +370,40 @@ export default function CartApp() {
     <div className="grid gap-8 lg:grid-cols-[1fr_400px]">
       {/* Список позиций */}
       <div className="space-y-4">
+        {gifts.map((g, idx) => (
+          <div
+            key={"gift-" + idx}
+            className="flex gap-4 rounded-xl border border-gold-600/40 bg-gold-500/5 p-4"
+          >
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg border border-gold-600/40 bg-ink-800">
+              <span className="font-serif text-lg text-gold-gradient">
+                {g.denomination}
+              </span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm text-ivory">
+                Подарочный сертификат {g.denomination} BYN
+              </p>
+              <p className="mt-0.5 text-xs text-ivory-faint">
+                {g.sendBySms
+                  ? "Электронный — ссылка уйдёт в SMS" +
+                    (g.recipientName ? " для " + g.recipientName : "")
+                  : "Бумажная карточка — отправим почтой"}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  removeGift(idx);
+                  setGifts(readGiftCart());
+                }}
+                className="mt-2 cursor-pointer text-xs text-ivory-faint hover:text-gold-400"
+              >
+                Убрать
+              </button>
+            </div>
+          </div>
+        ))}
+
         {cart.map((item, idx) => (
           <div
             key={`${item.productId}-${item.volumeMl}`}

@@ -1,6 +1,7 @@
 import { prisma } from "@doza/db";
 import { settlePaidOrder } from "@doza/db/payments";
 import { paidSmsText } from "@doza/db/order-rules";
+import { issueOrderCertificates } from "@doza/db/certificates";
 import { notifyOrder } from "./order-notify";
 import { notifyTelegram } from "./telegram";
 import { sendSmsFromSite } from "./sms";
@@ -25,6 +26,17 @@ export async function onOrderPaid(
   try {
     const settled = await settlePaidOrder(orderId, await loyaltyDays(), notifyTelegram);
     earned = settled.earned;
+
+    // Сертификаты выпускаем только теперь: до оплаты их не существует, и код,
+    // показанный раньше, был бы подарком всякому, кто дошёл до корзины.
+    await issueOrderCertificates({
+      orderId,
+      siteUrl: process.env.SITE_URL ?? "https://doza-parfum.by",
+      sendGiftSms: async ({ phone, text }) => {
+        await sendSmsFromSite({ kind: "certificate", phone, text });
+      },
+      notify: notifyTelegram,
+    });
   } catch (e) {
     // Деньги уже у нас — откатывать оплату из-за сбоя склада нельзя. Кричим,
     // разбирается человек.

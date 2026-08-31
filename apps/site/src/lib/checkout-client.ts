@@ -34,6 +34,14 @@ export interface CheckoutForm {
   comment: string;
   /** Промокод, введённый покупателем. Пустая строка — код не вводили. */
   promoCode?: string;
+  /** Подарочные сертификаты в заказе. */
+  certificates?: {
+    denomination: number;
+    sendBySms: boolean;
+    recipientPhone?: string;
+    recipientName?: string;
+    message?: string;
+  }[];
   loyaltySpend: number;
 }
 
@@ -87,6 +95,8 @@ export async function placeOrder(
         delivery: form.delivery,
         europost: form.europost,
         comment: form.comment,
+        promoCode: form.promoCode,
+        certificates: form.certificates ?? [],
         loyaltySpend: form.loyaltySpend,
         items: items.map((i) => ({
           productId: i.productId,

@@ -3,6 +3,10 @@ import { prisma } from "@doza/db";
 import { getBalance, spendPoints } from "@doza/db/loyalty";
 import { requestConsent } from "@doza/db/consent";
 import { findUsablePromoCode } from "@doza/db/promo-codes";
+import {
+  needsShipping,
+  type CertificateOrderLine,
+} from "@doza/db/certificate-rules";
 import { createPaymentAttempt, refundOrderPoints } from "@doza/db/payments";
 import { assertBelarusPhone } from "@doza/shared/phone";
 import { assertCustomerName } from "@doza/shared/customer-name";
@@ -58,6 +62,8 @@ interface OrderBody {
   comment?: string;
   /** Промокод, введённый покупателем. Регистр и пробелы не важны. */
   promoCode?: string;
+  /** Подарочные сертификаты в корзине. */
+  certificates?: CertificateOrderLine[];
   items: IncomingItem[];
   loyaltySpend?: number;
 }
@@ -79,6 +85,13 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
   const deliveryType = body.deliveryType;
   const items = Array.isArray(body.items) ? body.items : [];
+  const certificates: CertificateOrderLine[] = Array.isArray(body.certificates)
+    ? body.certificates
+    : [];
+
+  // Заказ только из электронных сертификатов везти некуда: адрес и отделение
+  // спрашивать не за что, и доставка не берётся.
+  const shipping = needsShipping({ hasProducts: items.length > 0, certificates });
 
   // Вошедший в кабинет покупатель опознаётся по сессии. Присланные имя и
   // телефон для него не значат ничего: карта привязана к аккаунту, и скидку по
@@ -107,7 +120,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   // Данные посылки проверяем и здесь: браузерная проверка — подсказка, а не
   // гарантия. Неполный адрес всплывёт только на почте, когда деньги уже взяты.
   let shipTo: DeliveryDetails | null = null;
-  if (needsPostalAddress(deliveryType)) {
+  if (shipping && needsPostalAddress(deliveryType)) {
     const bad_ = validateDelivery(body.delivery ?? {});
     if (bad_) return bad(bad_);
     shipTo = normalizeDelivery(body.delivery as DeliveryDetails);
@@ -121,7 +134,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     middleName: string;
     phone: string;
   } | null = null;
-  if (needsOffice(deliveryType)) {
+  if (shipping && needsOffice(deliveryType)) {
     const e = body.europost ?? {};
     const fio = [e.lastName, e.firstName, e.middleName]
       .map((s) => (s ?? "").trim());
@@ -150,7 +163,22 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       phone: recipientPhone,
     };
   }
-  if (items.length === 0) return bad("Корзина пуста");
+  if (items.length === 0 && certificates.length === 0) return bad("Корзина пуста");
+
+  // Телефон получателя подарка проверяем здесь: формат номера живёт в общем
+  // пакете, а правила сертификата — в @doza/db, который от него не зависит.
+  // Ошибиться тут дорого: SMS с чужим подарком уйдёт постороннему человеку.
+  for (const c of certificates) {
+    if (!c.sendBySms) continue;
+    try {
+      c.recipientPhone = assertBelarusPhone(c.recipientPhone ?? "");
+    } catch {
+      return bad(
+        "Проверьте номер, на который отправить сертификат: " +
+          "нужен белорусский номер",
+      );
+    }
+  }
 
   // Пересчёт цен на сервере — клиентским ценам не доверяем. Тот же расчёт, что
   // показывала корзина, поэтому сумма на платёжной странице совпадёт с той,
@@ -170,6 +198,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       vipPercent,
       promoCodePercent: promo?.discountPercent ?? 0,
       checkStock: true,
+      certificates,
     });
   } catch (e) {
     if (e instanceof CartError) return bad(e.message);
@@ -180,7 +209,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
   // Доставка. Порог считается по сумме товаров до списания баллов: баллы —
   // способ оплаты, а не уменьшение заказа.
-  const delivery = deliveryCost({ type: deliveryType, goodsTotal: total });
+  const delivery = shipping
+    ? deliveryCost({ type: deliveryType, goodsTotal: total })
+    : { fee: 0, missingForFree: 0, free: true };
 
   // Клиент (upsert по телефону)
   const existing = await prisma.customer.findUnique({
@@ -263,6 +294,16 @@ export const POST: APIRoute = async ({ request, cookies }) => {
           volumeMl: i.volumeMl,
           qty: i.qty,
           priceByn: i.priceByn,
+        })),
+      },
+      certificates: {
+        create: quote.certificates.map((c) => ({
+          denomination: c.denomination,
+          priceByn: c.priceByn,
+          sendBySms: c.sendBySms,
+          recipientPhone: c.recipientPhone,
+          recipientName: c.recipientName,
+          message: c.message,
         })),
       },
     },

@@ -15,6 +15,7 @@ const STATIC = [
   "/privacy",
   "/offer",
   "/returns",
+  "/gift-card",
 ];
 
 export const GET: APIRoute = async () => {
