@@ -8,14 +8,14 @@ import { prisma } from "./index";
  * акцию на товар, и вторая механика скидок рядом с первой не заводится.
  */
 
-/** Сколько длится подборка по умолчанию. */
+/**
+ * Сколько дней предлагать по умолчанию в форме.
+ *
+ * Именно предлагать: срок задаёт админ датами «с» и «по», как в обычных
+ * акциях. Неделя — частый случай, а не правило: подборку делают и на выходные,
+ * и на две недели, и пересчитывать это в уме из «длится N дней» неудобно.
+ */
 export const WEEKLY_PROMO_DAYS = 7;
-
-export function weeklyPromoEnd(from: Date, days = WEEKLY_PROMO_DAYS): Date {
-  const end = new Date(from);
-  end.setDate(end.getDate() + days);
-  return end;
-}
 
 /** Действующая подборка вместе с товарами. */
 export async function activeWeeklyPromo(now = new Date()) {

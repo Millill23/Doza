@@ -1,11 +1,7 @@
 "use server";
 
-import {
-  createWeeklyPromo,
-  deleteWeeklyPromo,
-  weeklyPromoEnd,
-  WEEKLY_PROMO_DAYS,
-} from "@doza/db/weekly-promo";
+import { createWeeklyPromo, deleteWeeklyPromo } from "@doza/db/weekly-promo";
+import { startOfDay, endOfDay, isDayString } from "@doza/shared/day-range";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/session";
 
@@ -21,7 +17,10 @@ export async function saveWeeklyPromo(input: {
   name: string;
   discountPercent: number;
   productIds: number[];
-  days?: number;
+  /** День начала в виде ГГГГ-ММ-ДД — как в обычных акциях. */
+  startsAt: string;
+  /** День окончания включительно: подборка живёт до конца этого дня. */
+  endsAt: string;
 }) {
   await requireRole(["admin"]);
 
@@ -33,9 +32,15 @@ export async function saveWeeklyPromo(input: {
   const ids = [...new Set((input.productIds ?? []).map(Number))].filter(Boolean);
   if (ids.length === 0) throw new Error("Выберите хотя бы один аромат");
 
-  const days = Number(input.days) > 0 ? Number(input.days) : WEEKLY_PROMO_DAYS;
-  const startsAt = new Date();
-  const endsAt = weeklyPromoEnd(startsAt, days);
+  // Выбирается только дата: начало — с 00:00 указанного дня, окончание — до
+  // конца указанного дня включительно. Ровно как в обычных акциях: продавец не
+  // должен помнить, что «по 7 сентября» где-то значит «до 7 сентября 00:00».
+  if (!isDayString(input.startsAt) || !isDayString(input.endsAt))
+    throw new Error("Укажите даты начала и окончания");
+
+  const startsAt = startOfDay(input.startsAt);
+  const endsAt = endOfDay(input.endsAt);
+  if (endsAt < startsAt) throw new Error("Дата окончания раньше начала");
 
   await createWeeklyPromo({
     name,

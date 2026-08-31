@@ -326,6 +326,33 @@ export default function CatalogApp({
       {/* Подборка недели — над каталогом и во всю ширину: это витринная
           вывеска, а не ещё один пункт в списке фильтров. Кнопки нет вовсе,
           когда подборка не идёт: пустая вывеска хуже отсутствующей. */}
+      {/* Сертификаты — ссылкой прямо в каталоге. В шапке они есть только на
+          широком экране, а с телефона именно каталог и есть вход в магазин. */}
+      <a
+        href="/gift-card"
+        className="mb-4 flex items-center justify-between gap-4 rounded-2xl border border-ink-600 bg-ink-800/60 px-5 py-3.5 transition-colors hover:border-gold-600/50"
+      >
+        <span className="flex items-center gap-3">
+          <svg
+            width="22" height="22" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"
+            strokeLinejoin="round" className="shrink-0 text-gold-400"
+            aria-hidden="true"
+          >
+            <path d="M20 12v9H4v-9M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
+          </svg>
+          <span>
+            <span className="block text-sm text-ivory">
+              Подарочный сертификат
+            </span>
+            <span className="mt-0.5 block text-xs font-light text-ivory-faint">
+              Когда не угадать с ароматом — пусть выберет сам
+            </span>
+          </span>
+        </span>
+        <span className="shrink-0 text-sm text-gold-400">Выбрать →</span>
+      </a>
+
       {weekly && (
         <button
           type="button"

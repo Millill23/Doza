@@ -34,6 +34,29 @@ function day(iso: string): string {
   return new Date(iso).toLocaleDateString("ru-RU");
 }
 
+/** Дата в формате поля ввода: сегодня или через N дней. */
+function isoDay(offsetDays = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Склонение: 1 аромат, 3 аромата, 5 ароматов. */
+function plural(n: number): string {
+  const ten = n % 100;
+  if (ten >= 11 && ten <= 14) return "ароматов";
+  switch (n % 10) {
+    case 1:
+      return "аромат";
+    case 2:
+    case 3:
+    case 4:
+      return "аромата";
+    default:
+      return "ароматов";
+  }
+}
+
 export default function WeeklyPromoApp({
   active,
   products,
@@ -43,6 +66,7 @@ export default function WeeklyPromoApp({
   active: Active | null;
   products: Product[];
   history: HistoryRow[];
+  /** Сколько дней предлагать по умолчанию — просто заготовка для поля «по». */
   defaultDays: number;
 }) {
   const [pending, startTransition] = useTransition();
@@ -50,7 +74,11 @@ export default function WeeklyPromoApp({
 
   const [name, setName] = useState("Парфюм недели");
   const [percent, setPercent] = useState(20);
-  const [days, setDays] = useState(defaultDays);
+  // Даты задаёт админ, как в обычных акциях: «неделя» — обычный случай, а не
+  // жёсткое правило, и подборку на выходные или на две недели должно быть
+  // видно из формы, а не пересчитывать в уме.
+  const [from, setFrom] = useState(isoDay());
+  const [to, setTo] = useState(isoDay(defaultDays));
   const [query, setQuery] = useState("");
   const [picked, setPicked] = useState<number[]>([]);
 
@@ -78,7 +106,8 @@ export default function WeeklyPromoApp({
           name,
           discountPercent: percent,
           productIds: picked,
-          days,
+          startsAt: from,
+          endsAt: to,
         });
         setPicked([]);
         setQuery("");
@@ -125,7 +154,7 @@ export default function WeeklyPromoApp({
               </h2>
               <p className="mt-1 text-sm text-ivory-muted">
                 Скидка {active.discountPercent}% на {active.productIds.length}{" "}
-                {active.productIds.length === 1 ? "аромат" : "ароматов"} · до{" "}
+                {plural(active.productIds.length)} · до{" "}
                 {day(active.endsAt)}
               </p>
               <p className="mt-2 text-xs text-ivory-faint">
@@ -162,7 +191,7 @@ export default function WeeklyPromoApp({
           </p>
         )}
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <label className={labelCls}>Название</label>
             <input
@@ -183,13 +212,20 @@ export default function WeeklyPromoApp({
             />
           </div>
           <div>
-            <label className={labelCls}>Длится, дней</label>
+            <label className={labelCls}>Действует с</label>
             <input
-              type="number"
-              min={1}
-              max={60}
-              value={days}
-              onChange={(e) => setDays(Number(e.target.value))}
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className={labelCls}>по включительно</label>
+            <input
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
               className={inputCls}
             />
           </div>
@@ -261,7 +297,7 @@ export default function WeeklyPromoApp({
                   <td className="px-5 py-2.5 text-ivory">{h.name}</td>
                   <td className="px-5 py-2.5 text-gold-400">−{h.discountPercent}%</td>
                   <td className="px-5 py-2.5 text-ivory-muted">
-                    {h.count} {h.count === 1 ? "аромат" : "ароматов"}
+                    {h.count} {plural(h.count)}
                   </td>
                   <td className="px-5 py-2.5 text-ivory-faint">
                     {day(h.startsAt)} — {day(h.endsAt)}

@@ -2,6 +2,13 @@
 import { prisma } from "@doza/db";
 import { getCustomerId } from "../lib/customer-auth";
 
+/**
+ * Шапка сайта.
+ *
+ * На узком экране ссылки скрыты — с телефона в каталог и к сертификатам ведут
+ * кнопки на самих страницах, а не тесная строка меню.
+ */
+
 const links = [
   { href: "/catalog", label: "Каталог" },
   { href: "/finder", label: "Подобрать аромат" },
@@ -10,6 +17,17 @@ const links = [
   { href: "/catalog?gender=unisex", label: "Унисекс" },
   { href: "/about", label: "О нас" },
 ];
+
+/**
+ * Сертификаты стоят отдельно от остальных ссылок: это не раздел каталога, а
+ * отдельный товар, и теряться среди «Мужские / Женские / Унисекс» ему нельзя.
+ * На широком экране — короткой подписью, чтобы строка не переполнялась.
+ */
+const GIFT = {
+  href: "/gift-card",
+  short: "Сертификаты",
+  full: "Подарочные сертификаты",
+};
 
 // Определяем вошедшего покупателя (для показа имени в шапке)
 const customerId = getCustomerId(Astro.cookies);
@@ -26,7 +44,7 @@ if (customerId) {
 <header
   class="sticky top-0 z-30 border-b border-ink-600/60 bg-ink-900/80 backdrop-blur-md"
 >
-  <nav class="container-luxe flex h-16 items-center justify-between gap-6">
+  <nav class="container-luxe flex h-16 items-center justify-between gap-4">
     <!-- Логотип -->
     <a href="/" class="flex items-center gap-2" aria-label="DOZA — на главную">
       <span
@@ -35,24 +53,33 @@ if (customerId) {
       >
     </a>
 
-    <!-- Навигация (desktop) -->
-    <ul class="hidden items-center gap-7 md:flex">
+    <!-- Навигация (десктоп) -->
+    <ul class="hidden items-center gap-5 md:flex lg:gap-7">
       {
         links.map((l) => (
           <li>
             <a
               href={l.href}
-              class="text-sm font-light text-ivory-muted transition-colors duration-200 hover:text-gold-400"
+              class="whitespace-nowrap text-sm font-light text-ivory-muted transition-colors duration-200 hover:text-gold-400"
             >
               {l.label}
             </a>
           </li>
         ))
       }
+      <li>
+        <a
+          href={GIFT.href}
+          class="whitespace-nowrap text-sm font-light text-gold-400 transition-colors duration-200 hover:text-gold-300"
+        >
+          <span class="lg:hidden">{GIFT.short}</span>
+          <span class="hidden lg:inline">{GIFT.full}</span>
+        </a>
+      </li>
     </ul>
 
     <!-- Действия -->
-    <div class="flex items-center gap-4">
+    <div class="flex items-center gap-3 sm:gap-4">
       {
         customerName ? (
           <a
@@ -82,7 +109,7 @@ if (customerId) {
       }
       <a
         href="/cart"
-        class="inline-flex h-10 items-center gap-2 rounded-full border border-gold-600/40 px-4 text-sm text-gold-400 transition-colors duration-200 hover:border-gold-500 hover:text-gold-300"
+        class="inline-flex h-10 items-center gap-2 rounded-full border border-gold-600/40 px-3 text-sm text-gold-400 transition-colors duration-200 hover:border-gold-500 hover:text-gold-300 sm:px-4"
         aria-label="Корзина"
       >
         <svg
@@ -107,32 +134,49 @@ if (customerId) {
           class="ml-0.5 hidden min-w-[20px] rounded-full bg-gold-gradient px-1.5 text-center text-xs font-semibold text-ink-900"
         ></span>
       </a>
+
     </div>
   </nav>
+
 </header>
 
 <script is:inline>
   (function () {
+    // ── Счётчик корзины ────────────────────────────────────────────────────
+    function count(key, each) {
+      try {
+        var list = JSON.parse(localStorage.getItem(key) || "[]");
+        return Array.isArray(list) ? list.reduce(each, 0) : 0;
+      } catch (e) {
+        return 0;
+      }
+    }
+
     function update() {
       var badge = document.getElementById("cart-badge");
       if (!badge) return;
-      var count = 0;
-      try {
-        var cart = JSON.parse(localStorage.getItem("doza_cart") || "[]");
-        count = cart.reduce(function (s, i) {
+      // Сертификаты лежат отдельным ключом, но для покупателя корзина одна —
+      // счётчик обязан считать и их, иначе добавленный подарок «пропадает».
+      var total =
+        count("doza_cart", function (s, i) {
           return s + (i.qty || 1);
-        }, 0);
-      } catch (e) {}
-      if (count > 0) {
-        badge.textContent = String(count);
+        }) +
+        count("doza_gift", function (s) {
+          return s + 1;
+        });
+
+      if (total > 0) {
+        badge.textContent = String(total);
         badge.classList.remove("hidden");
       } else {
         badge.classList.add("hidden");
       }
     }
+
     update();
     window.addEventListener("doza:cart-updated", update);
     window.addEventListener("storage", update);
     document.addEventListener("astro:after-swap", update);
+
   })();
 </script>
