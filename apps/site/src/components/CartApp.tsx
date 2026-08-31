@@ -129,6 +129,8 @@ export default function CartApp() {
   const [promoCodeDebounced, setPromoCodeDebounced] = useState("");
   /** Суммы со скидками — считает сервер, здесь мы их только показываем. */
   const [quote, setQuote] = useState<Quote | null>(null);
+  /** Товарная часть заказа — без сертификатов. По ней считаются баллы. */
+  const [goodsNet, setGoodsNet] = useState(0);
   /** Есть ли что предложить добрать: от этого зависит, куда ведёт кнопка. */
   const [hasOffer, setHasOffer] = useState(false);
   /** Стоимость доставки и подсказка про порог — считает сервер. */
@@ -182,6 +184,7 @@ export default function CartApp() {
         const data = await r.json();
         if (cancelled) return;
         setQuote(data.cart ?? null);
+        setGoodsNet(data.goodsNet ?? 0);
         setHasOffer((data.upsellCount ?? 0) > 0);
         setDeliveryInfo(data.delivery ?? null);
         setPromo(data.promo ?? null);
@@ -217,7 +220,10 @@ export default function CartApp() {
   const deliveryFee = deliveryInfo?.fee ?? 0;
   // Баллами платят за товар, но не за доставку: иначе бесплатная доставка
   // получалась бы за чужой счёт.
-  const maxSpend = Math.min(balance, total);
+  // Баллами платят за товар, но не за сертификат: он обменивается обратно в
+  // баллы при активации, и круг замкнулся бы — купил за баллы, активировал,
+  // получил их обратно со свежим сроком.
+  const maxSpend = Math.min(balance, goodsNet);
   const effectiveSpend = usePoints ? Math.min(pointsToSpend || maxSpend, maxSpend) : 0;
   const toPay = Math.max(0, Math.round((total + deliveryFee - effectiveSpend) * 100) / 100);
 

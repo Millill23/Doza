@@ -273,20 +273,40 @@ function monthStart(d = new Date()) {
  */
 async function monthTotalsBySeller() {
   const since = monthStart();
-  const [sales, rules] = await Promise.all([
+  const [sales, certificates, rules] = await Promise.all([
     prisma.offlineSale.findMany({
       where: { status: "closed", createdAt: { gte: since } },
       select: { sellerId: true, createdAt: true, totalByn: true },
     }),
+    // Проданные сертификаты. Деньги за них легли в кассу в день продажи, и
+    // засчитывать их только при погашении — значит не платить тому, кто
+    // продал, и заплатить тому, кто просто отпустил товар через три месяца.
+    // Купленные на сайте сюда не попадают: у них нет продавца.
+    prisma.giftCertificate.findMany({
+      where: { issuedAt: { gte: since }, issuedById: { not: null } },
+      select: { issuedById: true, issuedAt: true, paidByn: true },
+    }),
     splitRules(since),
   ]);
 
+  // Погашение сертификата позже попадёт в сумму ещё раз, уже как обычный чек.
+  // Это осознанно: правило простое и в пользу продавца, а разбираться, чей
+  // сертификат гасят, продавцу за прилавком некогда.
   return applySalesSplits(
-    sales.map((s) => ({
-      sellerId: s.sellerId,
-      day: dayKey(s.createdAt),
-      totalByn: Number(s.totalByn),
-    })),
+    [
+      ...sales.map((s) => ({
+        sellerId: s.sellerId,
+        day: dayKey(s.createdAt),
+        totalByn: Number(s.totalByn),
+      })),
+      ...certificates.map((c) => ({
+        sellerId: c.issuedById!,
+        day: dayKey(c.issuedAt),
+        // Считаем уплаченное, а не номинал: VIP берёт сертификат со скидкой,
+        // и в кассу легло именно столько.
+        totalByn: Number(c.paidByn),
+      })),
+    ],
     rules,
   );
 }

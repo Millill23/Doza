@@ -206,6 +206,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   }
   const orderItems = quote.lines;
   const total = quote.net;
+  const certificatesTotal =
+    Math.round(quote.certificates.reduce((s, c) => s + c.priceByn, 0) * 100) / 100;
 
   // Доставка. Порог считается по сумме товаров до списания баллов: баллы —
   // способ оплаты, а не уменьшение заказа.
@@ -243,11 +245,18 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   // набран в форме, — и любой, кто знал чужой телефон, оплачивал свой заказ
   // чужими баллами. Проверять телефон бессмысленно: это просто цифры в поле.
   // Ровно так же закрыта скидка по VIP-карте.
+  // Баллами платят только за товар. Сертификат за баллы купить нельзя: он
+  // обменивается обратно в баллы при активации, и получался бы вечный круг —
+  // купил за 300 баллов, активировал, получил 300 обратно со свежим сроком.
+  // Срок сгорания баллов при этом обнулялся бы бесконечно, а сами баллы
+  // превращались в инструмент, который можно передать другому человеку.
+  const goodsTotal = quote.net - certificatesTotal;
+
   let loyaltySpent = 0;
   const requested = Math.max(0, Number(body.loyaltySpend || 0));
   if (requested > 0 && account) {
     const balance = await getBalance(customer.id);
-    const allowed = Math.min(requested, balance, total);
+    const allowed = Math.min(requested, balance, goodsTotal);
     if (allowed > 0) {
       // заказ ещё не создан — спишем после создания, чтобы привязать ref
       loyaltySpent = Math.round(allowed * 100) / 100;

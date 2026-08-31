@@ -98,6 +98,12 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       cart,
       upsellCount,
       delivery: { ...delivery, hint: freeDeliveryHint(delivery), needed: shipping },
+      // Товарная часть — без сертификатов. По ней корзина считает потолок
+      // списания баллов: сертификат за баллы купить нельзя.
+      goodsNet:
+        Math.round(
+          (cart.net - cart.certificates.reduce((s, c) => s + c.priceByn, 0)) * 100,
+        ) / 100,
       promo: promo ? { code: promo.code, percent: promo.discountPercent } : null,
       promoError,
     });

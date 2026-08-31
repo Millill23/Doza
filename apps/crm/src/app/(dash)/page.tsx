@@ -3,6 +3,7 @@ import { formatByn } from "@doza/shared";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { myMonthSales, monthSalesBySeller, SOLD_ORDER } from "@/lib/analytics-data";
+import CommissionBar from "@/components/CommissionBar";
 
 export const dynamic = "force-dynamic";
 
@@ -114,6 +115,7 @@ export default async function DashboardPage() {
             <p className="mt-1 text-sm text-ivory-faint">продаж</p>
           </div>
         </div>
+        <CommissionBar sum={mine.sum} />
       </div>
 
       {isAdmin && bySeller.length > 0 && (
@@ -125,12 +127,15 @@ export default async function DashboardPage() {
             {bySeller.map((r) => (
               <li
                 key={r.sellerId}
-                className="flex items-center justify-between rounded-lg border border-ink-600/60 px-3 py-2 text-sm"
+                className="rounded-lg border border-ink-600/60 px-3 py-2.5 text-sm"
               >
-                <span className="text-ivory">
-                  {r.name} <span className="text-ivory-faint">· {r.count} прод.</span>
-                </span>
-                <span className="font-medium text-gold-400">{formatByn(r.sum)}</span>
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-ivory">
+                    {r.name} <span className="text-ivory-faint">· {r.count} прод.</span>
+                  </span>
+                  <span className="font-medium text-gold-400">{formatByn(r.sum)}</span>
+                </div>
+                <CommissionBar sum={r.sum} compact />
               </li>
             ))}
           </ul>

@@ -41,6 +41,7 @@
     "./stock-rules": "./src/stock-rules.ts",
     "./promo-codes": "./src/promo-codes.ts",
     "./promo-code-rules": "./src/promo-code-rules.ts",
-    "./weekly-promo": "./src/weekly-promo.ts"
+    "./weekly-promo": "./src/weekly-promo.ts",
+    "./commission-rules": "./src/commission-rules.ts"
   }
 }
