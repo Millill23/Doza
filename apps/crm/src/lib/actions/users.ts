@@ -5,8 +5,11 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/session";
 import { hashPassword } from "@/lib/password";
 
-type Role = "admin" | "seller" | "marketer";
-const ROLES: Role[] = ["admin", "seller", "marketer"];
+type Role = "admin" | "seller" | "marketer" | "influencer";
+// Блогер входит в список: создать его может только админ, а `requireRole`
+// выше это и обеспечивает. Отдельного ограничения не нужно — пользователей
+// вообще заводит только админ.
+const ROLES: Role[] = ["admin", "seller", "marketer", "influencer"];
 
 export async function createUser(formData: FormData) {
   await requireRole(["admin"]);

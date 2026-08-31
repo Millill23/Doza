@@ -8,6 +8,7 @@ export default async function DashLayout({
 }) {
   const session = await requireSession();
   const role = session.user.role;
+
   const name = session.user.name ?? session.user.email ?? "";
 
   return (

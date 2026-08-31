@@ -19,6 +19,7 @@ const ROLE_LABEL: Record<string, string> = {
   admin: "Администратор",
   seller: "Продавец",
   marketer: "Маркетолог",
+  influencer: "Блогер",
 };
 
 export default function UsersManager({ users }: { users: UserRow[] }) {
@@ -127,6 +128,7 @@ export default function UsersManager({ users }: { users: UserRow[] }) {
             <option value="admin">Администратор</option>
             <option value="seller">Продавец</option>
             <option value="marketer">Маркетолог</option>
+            <option value="influencer">Блогер</option>
           </select>
           <input name="password" type="text" placeholder="Пароль" required
             className="h-10 w-full rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory focus:border-gold-500 focus:outline-none" />

@@ -62,6 +62,8 @@ const DISCOUNT_LABEL: Record<string, string> = {
   social: "за подписки",
   date: "по памятной дате",
   promo: "акция",
+  promocode: "промокод",
+  remnant: "остаток во флаконе",
   super: "супер-акция",
   none: "",
 };
@@ -83,6 +85,7 @@ export default function CashRegister({
   subscribePercent = 5,
   storyPercent = 5,
   remnantPercent = 20,
+  promoCodes = [],
 }: {
   products: ProductOpt[];
   atomizers: AtomizerOpt[];
@@ -93,6 +96,12 @@ export default function CashRegister({
   subscribePercent?: number;
   storyPercent?: number;
   remnantPercent?: number;
+  promoCodes?: {
+    code: string;
+    comment: string | null;
+    discountPercent: number;
+    influencer: string | null;
+  }[];
 }) {
   const [query, setQuery] = useState("");
   const [brandFilter, setBrandFilter] = useState<string | null>(null);
@@ -120,6 +129,9 @@ export default function CashRegister({
   const [story, setStory] = useState(false);
   /** Флакон почти пуст — продавец отдаёт остаток дешевле. */
   const [remnant, setRemnant] = useState(false);
+  /** Промокод покупателя. Продавец выбирает из списка, а не печатает. */
+  const [promoCode, setPromoCode] = useState("");
+  const [promoQuery, setPromoQuery] = useState("");
   const [sellerId, setSellerId] = useState<number>(currentUserId);
   const [usePoints, setUsePoints] = useState(false);
   const [spend, setSpend] = useState(0);
@@ -187,6 +199,8 @@ export default function CashRegister({
       socialPercent,
       datePercent: useDate ? (dateReward?.percent ?? 0) : 0,
       remnantPercent: remnant ? remnantPercent : 0,
+      promoCodePercent:
+        promoCodes.find((c) => c.code === promoCode)?.discountPercent ?? 0,
       productPromoPercent: promoMap,
       superPromo: superPromo
         ? {
@@ -204,6 +218,8 @@ export default function CashRegister({
     superPromo,
     remnant,
     remnantPercent,
+    promoCode,
+    promoCodes,
   ]);
 
   const total = priced.gross;
@@ -320,6 +336,8 @@ export default function CashRegister({
     setSubscribe(false);
     setStory(false);
     setRemnant(false);
+    setPromoCode("");
+    setPromoQuery("");
     setUsePoints(false);
     setSpend(0);
     setOtp("");
@@ -364,6 +382,7 @@ export default function CashRegister({
           loyaltySpend: effSpend,
           loyaltyOtp: otp || undefined,
           remnant,
+          promoCode,
           socialSubscribe: subscribe,
           socialStory: story,
           useDateReward: useDate,
@@ -657,6 +676,75 @@ export default function CashRegister({
               Остаток не складывается с подписками — применится то, что выгоднее
               клиенту.
             </p>
+          )}
+
+          {/* Промокод: продавец выбирает из списка, а не печатает со слов
+              покупателя — так не бывает опечаток и «кода, которого нет». */}
+          {promoCodes.length > 0 && (
+            <div className="mt-4">
+              <label className="mb-1.5 block text-xs uppercase tracking-wide text-gold-500">
+                Промокод
+              </label>
+              {promoCode ? (
+                <div className="flex items-center justify-between rounded-lg border border-gold-500/40 bg-gold-500/5 px-3 py-2">
+                  <div>
+                    <span className="font-mono text-sm text-gold-300">{promoCode}</span>
+                    <span className="ml-2 text-xs text-ivory-faint">
+                      −{promoCodes.find((c) => c.code === promoCode)?.discountPercent}%
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPromoCode("")}
+                    className="text-xs text-ivory-faint hover:text-gold-400"
+                  >
+                    Убрать
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <input
+                    value={promoQuery}
+                    onChange={(e) => setPromoQuery(e.target.value)}
+                    placeholder="Поиск по коду или блогеру"
+                    className="h-10 w-full rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory placeholder:text-ivory-faint focus:border-gold-500 focus:outline-none"
+                  />
+                  <div className="mt-1.5 max-h-40 space-y-1 overflow-y-auto">
+                    {promoCodes
+                      .filter((c) => {
+                        const q = promoQuery.trim().toLowerCase();
+                        if (!q) return true;
+                        return (
+                          c.code.toLowerCase().includes(q) ||
+                          (c.influencer ?? "").toLowerCase().includes(q) ||
+                          (c.comment ?? "").toLowerCase().includes(q)
+                        );
+                      })
+                      .slice(0, 20)
+                      .map((c) => (
+                        <button
+                          key={c.code}
+                          type="button"
+                          onClick={() => setPromoCode(c.code)}
+                          className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm text-ivory-muted transition-colors hover:bg-ink-600/40"
+                        >
+                          <span>
+                            <span className="font-mono text-ivory">{c.code}</span>
+                            {c.influencer && (
+                              <span className="ml-2 text-xs text-ivory-faint">
+                                {c.influencer}
+                              </span>
+                            )}
+                          </span>
+                          <span className="text-xs text-gold-400">
+                            −{c.discountPercent}%
+                          </span>
+                        </button>
+                      ))}
+                  </div>
+                </>
+              )}
+            </div>
           )}
           {socialPercent > 0 && vipPercent > 0 && (
             <p className="mt-1.5 text-xs text-ivory-faint">

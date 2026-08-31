@@ -107,6 +107,15 @@ export default function CartApp() {
 
   /** Аккаунт покупателя, если он вошёл в кабинет. */
   const [account, setAccount] = useState<Account | null>(null);
+  /** Промокод: то, что набрал покупатель, и вердикт сервера по нему. */
+  const [promoCode, setPromoCode] = useState("");
+  const [promo, setPromo] = useState<{ code: string; percent: number } | null>(null);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  /**
+   * Код для пересчёта — с задержкой. Иначе запрос улетал бы на каждую букву, и
+   * покупатель видел бы «такого промокода нет», ещё не дописав свой.
+   */
+  const [promoCodeDebounced, setPromoCodeDebounced] = useState("");
   /** Суммы со скидками — считает сервер, здесь мы их только показываем. */
   const [quote, setQuote] = useState<Quote | null>(null);
   /** Есть ли что предложить добрать: от этого зависит, куда ведёт кнопка. */
@@ -146,6 +155,7 @@ export default function CartApp() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             deliveryType: delivery,
+            promoCode,
             items: cart.map((i) => ({
               productId: i.productId,
               volumeMl: i.volumeMl,
@@ -158,6 +168,8 @@ export default function CartApp() {
         setQuote(data.cart ?? null);
         setHasOffer((data.upsellCount ?? 0) > 0);
         setDeliveryInfo(data.delivery ?? null);
+        setPromo(data.promo ?? null);
+        setPromoError(data.promoError ?? null);
         if (data.session?.authenticated) {
           setAccount(data.session);
           setBalance(data.session.balance || 0);
@@ -171,7 +183,12 @@ export default function CartApp() {
     return () => {
       cancelled = true;
     };
-  }, [cart, mounted, delivery]);
+  }, [cart, mounted, delivery, promoCodeDebounced]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setPromoCodeDebounced(promoCode.trim()), 500);
+    return () => clearTimeout(t);
+  }, [promoCode]);
 
   // Суммы: пока сервер не ответил, показываем цены из корзины.
   const gross = quote?.gross ?? cart.reduce((s, i) => s + i.priceByn * i.qty, 0);
@@ -250,6 +267,7 @@ export default function CartApp() {
           }
         : undefined,
       comment,
+      promoCode,
       loyaltySpend: effectiveSpend,
     };
 
@@ -581,6 +599,32 @@ export default function CartApp() {
             className="w-full rounded-lg border border-ink-600 bg-ink-800 px-3 py-2 text-sm text-ivory placeholder:text-ivory-faint focus:border-gold-500 focus:outline-none"
             placeholder="Пожелания к заказу"
           />
+        </div>
+
+        {/* Промокод */}
+        <div>
+          <label htmlFor="f-promo" className="mb-1.5 block text-xs uppercase tracking-luxe text-gold-500">
+            Промокод
+          </label>
+          <input
+            id="f-promo"
+            type="text"
+            value={promoCode}
+            onChange={(e) => setPromoCode(e.target.value)}
+            autoComplete="off"
+            autoCapitalize="characters"
+            placeholder="Если есть"
+            className="h-11 w-full rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm uppercase text-ivory placeholder:normal-case placeholder:text-ivory-faint focus:border-gold-500 focus:outline-none"
+          />
+          {promo && (
+            <p className="mt-1.5 text-xs text-botanical-300">
+              Промокод {promo.code} применён — скидка {promo.percent}%. Если у
+              вас есть скидка выгоднее, посчитаем по ней.
+            </p>
+          )}
+          {promoError && (
+            <p className="mt-1.5 text-xs text-red-300">{promoError}</p>
+          )}
         </div>
 
         {/* Баллы — только вошедшему в кабинет: сервер спишет их лишь по сессии. */}

@@ -4,10 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 
-type Role = "admin" | "seller" | "marketer";
+type Role = "admin" | "seller" | "marketer" | "influencer";
 
 const NAV: { href: string; label: string; roles: Role[] }[] = [
   { href: "/", label: "Дашборд", roles: ["admin", "seller", "marketer"] },
+  // Блогер видит ровно один раздел: свои продажи. Ни дашборда, ни клиентов —
+  // это чужие персональные данные, и ему они ни к чему.
+  { href: "/my-sales", label: "Продажи", roles: ["influencer"] },
   { href: "/orders", label: "Заказы", roles: ["admin", "seller"] },
   { href: "/cash", label: "Оффлайн-касса", roles: ["admin", "seller"] },
   { href: "/preorders", label: "Предзаказы", roles: ["admin", "seller"] },
@@ -15,6 +18,8 @@ const NAV: { href: string; label: string; roles: Role[] }[] = [
   { href: "/products", label: "Товары", roles: ["admin"] },
   { href: "/promos", label: "Акции", roles: ["admin"] },
   { href: "/super-promos", label: "Супер акции", roles: ["admin"] },
+  { href: "/weekly-promo", label: "Парфюм недели", roles: ["admin"] },
+  { href: "/promo-codes", label: "Промокоды", roles: ["admin"] },
   { href: "/customers", label: "Клиенты", roles: ["admin", "seller", "marketer"] },
   { href: "/loyalty", label: "Лояльность", roles: ["admin", "marketer"] },
   { href: "/analytics", label: "Аналитика", roles: ["admin", "marketer"] },
@@ -28,6 +33,7 @@ const ROLE_LABEL: Record<Role, string> = {
   admin: "Администратор",
   seller: "Продавец",
   marketer: "Маркетолог",
+  influencer: "Блогер",
 };
 
 export default function Sidebar({

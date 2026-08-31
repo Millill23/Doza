@@ -2,6 +2,7 @@
 import Layout from "../layouts/Layout.astro";
 import CatalogApp from "../components/CatalogApp.tsx";
 import { getProducts, getBrands } from "../lib/products";
+import { activeWeeklyPromo } from "@doza/db/weekly-promo";
 import { catalogItemListLd } from "../lib/seo";
 import type { Gender } from "../lib/types";
 
@@ -9,12 +10,28 @@ const url = new URL(Astro.request.url);
 const genderParam = (url.searchParams.get("gender") ?? "") as Gender | "";
 const queryParam = url.searchParams.get("q") ?? "";
 const boostedParam = url.searchParams.get("boosted") === "1";
+const weekParam = url.searchParams.get("week") === "1";
 const brandsParam = (url.searchParams.get("brands") ?? "")
   .split(",")
   .map((b) => decodeURIComponent(b.trim()))
   .filter(Boolean);
 
-const [products, brands] = await Promise.all([getProducts(), getBrands()]);
+const [products, brands, weeklyPromo] = await Promise.all([
+  getProducts(),
+  getBrands(),
+  activeWeeklyPromo(),
+]);
+
+// Подборку показываем, только если в ней остались живые товары: пустая
+// вывеска ведёт покупателя на пустой каталог.
+const weekly =
+  weeklyPromo && weeklyPromo.productIds.length > 0
+    ? {
+        name: weeklyPromo.name,
+        percent: weeklyPromo.discountPercent,
+        productIds: weeklyPromo.productIds,
+      }
+    : null;
 ---
 
 <Layout
@@ -40,6 +57,8 @@ const [products, brands] = await Promise.all([getProducts(), getBrands()]);
       initialQuery={queryParam}
       initialBrands={brandsParam}
       initialBoosted={boostedParam}
+      weekly={weekly}
+      initialWeekly={weekParam}
     />
   </section>
 </Layout>

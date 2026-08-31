@@ -38,6 +38,9 @@
     "./similar-rules": "./src/similar-rules.ts",
     "./upsell-rules": "./src/upsell-rules.ts",
     "./delivery-rules": "./src/delivery-rules.ts",
-    "./stock-rules": "./src/stock-rules.ts"
+    "./stock-rules": "./src/stock-rules.ts",
+    "./promo-codes": "./src/promo-codes.ts",
+    "./promo-code-rules": "./src/promo-code-rules.ts",
+    "./weekly-promo": "./src/weekly-promo.ts"
   }
 }

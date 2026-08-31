@@ -12,9 +12,19 @@ export async function requireSession() {
   return session;
 }
 
+/**
+ * Куда отправлять человека, которому сюда нельзя.
+ *
+ * Для блогера это не дашборд: дашборд ему тоже закрыт, и отправлять его туда
+ * значит зациклить редиректы вместо того, чтобы показать страницу.
+ */
+export function homeFor(role: Role): string {
+  return role === "influencer" ? "/my-sales" : "/";
+}
+
 export async function requireRole(roles: Role[]) {
   const session = await requireSession();
   const role = session.user.role;
-  if (!roles.includes(role)) redirect("/");
+  if (!roles.includes(role)) redirect(homeFor(role));
   return session;
 }

@@ -450,3 +450,49 @@ test("остаток вместе с датой: дата не тратится 
   assert.equal(r.net, 80);
   assert.equal(r.kind, "remnant");
 });
+
+// ── Промокод ────────────────────────────────────────────────────────────────
+
+test("промокод даёт скидку на весь чек", () => {
+  const r = priceCart({
+    lines: [
+      { productId: 1, qty: 1, unitPrice: 100 },
+      { productId: 2, qty: 2, unitPrice: 50 },
+    ],
+    promoCodePercent: 15,
+  });
+  assert.equal(r.net, 170); // 85 + 42.5*2
+  assert.equal(r.kind, "promocode");
+});
+
+test("промокод не складывается ни с чем", () => {
+  const r = priceCart({
+    lines: [{ productId: 1, qty: 1, unitPrice: 100 }],
+    promoCodePercent: 15,
+    socialPercent: 10,
+    productPromoPercent: { 1: 10 },
+  });
+  assert.equal(r.net, 85, "берётся максимум 15%, а не сумма");
+  assert.equal(r.kind, "promocode");
+});
+
+test("VIP выгоднее промокода — платит меньше, а код не мешает", () => {
+  const r = priceCart({
+    lines: [{ productId: 1, qty: 1, unitPrice: 100 }],
+    promoCodePercent: 10,
+    vipPercent: 20,
+  });
+  assert.equal(r.net, 80);
+  assert.equal(r.kind, "vip");
+});
+
+test("промокод не тратит одноразовую скидку по дате", () => {
+  // При равенстве побеждает то, что ничего не стоит магазину на будущее.
+  const r = priceCart({
+    lines: [{ productId: 1, qty: 1, unitPrice: 100 }],
+    promoCodePercent: 20,
+    datePercent: 20,
+  });
+  assert.equal(r.net, 80);
+  assert.equal(r.kind, "promocode");
+});

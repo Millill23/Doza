@@ -3,7 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "@doza/db";
 import { verifyPassword } from "./password";
 
-export type Role = "admin" | "seller" | "marketer";
+export type Role = "admin" | "seller" | "marketer" | "influencer";
 
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt", maxAge: 60 * 60 * 12 },

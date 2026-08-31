@@ -4,6 +4,7 @@ import { prisma } from "@doza/db";
 import { currentCustomerId } from "../../../lib/customer-auth";
 import { quoteCart, vipPercentFor, CartError } from "../../../lib/cart-pricing";
 import { offerProductIds } from "../../../lib/upsell";
+import { findUsablePromoCode } from "@doza/db/promo-codes";
 import {
   DELIVERY_CHOICES,
   deliveryCost,
@@ -53,8 +54,17 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   // по ним корзина решает, показывать ли поля телефона и имени.
   if (items.length === 0) return json({ ok: true, session, cart: null });
 
+  // Промокод проверяем и здесь, чтобы покупатель увидел скидку сразу, а не
+  // узнал о неверном коде уже на кнопке оплаты.
+  const promoLookup = await findUsablePromoCode(String(body.promoCode ?? ""));
+  const promo = promoLookup?.ok ? promoLookup.promo : null;
+  const promoError = promoLookup && !promoLookup.ok ? promoLookup.error : null;
+
   try {
-    const cart = await quoteCart(items, { vipPercent });
+    const cart = await quoteCart(items, {
+      vipPercent,
+      promoCodePercent: promo?.discountPercent ?? 0,
+    });
     // Корзине важно лишь, есть ли предложение: от этого зависит, ведёт кнопка
     // на шаг допродажи или сразу к оплате. Пустой страницы быть не должно.
     const upsellCount = (await offerProductIds(items)).length;
@@ -67,6 +77,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       cart,
       upsellCount,
       delivery: { ...delivery, hint: freeDeliveryHint(delivery) },
+      promo: promo ? { code: promo.code, percent: promo.discountPercent } : null,
+      promoError,
     });
   } catch (e) {
     if (e instanceof CartError)

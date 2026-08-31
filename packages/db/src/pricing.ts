@@ -46,6 +46,11 @@ export interface PricingInput {
    */
   datePercent?: number;
   /**
+   * Скидка по промокоду, %. Код проверен вызывающим кодом: сюда приходит
+   * только процент действующего кода.
+   */
+  promoCodePercent?: number;
+  /**
    * Скидка за остаток во флаконе, %. Ставит продавец вручную в кассе.
    *
    * Отдельная механика, а не разновидность соцскидки: та даётся за действие
@@ -69,6 +74,7 @@ export type DiscountKind =
   | "social"
   | "date"
   | "remnant"
+  | "promocode"
   | "promo"
   | "super";
 
@@ -142,7 +148,13 @@ function unitAfter(unitPrice: number, percent: number): number {
  */
 function percentScenario(
   input: PricingInput,
-  opts: { vip: number; social: number; date: number; remnant: number },
+  opts: {
+    vip: number;
+    social: number;
+    date: number;
+    remnant: number;
+    promoCode: number;
+  },
 ): { lineNet: number[]; total: number } {
   const lineNet: number[] = [];
   let total = 0;
@@ -152,6 +164,7 @@ function percentScenario(
       opts.social,
       opts.date,
       opts.remnant,
+      opts.promoCode,
       promoFor(input, l),
     );
     const sum = r2(unitAfter(l.unitPrice, pct) * l.qty);
@@ -213,8 +226,9 @@ export function priceCart(input: PricingInput): PricingResult {
   const social = clampPercent(input.socialPercent);
   const date = clampPercent(input.datePercent);
   const remnant = clampPercent(input.remnantPercent);
+  const promoCode = clampPercent(input.promoCodePercent);
 
-  const withAll = percentScenario(safe, { vip, social, date, remnant });
+  const withAll = percentScenario(safe, { vip, social, date, remnant, promoCode });
   // Базовый сценарий — только акции товаров. Нужен, чтобы понять, дал ли
   // выигрыш именно персональная скидка, или всё сделала обычная акция.
   const promoOnly = percentScenario(safe, {
@@ -222,6 +236,7 @@ export function priceCart(input: PricingInput): PricingResult {
     social: 0,
     date: 0,
     remnant: 0,
+    promoCode: 0,
   });
 
   let best = { lineNet: withAll.lineNet, total: withAll.total, freeUnits: 0 };
@@ -232,15 +247,17 @@ export function priceCart(input: PricingInput): PricingResult {
     // скидка по дате одноразовая, и списывать её ради того же результата,
     // что даёт VIP-карта, — значит обокрасть покупателя. Поэтому дата — в
     // конце списка, и выигрывает она, только если действительно больше всех.
-    const bestPct = Math.max(vip, social, date, remnant);
+    const bestPct = Math.max(vip, social, date, remnant, promoCode);
     kind =
       bestPct === vip
         ? "vip"
         : bestPct === social
           ? "social"
-          : bestPct === remnant
-            ? "remnant"
-            : "date";
+          : bestPct === promoCode
+            ? "promocode"
+            : bestPct === remnant
+              ? "remnant"
+              : "date";
   } else {
     kind = promoOnly.total < gross ? "promo" : "none";
   }

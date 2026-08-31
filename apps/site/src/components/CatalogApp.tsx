@@ -10,6 +10,9 @@ interface Props {
   initialQuery?: string;
   initialBrands?: string[];
   initialBoosted?: boolean;
+  /** Идёт ли сейчас «Парфюм недели» и что в неё входит. */
+  weekly?: { name: string; percent: number; productIds: number[] } | null;
+  initialWeekly?: boolean;
 }
 
 const GENDERS: { value: Gender | ""; label: string }[] = [
@@ -23,6 +26,27 @@ function formatByn(amount: number): string {
   return `${amount.toFixed(2)} BYN`;
 }
 
+/**
+ * Склонение: 1 аромат, 3 аромата, 5 ароматов.
+ *
+ * Русские числительные не сводятся к «один или много»: «3 ароматов» читается
+ * как недоделка, а витрина — не место для недоделок.
+ */
+function plural(n: number): string {
+  const ten = n % 100;
+  if (ten >= 11 && ten <= 14) return "ароматов";
+  switch (n % 10) {
+    case 1:
+      return "аромат";
+    case 2:
+    case 3:
+    case 4:
+      return "аромата";
+    default:
+      return "ароматов";
+  }
+}
+
 export default function CatalogApp({
   products,
   brands,
@@ -30,11 +54,14 @@ export default function CatalogApp({
   initialQuery = "",
   initialBrands = [],
   initialBoosted = false,
+  weekly = null,
+  initialWeekly = false,
 }: Props) {
   const [query, setQuery] = useState(initialQuery);
   const [gender, setGender] = useState<Gender | "">(initialGender);
   const [selectedBrands, setSelectedBrands] = useState<string[]>(initialBrands);
   const [onlyBoosted, setOnlyBoosted] = useState(initialBoosted);
+  const [onlyWeekly, setOnlyWeekly] = useState(initialWeekly && !!weekly);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Кнопка «наверх»: появляется, когда витрина ушла под шапку
@@ -65,10 +92,11 @@ export default function CatalogApp({
     if (gender) params.set("gender", gender);
     if (selectedBrands.length) params.set("brands", selectedBrands.join(","));
     if (onlyBoosted) params.set("boosted", "1");
+    if (onlyWeekly) params.set("week", "1");
     const qs = params.toString();
     const newUrl = qs ? `/catalog?${qs}` : "/catalog";
     window.history.replaceState(null, "", newUrl);
-  }, [query, gender, selectedBrands, onlyBoosted]);
+  }, [query, gender, selectedBrands, onlyBoosted, onlyWeekly]);
 
   const fuse = useMemo(
     () =>
@@ -91,8 +119,12 @@ export default function CatalogApp({
       list = list.filter((p) => set.has(p.brand));
     }
     if (onlyBoosted) list = list.filter((p) => p.cashbackBoosted);
+    if (onlyWeekly && weekly) {
+      const set = new Set(weekly.productIds);
+      list = list.filter((p) => set.has(p.id));
+    }
     return list;
-  }, [query, gender, selectedBrands, onlyBoosted, products, fuse]);
+  }, [query, gender, selectedBrands, onlyBoosted, onlyWeekly, weekly, products, fuse]);
 
   function toggleBrand(brand: string) {
     setSelectedBrands((prev) =>
@@ -104,10 +136,14 @@ export default function CatalogApp({
     setGender("");
     setSelectedBrands([]);
     setOnlyBoosted(false);
+    setOnlyWeekly(false);
   }
 
   const activeCount =
-    (gender ? 1 : 0) + selectedBrands.length + (onlyBoosted ? 1 : 0);
+    (gender ? 1 : 0) +
+    selectedBrands.length +
+    (onlyBoosted ? 1 : 0) +
+    (onlyWeekly ? 1 : 0);
   const hasFilters = query || activeCount > 0;
 
   // ── Поиск (общий для десктопа и мобильного) ──────────────────────────────
@@ -286,6 +322,47 @@ export default function CatalogApp({
   };
 
   return (
+    <>
+      {/* Подборка недели — над каталогом и во всю ширину: это витринная
+          вывеска, а не ещё один пункт в списке фильтров. Кнопки нет вовсе,
+          когда подборка не идёт: пустая вывеска хуже отсутствующей. */}
+      {weekly && (
+        <button
+          type="button"
+          onClick={() => {
+            setOnlyWeekly((v) => !v);
+            setQuery("");
+          }}
+          aria-pressed={onlyWeekly}
+          className={
+            "mb-8 flex w-full items-center justify-between gap-4 rounded-2xl border px-5 py-4 text-left transition-all " +
+            (onlyWeekly
+              ? "border-gold-500 bg-gold-500/15 shadow-gold"
+              : "border-gold-600/50 bg-gradient-to-r from-gold-500/10 to-transparent hover:border-gold-500 hover:shadow-gold")
+          }
+        >
+          <span>
+            <span className="block font-serif text-xl text-gold-gradient sm:text-2xl">
+              {weekly.name}
+            </span>
+            <span className="mt-0.5 block text-sm font-light text-ivory-muted">
+              {weekly.productIds.length} {plural(weekly.productIds.length)} со
+              скидкой {weekly.percent}% — только на этой неделе
+            </span>
+          </span>
+          <span
+            className={
+              "shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors " +
+              (onlyWeekly
+                ? "bg-ink-800 text-gold-300"
+                : "bg-gold-gradient text-ink-900")
+            }
+          >
+            {onlyWeekly ? "Показать все" : "Смотреть"}
+          </span>
+        </button>
+      )}
+
     <div className="grid gap-8 lg:grid-cols-[260px_1fr]">
       {/* ── Десктоп: сайдбар ──
           Собственная прокрутка: колёсико над фильтром листает фильтр, над
@@ -416,5 +493,6 @@ export default function CatalogApp({
         </div>
       )}
     </div>
+    </>
   );
 }

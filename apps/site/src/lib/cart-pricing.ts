@@ -78,7 +78,7 @@ export async function vipPercentFor(customerId: number | null): Promise<number> 
  */
 export async function quoteCart(
   items: QuoteItem[],
-  opts: { vipPercent?: number; checkStock?: boolean } = {},
+  opts: { vipPercent?: number; promoCodePercent?: number; checkStock?: boolean } = {},
 ): Promise<CartQuote> {
   if (items.length === 0) throw new CartError("Корзина пуста");
 
@@ -177,6 +177,7 @@ export async function quoteCart(
   const priced = priceCart({
     lines,
     vipPercent: opts.vipPercent ?? 0,
+    promoCodePercent: opts.promoCodePercent ?? 0,
     productPromoPercent,
     allProductsPromoPercent: globalPromo.discountPercent,
   });

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@doza/db";
 import { pickActivePromo, getGlobalPromo, getActiveSuperPromo } from "@doza/db/promos";
 import { requireRole } from "@/lib/session";
+import { listActivePromoCodes } from "@doza/db/promo-codes";
 import CashRegister from "@/components/CashRegister";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +36,8 @@ export default async function CashPage() {
   const now = new Date();
 
   // Акция «на все товары» и супер-акция + список продавцов (для админа).
-  const [globalPromo, superPromo, sellers, socialSettings] = await Promise.all([
+  const [globalPromo, superPromo, sellers, socialSettings, promoCodeRows] =
+    await Promise.all([
     getGlobalPromo(now),
     getActiveSuperPromo(now),
     isAdmin
@@ -56,7 +58,15 @@ export default async function CashPage() {
         },
       },
     }),
+    listActivePromoCodes(now),
   ]);
+
+  const promoCodes = promoCodeRows.map((c) => ({
+    code: c.code,
+    comment: c.comment,
+    discountPercent: Number(c.discountPercent),
+    influencer: c.influencer?.name ?? null,
+  }));
 
   const settingNum = (key: string, fallback: number) => {
     const s = socialSettings.find((x) => x.key === key);
@@ -122,6 +132,7 @@ export default async function CashPage() {
         subscribePercent={settingNum("social_subscribe_percent", 5)}
         storyPercent={settingNum("social_story_percent", 5)}
         remnantPercent={settingNum("remnant_percent", 20)}
+        promoCodes={promoCodes}
       />
     </div>
   );

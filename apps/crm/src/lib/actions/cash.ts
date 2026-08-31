@@ -12,6 +12,7 @@ import { priceCart } from "@doza/db/pricing";
 import { createSmsCode, verifySmsCode } from "@doza/db/sms-codes";
 import { lookupCertificate, redeemCertificate } from "@doza/db/certificates";
 import { justRanLow, lowStockMessage } from "@doza/db/stock-rules";
+import { findUsablePromoCode } from "@doza/db/promo-codes";
 
 /** Перенос строки в тексте уведомления. */
 const BR = String.fromCharCode(10);
@@ -71,6 +72,7 @@ const DISCOUNT_LABEL: Record<string, string> = {
   social: "за подписки",
   date: "по памятной дате",
   remnant: "остаток во флаконе",
+  promocode: "промокод",
   promo: "акция",
   super: "супер-акция",
   none: "",
@@ -149,6 +151,8 @@ interface CreateSaleInput {
   socialStory?: boolean;
   /** Скидка за остаток во флаконе — продавец ставит вручную. */
   remnant?: boolean;
+  /** Промокод, названный покупателем. Продавец выбирает его из списка. */
+  promoCode?: string;
   /** Применить разовую скидку по памятной дате (покупатель согласился). */
   useDateReward?: boolean;
   /**
@@ -240,6 +244,12 @@ export async function createOfflineSale(input: CreateSaleInput) {
   // движок возьмёт то, что выгоднее покупателю.
   const remnantPct = input.remnant ? await getSetting("remnant_percent", 20) : 0;
 
+  // Промокод проверяем на сервере, даже если продавец выбрал его из списка:
+  // список мог устареть за время, пока чек собирали, а срок кода — истечь.
+  const promoLookup = await findUsablePromoCode(input.promoCode ?? "");
+  if (promoLookup && !promoLookup.ok) throw new Error(promoLookup.error);
+  const promoCode = promoLookup?.ok ? promoLookup.promo : null;
+
   const [globalPromo, superPromo, promoRows] = await Promise.all([
     getGlobalPromo(),
     getActiveSuperPromo(),
@@ -292,6 +302,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
     socialPercent: socialPct,
     datePercent: dateReward?.percent ?? 0,
     remnantPercent: remnantPct,
+    promoCodePercent: promoCode?.discountPercent ?? 0,
     productPromoPercent,
     allProductsPromoPercent: globalPromo.discountPercent,
     superPromo,
@@ -335,6 +346,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
       sellerId,
       createdById,
       discountKind: priced.discount > 0 ? priced.kind : null,
+      promoCodeId: promoCode?.id ?? null,
       customerId,
       status: "closed",
       totalByn: saleTotal,

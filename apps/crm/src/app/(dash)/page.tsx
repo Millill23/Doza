@@ -1,5 +1,6 @@
 import { prisma } from "@doza/db";
 import { formatByn } from "@doza/shared";
+import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { myMonthSales, monthSalesBySeller, SOLD_ORDER } from "@/lib/analytics-data";
 
@@ -76,6 +77,8 @@ function Kpi({
 
 export default async function DashboardPage() {
   const session = await getSession();
+  // Блогеру дашборд не показываем: там чужая выручка и чужие клиенты.
+  if (session?.user?.role === "influencer") redirect("/my-sales");
   const userId = Number(session?.user?.id);
   const isAdmin = session?.user?.role === "admin";
   const monthLabel = new Date().toLocaleDateString("ru-RU", {

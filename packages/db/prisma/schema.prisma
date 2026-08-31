@@ -42,6 +42,7 @@ model CrmUser {
   certificateRedemptions CertificateRedemption[]
   salesSplitsAsSource   SalesSplit[]      @relation("SalesSplitSource")
   salesSplitsCreated    SalesSplit[]      @relation("SalesSplitCreatedBy")
+  promoCodes            PromoCode[]
   salesSplitShares      SalesSplitShare[]
 
   @@map("crm_users")
@@ -67,6 +68,9 @@ enum CrmRole {
   admin
   seller
   marketer
+  /// Блогер с личным промокодом. Видит только свои продажи — время и сумму,
+  /// без имён покупателей и состава чеков. Заводит его только админ.
+  influencer
 }
 
 // ─── Товары ────────────────────────────────────────────────────────────────────
@@ -113,8 +117,62 @@ model Promo {
   reminderSent    Boolean   @default(false) @map("reminder_sent")
   createdAt       DateTime  @default(now()) @map("created_at")
 
+  /// Заведена подборкой «Парфюм недели», а не руками. Удаление подборки
+  /// уносит и эти строки — иначе скидка пережила бы саму акцию.
+  weeklyPromoId   Int?         @map("weekly_promo_id")
+  weeklyPromo     WeeklyPromo? @relation(fields: [weeklyPromoId], references: [id], onDelete: Cascade)
+
   @@index([productId])
+  @@index([weeklyPromoId])
   @@map("promos")
+}
+
+/// Промокод: процентная скидка по слову, которое называет покупатель.
+///
+/// Код хранится в верхнем регистре, а на входе приводится к нему же — человек
+/// набирает как придётся, и «leto20» должен работать так же, как «LETO20».
+///
+/// Ограничения на число применений намеренно нет: коды раздают блогерам, и
+/// смысл в том, чтобы ими пользовались все подписчики сколько угодно раз.
+/// Ограничивает только срок.
+model PromoCode {
+  id              Int      @id @default(autoincrement())
+  code            String   @unique
+  /// Для чего заведён — видно в списке CRM. Не показывается покупателю.
+  comment         String?
+  discountPercent Decimal  @map("discount_percent") @db.Decimal(5, 2)
+  startsAt        DateTime @map("starts_at")
+  endsAt          DateTime @map("ends_at")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  /// Чей это код. Блогер видит продажи только по своим кодам.
+  influencerId    Int?     @map("influencer_id")
+  influencer      CrmUser? @relation(fields: [influencerId], references: [id], onDelete: SetNull)
+
+  orders          Order[]
+  offlineSales    OfflineSale[]
+
+  @@index([influencerId])
+  @@map("promo_codes")
+}
+
+/// «Парфюм недели» — подборка ароматов с одинаковой скидкой на неделю.
+///
+/// Сама скидка живёт в обычных `Promo`: подборка их создаёт и удаляет вместе с
+/// собой. Так движку цен не нужно знать о ней ничего — он и так умеет считать
+/// акцию на товар, и подборка не заводит вторую механику скидок рядом с первой.
+model WeeklyPromo {
+  id              Int      @id @default(autoincrement())
+  name            String   @default("Парфюм недели")
+  discountPercent Decimal  @map("discount_percent") @db.Decimal(5, 2)
+  startsAt        DateTime @map("starts_at")
+  endsAt          DateTime @map("ends_at")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+  promos          Promo[]
+
+  @@map("weekly_promos")
 }
 
 /// Тип шаблона супер-акции. Пока один: каждый N-й товар в чеке бесплатно.
@@ -566,6 +624,11 @@ model Order {
   items           OrderItem[]
 
   @@map("orders")
+  /// Промокод, применённый к заказу.
+  promoCodeId       Int?       @map("promo_code_id")
+  promoCode         PromoCode? @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+
+  @@index([promoCodeId])
 }
 
 enum PaymentStatus {
@@ -730,6 +793,11 @@ model OfflineSale {
   redemptions     CertificateRedemption[]
 
   @@map("offline_sales")
+  /// Промокод, названный покупателем в кассе.
+  promoCodeId    Int?       @map("promo_code_id")
+  promoCode      PromoCode? @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+
+  @@index([promoCodeId])
 }
 
 // Подарочные сертификаты в оффлайн-продаже (номиналы, без кешбека)

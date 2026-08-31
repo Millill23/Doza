@@ -32,6 +32,8 @@ export interface CheckoutForm {
     officeCode: string;
   };
   comment: string;
+  /** Промокод, введённый покупателем. Пустая строка — код не вводили. */
+  promoCode?: string;
   loyaltySpend: number;
 }
 

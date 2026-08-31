@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { prisma } from "@doza/db";
 import { getBalance, spendPoints } from "@doza/db/loyalty";
 import { requestConsent } from "@doza/db/consent";
+import { findUsablePromoCode } from "@doza/db/promo-codes";
 import { createPaymentAttempt, refundOrderPoints } from "@doza/db/payments";
 import { assertBelarusPhone } from "@doza/shared/phone";
 import { assertCustomerName } from "@doza/shared/customer-name";
@@ -55,6 +56,8 @@ interface OrderBody {
     officeCode?: string;
   };
   comment?: string;
+  /** Промокод, введённый покупателем. Регистр и пробелы не важны. */
+  promoCode?: string;
   items: IncomingItem[];
   loyaltySpend?: number;
 }
@@ -153,9 +156,21 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   // показывала корзина, поэтому сумма на платёжной странице совпадёт с той,
   // которую покупатель видел.
   const vipPercent = await vipPercentFor(sessionCustomerId);
+
+  // Промокод проверяем на сервере: в браузере он всего лишь текст в поле.
+  // Неверный код — отказ, а не тихое оформление по полной цене: покупатель
+  // рассчитывал на скидку и должен узнать об этом до оплаты.
+  const promoLookup = await findUsablePromoCode(body.promoCode ?? "");
+  if (promoLookup && !promoLookup.ok) return bad(promoLookup.error);
+  const promo = promoLookup?.ok ? promoLookup.promo : null;
+
   let quote;
   try {
-    quote = await quoteCart(items, { vipPercent, checkStock: true });
+    quote = await quoteCart(items, {
+      vipPercent,
+      promoCodePercent: promo?.discountPercent ?? 0,
+      checkStock: true,
+    });
   } catch (e) {
     if (e instanceof CartError) return bad(e.message);
     throw e;
@@ -238,6 +253,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
           }
         : {}),
       comment: (body.comment ?? "").trim() || null,
+      promoCodeId: promo?.id ?? null,
       totalByn: total,
       deliveryFeeByn: delivery.fee,
       loyaltySpentByn: loyaltySpent,
