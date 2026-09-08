@@ -1,6 +1,8 @@
 {
   "name": "doza",
   "private": true,
+  "//packageManager": "Версия pnpm закреплена намеренно: без этого поля corepack в образе тянет свежайшую мажорную, и сборка ломается на ровном месте от чужого релиза.",
+  "packageManager": "pnpm@11.9.0",
   "scripts": {
     "dev:site": "pnpm --filter @doza/site dev",
     "dev:crm": "pnpm --filter @doza/crm dev",

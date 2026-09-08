@@ -9,7 +9,9 @@ COPY packages/db/package.json packages/db/
 COPY packages/shared/package.json packages/shared/
 COPY apps/crm/package.json apps/crm/
 
-RUN pnpm install --frozen-lockfile=false
+# `--no-frozen-lockfile`, а не `--frozen-lockfile=false`: форму с
+# «=false» pnpm 12 больше не разбирает, а эта работает во всех версиях.
+RUN pnpm install --no-frozen-lockfile
 
 COPY packages ./packages
 COPY apps/crm ./apps/crm
