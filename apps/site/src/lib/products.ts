@@ -6,6 +6,7 @@ import {
   type EffectivePromo,
 } from "@doza/db/promos";
 import { effectiveCashbackPercent } from "@doza/db/pricing";
+import { isSoldOut } from "@doza/db/stock-rules";
 import type { ProductCard, ProductDetail, Gender } from "./types";
 
 /**
@@ -27,6 +28,7 @@ type ProductWithRels = {
   loyaltyPercentOverride: unknown | null;
   brand: { name: string };
   photos: { url: string }[];
+  inventory: { quantityMl: number } | null;
   volumes: { volumeMl: number; priceByn: unknown; isActive: boolean }[];
   promos: {
     discountPercent: unknown | null;
@@ -81,6 +83,9 @@ function toCard(
     discountPercent: promo.discountPercent,
     cashbackPercent,
     cashbackBoosted: cashbackPercent > globalPercent,
+    // Донышко флакона с витрины убираем: реальный остаток всегда меньше
+    // учётного, и заказ на последние миллилитры кончается возвратом денег.
+    soldOut: isSoldOut(p.inventory?.quantityMl ?? 0),
   };
 }
 
@@ -102,6 +107,7 @@ const cardInclude = {
   photos: { orderBy: { sortOrder: "asc" as const }, take: 1 },
   volumes: { where: { isActive: true } },
   promos: { select: promoSelect },
+  inventory: { select: { quantityMl: true } },
 };
 
 export async function getProducts(
@@ -140,6 +146,7 @@ export async function getProduct(slug: string): Promise<ProductDetail | null> {
       photos: { orderBy: { sortOrder: "asc" } },
       volumes: { where: { isActive: true }, orderBy: { volumeMl: "asc" } },
       promos: { select: promoSelect },
+      inventory: { select: { quantityMl: true } },
     },
   });
 
@@ -213,11 +220,15 @@ export async function getFinderProducts(): Promise<FinderProduct[]> {
     notesTop: string | null;
     notesMid: string | null;
     notesBase: string | null;
-  })[]).map((p) => ({
-    ...toCard(p, globalPercent, globalPromo),
-    notes: [p.notesTop, p.notesMid, p.notesBase]
-      .filter(Boolean)
-      .join(", ")
-      .toLowerCase(),
-  }));
+  })[])
+    // Подбор ведёт к одной карточке и обещает попадание — советовать аромат,
+    // который нельзя купить, значит обмануть на последнем шаге.
+    .filter((p) => !isSoldOut(p.inventory?.quantityMl ?? 0))
+    .map((p) => ({
+      ...toCard(p, globalPercent, globalPromo),
+      notes: [p.notesTop, p.notesMid, p.notesBase]
+        .filter(Boolean)
+        .join(", ")
+        .toLowerCase(),
+    }));
 }

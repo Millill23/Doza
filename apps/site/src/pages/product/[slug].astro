@@ -73,7 +73,10 @@ const faq = productFaq(product);
         <img
           src={product.image}
           alt={`${product.brand} ${product.name}`}
-          class="aspect-[4/5] w-full object-cover"
+          class:list={[
+            "aspect-[4/5] w-full object-cover",
+            product.soldOut && "opacity-40 grayscale",
+          ]}
           fetchpriority="high"
         />
       </div>
@@ -92,12 +95,17 @@ const faq = productFaq(product);
           >
             {GENDER_LABELS[product.gender]}
           </span>
-          {product.discountPercent > 0 && (
+          {product.soldOut && (
+            <span class="inline-flex items-center gap-1.5 rounded-full border border-ink-600 bg-ink-800 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-ivory-muted">
+              Закончился
+            </span>
+          )}
+          {!product.soldOut && product.discountPercent > 0 && (
             <span class="inline-flex items-center gap-1.5 rounded-full bg-botanical-500 px-3 py-1 text-xs font-semibold text-ink-900">
               Скидка −{product.discountPercent}%
             </span>
           )}
-          {product.cashbackBoosted ? (
+          {product.soldOut ? null : product.cashbackBoosted ? (
             <span class="inline-flex items-center gap-1.5 rounded-full bg-gold-gradient px-3 py-1 text-xs font-semibold text-ink-900 shadow-gold">
               Вернём {product.cashbackPercent}% баллами!
             </span>
@@ -122,6 +130,7 @@ const faq = productFaq(product);
           image={product.image}
           volumes={product.volumes}
           discountPercent={product.discountPercent}
+          soldOut={product.soldOut}
         />
       </div>
     </div>

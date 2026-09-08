@@ -25,9 +25,12 @@ function monthStartDay(): string {
 export default function PeriodPicker({
   from: initialFrom,
   to: initialTo,
+  basePath = "/analytics",
 }: {
   from: string;
   to: string;
+  /** Куда возвращать с выбранным периодом. По умолчанию — аналитика. */
+  basePath?: string;
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -43,7 +46,7 @@ export default function PeriodPicker({
     else q.delete("from");
     if (nextTo) q.set("to", nextTo);
     else q.delete("to");
-    router.push(`/analytics?${q.toString()}`);
+    router.push(q.toString() ? `${basePath}?${q}` : basePath);
   }
 
   const presets: { label: string; from: string; to: string }[] = [

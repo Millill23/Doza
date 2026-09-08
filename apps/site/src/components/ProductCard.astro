@@ -8,7 +8,9 @@ interface Props {
 }
 
 const { product } = Astro.props;
-const disc = product.discountPercent > 0 ? product.discountPercent : 0;
+// У распроданного скидку не показываем ни плашкой, ни зачёркнутой ценой:
+// выгодное предложение на то, чего нет, только злит.
+const disc = product.soldOut || product.discountPercent <= 0 ? 0 : product.discountPercent;
 const finalFrom =
   disc > 0
     ? Math.round(product.priceFrom * (1 - disc / 100) * 100) / 100
@@ -26,7 +28,10 @@ const finalFrom =
       alt={`${product.brand} ${product.name}`}
       loading="lazy"
       decoding="async"
-      class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+      class:list={[
+        "h-full w-full object-cover transition-transform duration-500 group-hover:scale-105",
+        product.soldOut && "opacity-40 grayscale",
+      ]}
     />
     <!-- затемнение снизу -->
     <div
@@ -39,6 +44,15 @@ const finalFrom =
     >
       {GENDER_LABELS[product.gender]}
     </span>
+    <!-- плашка «закончился». Карточку не прячем: аромат вернётся, а по
+         названию его ищут и приходят из поиска. -->
+    {product.soldOut && (
+      <span
+        class="absolute inset-x-0 top-1/2 -translate-y-1/2 bg-ink-900/85 py-2 text-center text-xs font-semibold uppercase tracking-luxe text-ivory backdrop-blur-sm"
+      >
+        Закончился
+      </span>
+    )}
     <!-- плашка скидки -->
     {disc > 0 && (
       <span
@@ -48,7 +62,7 @@ const finalFrom =
       </span>
     )}
     <!-- плашка повышенного кешбэка -->
-    {product.cashbackBoosted && (
+    {!product.soldOut && product.cashbackBoosted && (
       <span
         class="absolute right-3 top-3 rounded-full bg-gold-gradient px-2.5 py-1 text-[11px] font-semibold text-ink-900 shadow-gold"
       >
@@ -83,7 +97,7 @@ const finalFrom =
       <span
         class="translate-y-1 text-sm font-light text-ivory-faint opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:text-gold-400 group-hover:opacity-100"
       >
-        Подробнее →
+        {product.soldOut ? "Скоро вернётся" : "Подробнее →"}
       </span>
     </div>
   </div>

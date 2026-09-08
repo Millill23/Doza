@@ -9,6 +9,21 @@
 /** Ниже этого остатка флакон считается заканчивающимся, мл. */
 export const LOW_STOCK_ML = 10;
 
+/**
+ * Ниже этого остатка аромат снимается с продажи, мл.
+ *
+ * Донышко флакона продавать нельзя: реальный остаток всегда меньше учётного —
+ * капли на стенках, недолив в атомайзер, — и заказ на последние миллилитры
+ * оборачивается возвратом денег. Порог выше {@link LOW_STOCK_ML}: сперва
+ * приходит предупреждение продавцам, и только потом закрывается витрина.
+ */
+export const OUT_OF_STOCK_ML = 15;
+
+/** Можно ли ещё продавать этот аромат. */
+export function isSoldOut(quantityMl: number, thresholdMl = OUT_OF_STOCK_ML): boolean {
+  return (Number.isFinite(quantityMl) ? quantityMl : 0) < thresholdMl;
+}
+
 export interface StockLine {
   productId: number;
   volumeMl: number;
@@ -48,13 +63,20 @@ export interface Shortage {
 export function shortages(
   lines: StockLine[],
   available: Map<number, number>,
+  /**
+   * Остаток, ниже которого аромат считается снятым с продажи. Тот же порог,
+   * что показывает на витрине плашку «закончился»: иначе карточка говорила бы
+   * одно, а корзина пропускала бы заказ на донышко флакона.
+   */
+  soldOutBelowMl = OUT_OF_STOCK_ML,
 ): Shortage[] {
   const need = neededMl(lines);
   const labels = new Map(lines.map((l) => [l.productId, l.label]));
   const out: Shortage[] = [];
 
   for (const [productId, needMl] of need) {
-    const haveMl = available.get(productId) ?? 0;
+    const stockMl = available.get(productId) ?? 0;
+    const haveMl = isSoldOut(stockMl, soldOutBelowMl) ? 0 : stockMl;
     if (haveMl < needMl) {
       out.push({
         productId,

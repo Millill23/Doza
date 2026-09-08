@@ -1,4 +1,5 @@
 import { prisma } from "@doza/db";
+import { MAX_SPILL_PERCENT } from "@doza/db/spill-rules";
 import { requireRole } from "@/lib/session";
 import { saveSettings } from "@/lib/actions/settings";
 import BrandsManager from "@/components/BrandsManager";
@@ -14,10 +15,11 @@ async function getSetting(key: string, fallback: string) {
 export default async function SettingsPage() {
   await requireRole(["admin"]);
 
-  const [percent, days, threshold, brands, atomizers] = await Promise.all([
+  const [percent, days, threshold, spill, brands, atomizers] = await Promise.all([
     getSetting("loyalty_percent", "5"),
     getSetting("loyalty_days", "180"),
     getSetting("low_stock_threshold", "50"),
+    getSetting("stock_spill_percent", "0"),
     prisma.brand.findMany({
       orderBy: { name: "asc" },
       include: { _count: { select: { products: true } } },
@@ -65,6 +67,23 @@ export default async function SettingsPage() {
                 defaultValue={threshold}
                 className="h-10 w-full rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory focus:border-gold-500 focus:outline-none"
               />
+            </div>
+            <div>
+              <label htmlFor="stock_spill_percent" className="mb-1.5 block text-xs uppercase tracking-wide text-gold-500">
+                Потери при распиве (%)
+              </label>
+              <input
+                id="stock_spill_percent" name="stock_spill_percent" type="number" step="0.1" min="0" max={MAX_SPILL_PERCENT}
+                defaultValue={spill}
+                className="h-10 w-full rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory focus:border-gold-500 focus:outline-none"
+              />
+              <p className="mt-1.5 text-xs leading-relaxed text-ivory-faint">
+                Сколько списывать сверх отлитого: капли на горлышке, остаток в
+                шприце, недолив в атомайзер. При 5% из флакона на 100 мл уйдёт
+                около 105. Доли миллилитра копятся и списываются целым, поэтому
+                на мелких отливах процент не теряется. 0 — считать миллилитр в
+                миллилитр.
+              </p>
             </div>
             <button
               type="submit"

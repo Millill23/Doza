@@ -7,6 +7,8 @@ import {
   canSendConsentSms,
   canSendThrottledSms,
   isThrottledKind,
+  SMS_LOG_KEEP_DAYS,
+  SMS_LOG_KEEP_FOREVER,
   type SmsKind,
   type ConsentSendState,
 } from "./sms-rules";
@@ -191,6 +193,25 @@ export async function consentSendState(phone: string): Promise<ConsentSendState>
     select: { createdAt: true },
   });
   return { sent: rows.length, lastSentAt: rows[0]?.createdAt ?? null };
+}
+
+/**
+ * Убрать из журнала всё, что старше срока хранения.
+ *
+ * Вызывается фоновой задачей. Сообщения о согласии не трогаем — см.
+ * {@link SMS_LOG_KEEP_FOREVER}.
+ */
+export async function pruneSmsLog(
+  keepDays: number = SMS_LOG_KEEP_DAYS,
+): Promise<number> {
+  const before = new Date(Date.now() - keepDays * 24 * 60 * 60 * 1000);
+  const { count } = await prisma.smsLog.deleteMany({
+    where: {
+      createdAt: { lt: before },
+      kind: { notIn: SMS_LOG_KEEP_FOREVER },
+    },
+  });
+  return count;
 }
 
 /** Разрешено ли слать очередное сообщение о согласии на этот номер. */

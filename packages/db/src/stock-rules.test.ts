@@ -10,7 +10,9 @@ import {
   shortageMessage,
   justRanLow,
   lowStockMessage,
+  isSoldOut,
   LOW_STOCK_ML,
+  OUT_OF_STOCK_ML,
 } from "./stock-rules.ts";
 
 const line = (productId: number, volumeMl: number, qty: number, label = "Аромат") => ({
@@ -35,15 +37,39 @@ test("разные товары не смешиваются", () => {
 test("нехватка ловится по сумме, а не по отдельной позиции", () => {
   // По 5 мл каждой позиции хватает, а вместе — нет. Проверка по позициям
   // пропустила бы это и продала воздух.
-  const have = new Map([[1, 8]]);
-  const short = shortages([line(1, 5, 1), line(1, 5, 1)], have);
+  const have = new Map([[1, 28]]);
+  const short = shortages([line(1, 20, 1), line(1, 20, 1)], have);
   assert.equal(short.length, 1);
-  assert.equal(short[0].needMl, 10);
-  assert.equal(short[0].haveMl, 8);
+  assert.equal(short[0].needMl, 40);
+  assert.equal(short[0].haveMl, 28);
 });
 
 test("когда всего хватает — нехватки нет", () => {
-  assert.deepEqual(shortages([line(1, 5, 2)], new Map([[1, 10]])), []);
+  assert.deepEqual(shortages([line(1, 5, 2)], new Map([[1, 30]])), []);
+});
+
+test("донышко флакона не продаём", () => {
+  // 12 мл на остатке хватило бы на отлив в 5 мл, но такой флакон снят с
+  // продажи: реальный остаток меньше учётного, и заказ обернулся бы возвратом.
+  const short = shortages([line(1, 5, 1)], new Map([[1, OUT_OF_STOCK_ML - 3]]));
+  assert.equal(short.length, 1);
+  assert.equal(short[0].haveMl, 0, "для покупателя это «закончился»");
+  assert.match(shortageMessage(short), /закончился/);
+});
+
+test("ровно на пороге аромат ещё продаётся", () => {
+  assert.equal(isSoldOut(OUT_OF_STOCK_ML), false);
+  assert.equal(isSoldOut(OUT_OF_STOCK_ML - 1), true);
+  assert.deepEqual(
+    shortages([line(1, 5, 1)], new Map([[1, OUT_OF_STOCK_ML]])),
+    [],
+  );
+});
+
+test("порог снятия с продажи выше порога тревоги", () => {
+  // Сначала продавец получает предупреждение и успевает заказать флакон,
+  // и только потом витрина закрывается.
+  assert.ok(OUT_OF_STOCK_ML > LOW_STOCK_ML);
 });
 
 test("товара нет в остатках вовсе — это тоже нехватка", () => {

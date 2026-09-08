@@ -254,6 +254,8 @@ model Inventory {
   productId  Int     @id @map("product_id")
   product    Product @relation(fields: [productId], references: [id])
   quantityMl Int     @default(0) @map("quantity_ml")
+  /// Недосписанные потери при распиве, сотые доли мл. Копятся до целого мл.
+  spillCarry Int     @default(0) @map("spill_carry")
 
   @@map("inventory")
 }

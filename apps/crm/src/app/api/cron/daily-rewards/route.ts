@@ -5,6 +5,7 @@ import {
   minskHour,
   REWARD_NOTIFY_HOUR,
 } from "@doza/db/rewards";
+import { pruneSmsLog } from "@doza/db/sms-log";
 import { sendSmsFromCrm } from "@/lib/sms";
 import { notifyTelegram, tgEscape } from "@/lib/telegram";
 import { checkCronKey } from "@/lib/cron-auth";
@@ -32,12 +33,19 @@ export async function GET(request: Request) {
   const denied = checkCronKey(request);
   if (denied) return denied;
 
+  // Чистку журнала SMS делаем здесь же и на каждом вызове: это один запрос по
+  // индексу, который почти всегда удаляет ноль строк. Заводить ради него
+  // отдельный роут и отдельную запись в планировщике значит завести ещё одну
+  // вещь, которую забудут настроить на боевом сервере.
+  const prunedSms = await pruneSmsLog();
+
   const url = new URL(request.url);
   const force = url.searchParams.get("force") === "1";
   if (!force && !isRewardNotifyHour()) {
     return NextResponse.json({
       ok: true,
       skipped: "не время рассылки",
+      prunedSms,
       minskHour: minskHour(),
       notifyHour: REWARD_NOTIFY_HOUR,
     });
@@ -96,5 +104,6 @@ export async function GET(request: Request) {
     issued: issued.length,
     delivered,
     failed: failures.length,
+    prunedSms,
   });
 }

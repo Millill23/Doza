@@ -123,7 +123,10 @@ export default function CatalogApp({
       const set = new Set(weekly.productIds);
       list = list.filter((p) => set.has(p.id));
     }
-    return list;
+    // Распроданное — в конец списка, сохраняя порядок внутри групп. Убирать
+    // такие карточки совсем нельзя: аромат вернётся, а по названию его ищут и
+    // приходят из поиска. Но первым экраном должно быть то, что можно купить.
+    return [...list].sort((a, b) => Number(a.soldOut) - Number(b.soldOut));
   }, [query, gender, selectedBrands, onlyBoosted, onlyWeekly, weekly, products, fuse]);
 
   function toggleBrand(brand: string) {
@@ -261,7 +264,9 @@ export default function CatalogApp({
 
   // ── Карточка товара ───────────────────────────────────────────────────────
   const card = (p: ProductCard) => {
-    const disc = p.discountPercent > 0 ? p.discountPercent : 0;
+    // У распроданного скидку не показываем ни плашкой, ни зачёркнутой
+    // ценой: выгодное предложение на то, чего нет, только злит.
+    const disc = p.soldOut || p.discountPercent <= 0 ? 0 : p.discountPercent;
     const finalFrom =
       disc > 0
         ? Math.round(p.priceFrom * (1 - disc / 100) * 100) / 100
@@ -278,18 +283,27 @@ export default function CatalogApp({
             alt={`${p.brand} ${p.name}`}
             loading="lazy"
             decoding="async"
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+            className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${
+              p.soldOut ? "opacity-40 grayscale" : ""
+            }`}
           />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-ink-700/90 to-transparent" />
           <span className="absolute left-3 top-3 rounded-full border border-gold-500/30 bg-ink-900/70 px-2.5 py-1 text-[11px] font-light text-gold-400 backdrop-blur-sm">
             {GENDER_LABELS[p.gender]}
           </span>
+          {/* Плашка «закончился». Карточку не прячем: аромат вернётся, а по
+              названию его ищут и приходят из поиска. */}
+          {p.soldOut && (
+            <span className="absolute inset-x-0 top-1/2 -translate-y-1/2 bg-ink-900/85 py-2 text-center text-xs font-semibold uppercase tracking-luxe text-ivory backdrop-blur-sm">
+              Закончился
+            </span>
+          )}
           {disc > 0 && (
             <span className="absolute left-3 top-11 rounded-full bg-botanical-500 px-2.5 py-1 text-[11px] font-semibold text-ink-900">
               −{disc}%
             </span>
           )}
-          {p.cashbackBoosted && (
+          {!p.soldOut && p.cashbackBoosted && (
             <span className="absolute right-3 top-3 rounded-full bg-gold-gradient px-2.5 py-1 text-[11px] font-semibold text-ink-900 shadow-gold">
               Вернём {p.cashbackPercent}% баллами
             </span>

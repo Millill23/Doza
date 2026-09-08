@@ -1,9 +1,15 @@
 import Link from "next/link";
 import { prisma } from "@doza/db";
 import { formatByn } from "@doza/shared";
+import { startOfDay, endOfDay, isDayString } from "@doza/shared/day-range";
 import { requireRole } from "@/lib/session";
+import PeriodPicker from "@/components/PeriodPicker";
 
 export const dynamic = "force-dynamic";
+
+/** Сколько чеков показываем за раз. За период — больше: это уже выборка. */
+const PAGE_SIZE = 100;
+const PERIOD_SIZE = 500;
 
 const STATUS_LABEL: Record<string, string> = {
   open: "Открыта",
@@ -16,18 +22,40 @@ const STATUS_STYLE: Record<string, string> = {
   cancelled: "border-red-500/40 bg-red-500/10 text-red-300",
 };
 
-export default async function SalesPage() {
+export default async function SalesPage({
+  searchParams,
+}: {
+  searchParams: { from?: string; to?: string };
+}) {
   await requireRole(["admin", "seller"]);
 
+  // Даты в адресе — те же, что в аналитике: одна и та же кнопка «7 дней»
+  // должна давать одинаковый период на обеих страницах.
+  const fromDay = isDayString(searchParams.from) ? searchParams.from : "";
+  const toDay = isDayString(searchParams.to) ? searchParams.to : "";
+  const hasPeriod = Boolean(fromDay || toDay);
+  const createdAt = {
+    ...(fromDay ? { gte: startOfDay(fromDay) } : {}),
+    ...(toDay ? { lte: endOfDay(toDay) } : {}),
+  };
+
   const sales = await prisma.offlineSale.findMany({
+    where: hasPeriod ? { createdAt } : {},
     include: {
       items: true,
       seller: { select: { name: true } },
       customer: { select: { name: true } },
     },
     orderBy: { createdAt: "desc" },
-    take: 100,
+    take: hasPeriod ? PERIOD_SIZE : PAGE_SIZE,
   });
+
+  // Итог по выбранному периоду: за отменённые продажи денег не брали, и в
+  // сумму они попадать не должны.
+  const total = sales
+    .filter((s) => s.status === "closed")
+    .reduce((sum, s) => sum + Number(s.totalByn), 0);
+  const closedCount = sales.filter((s) => s.status === "closed").length;
 
   return (
     <div>
@@ -41,9 +69,21 @@ export default async function SalesPage() {
         </Link>
       </div>
 
+      <PeriodPicker from={fromDay} to={toDay} basePath="/cash/sales" />
+
+      <p className="mb-4 text-sm text-ivory-faint">
+        {hasPeriod ? "За период" : "Последние"}{" "}
+        <span className="text-ivory">{sales.length}</span> чеков · закрытых{" "}
+        <span className="text-ivory">{closedCount}</span> на{" "}
+        <span className="text-gold-400">{formatByn(total)}</span>
+        {!hasPeriod && sales.length === PAGE_SIZE && (
+          <> · выберите период, чтобы увидеть более ранние</>
+        )}
+      </p>
+
       {sales.length === 0 ? (
         <p className="rounded-xl border border-ink-600/60 bg-ink-700 p-10 text-center text-ivory-muted">
-          Продаж пока нет.
+          {hasPeriod ? "За выбранный период продаж нет." : "Продаж пока нет."}
         </p>
       ) : (
         <div className="overflow-hidden rounded-xl border border-ink-600/60">
@@ -77,7 +117,13 @@ export default async function SalesPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-xs text-ivory-faint">
-                    {s.createdAt.toLocaleDateString("ru-RU")}
+                    {s.createdAt.toLocaleString("ru-RU", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
                   </td>
                 </tr>
               ))}

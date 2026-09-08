@@ -8,6 +8,8 @@ interface Props {
   image: string;
   volumes: ProductVolume[];
   discountPercent?: number;
+  /** Остаток ниже порога — аромат снят с продажи. */
+  soldOut?: boolean;
 }
 
 function formatByn(amount: number): string {
@@ -43,18 +45,21 @@ export default function VolumeSelector({
   image,
   volumes,
   discountPercent = 0,
+  soldOut = false,
 }: Props) {
   const active = volumes.filter((v) => v.priceByn > 0);
   const [selected, setSelected] = useState<number>(active[0]?.volumeMl ?? 0);
   const [added, setAdded] = useState(false);
 
-  const d = discountPercent > 0 ? discountPercent : 0;
+  // Скидку на распроданное не показываем: выгодное предложение на то, чего
+  // нет, только злит.
+  const d = soldOut || discountPercent <= 0 ? 0 : discountPercent;
   const finalPrice = (p: number) => Math.round(p * (1 - d / 100) * 100) / 100;
 
   const current = active.find((v) => v.volumeMl === selected) ?? active[0];
 
   function handleAdd() {
-    if (!current) return;
+    if (!current || soldOut) return;
     addToCart({
       productId,
       name: productName,
@@ -136,9 +141,16 @@ export default function VolumeSelector({
 
         <button
           onClick={handleAdd}
-          className="inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-full bg-gold-gradient px-8 text-base font-medium text-ink-900 shadow-gold transition-all duration-300 hover:shadow-gold-lg"
+          disabled={soldOut}
+          className={`inline-flex h-12 items-center justify-center gap-2 rounded-full px-8 text-base font-medium transition-all duration-300 ${
+            soldOut
+              ? "cursor-not-allowed border border-ink-600 bg-ink-800 text-ivory-faint"
+              : "cursor-pointer bg-gold-gradient text-ink-900 shadow-gold hover:shadow-gold-lg"
+          }`}
         >
-          {added ? (
+          {soldOut ? (
+            "Закончился"
+          ) : added ? (
             <>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="20 6 9 17 4 12" />
@@ -152,7 +164,9 @@ export default function VolumeSelector({
       </div>
 
       <p className="text-center text-xs font-light text-ivory-faint">
-        Оплата картой онлайн на защищённой странице банка.
+        {soldOut
+          ? "Флакон допит. Закажем новый — вернём аромат на витрину."
+          : "Оплата картой онлайн на защищённой странице банка."}
       </p>
     </div>
   );

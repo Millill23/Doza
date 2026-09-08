@@ -2,19 +2,31 @@
 
 import { prisma } from "@doza/db";
 import { revalidatePath } from "next/cache";
+import { clampPercent } from "@doza/db/spill-rules";
 import { requireRole } from "@/lib/session";
 
-const ALLOWED_KEYS = ["loyalty_percent", "loyalty_days", "low_stock_threshold"];
+const ALLOWED_KEYS = [
+  "loyalty_percent",
+  "loyalty_days",
+  "low_stock_threshold",
+  "stock_spill_percent",
+];
 
 export async function saveSettings(formData: FormData) {
   await requireRole(["admin"]);
   for (const key of ALLOWED_KEYS) {
     const value = formData.get(key);
     if (value == null) continue;
+    // Процент потерь при распиве ограничиваем теми же рамками, что и расчёт:
+    // сохранённая опечатка вроде «50» съедала бы полфлакона на каждой продаже.
+    const clean =
+      key === "stock_spill_percent"
+        ? String(clampPercent(Number(value)))
+        : String(value);
     await prisma.setting.upsert({
       where: { key },
-      update: { value: String(value) },
-      create: { key, value: String(value) },
+      update: { value: clean },
+      create: { key, value: clean },
     });
   }
   revalidatePath("/settings");

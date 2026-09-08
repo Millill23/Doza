@@ -10,10 +10,10 @@ function dayKey(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-/** Правила разделения выручки начиная с даты. */
-async function splitRules(since: Date): Promise<SplitRule[]> {
+/** Правила разделения выручки за период. */
+async function splitRules(since: Date, until?: Date): Promise<SplitRule[]> {
   const splits = await prisma.salesSplit.findMany({
-    where: { date: { gte: since } },
+    where: { date: { gte: since, ...(until ? { lt: until } : {}) } },
     include: { shares: { select: { sellerId: true, percent: true } } },
   });
   return splits.map((s) => ({
@@ -267,15 +267,64 @@ function monthStart(d = new Date()) {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 
+function monthEnd(d = new Date()) {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 1);
+}
+
+/** Месяц как `YYYY-MM`. Ключ, по которому месяц ходит в адресе страницы. */
+export function monthKey(d = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 /**
- * Продажи всех продавцов за текущий месяц с учётом разделения выручки.
+ * Разобрать `YYYY-MM` в первое число месяца.
+ *
+ * Мусор и будущее приводим к текущему месяцу: подобранный руками адрес не
+ * должен показывать пустую страницу без объяснений.
+ */
+export function parseMonth(key: string | undefined | null): Date {
+  const m = /^(\d{4})-(\d{2})$/.exec((key ?? "").trim());
+  if (!m) return monthStart();
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, 1);
+  if (Number.isNaN(d.getTime()) || d > monthStart()) return monthStart();
+  return d;
+}
+
+/** Название месяца для заголовка: «сентябрь 2026». */
+export function monthLabel(d: Date): string {
+  return d.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+}
+
+/**
+ * Месяцы, в которых что-то продавалось, от свежего к старому.
+ *
+ * Список строим по первой продаже, а не по фиксированному «последние 12»:
+ * магазину полгода, и половина выпадающего списка вела бы в пустоту.
+ */
+export async function salesMonths(): Promise<string[]> {
+  const first = await prisma.offlineSale.findFirst({
+    where: { status: "closed" },
+    orderBy: { createdAt: "asc" },
+    select: { createdAt: true },
+  });
+  const from = first ? monthStart(first.createdAt) : monthStart();
+  const out: string[] = [];
+  for (let d = monthStart(); d >= from; d = new Date(d.getFullYear(), d.getMonth() - 1, 1)) {
+    out.push(monthKey(d));
+  }
+  return out;
+}
+
+/**
+ * Продажи всех продавцов за месяц с учётом разделения выручки.
  * Если на день задано разделение, сумма аккаунта расходится по долям.
  */
-async function monthTotalsBySeller() {
-  const since = monthStart();
+async function monthTotalsBySeller(month: Date = monthStart()) {
+  const since = monthStart(month);
+  const until = monthEnd(month);
   const [sales, certificates, rules] = await Promise.all([
     prisma.offlineSale.findMany({
-      where: { status: "closed", createdAt: { gte: since } },
+      where: { status: "closed", createdAt: { gte: since, lt: until } },
       select: { sellerId: true, createdAt: true, totalByn: true },
     }),
     // Проданные сертификаты. Деньги за них легли в кассу в день продажи, и
@@ -283,10 +332,10 @@ async function monthTotalsBySeller() {
     // продал, и заплатить тому, кто просто отпустил товар через три месяца.
     // Купленные на сайте сюда не попадают: у них нет продавца.
     prisma.giftCertificate.findMany({
-      where: { issuedAt: { gte: since }, issuedById: { not: null } },
+      where: { issuedAt: { gte: since, lt: until }, issuedById: { not: null } },
       select: { issuedById: true, issuedAt: true, paidByn: true },
     }),
-    splitRules(since),
+    splitRules(since, until),
   ]);
 
   // Погашение сертификата позже попадёт в сумму ещё раз, уже как обычный чек.
@@ -311,16 +360,16 @@ async function monthTotalsBySeller() {
   );
 }
 
-/** Продажи продавца за текущий месяц (сумма + количество закрытых оффлайн-продаж). */
-export async function myMonthSales(sellerId: number) {
-  const totals = await monthTotalsBySeller();
+/** Продажи продавца за месяц (сумма + количество закрытых оффлайн-продаж). */
+export async function myMonthSales(sellerId: number, month?: Date) {
+  const totals = await monthTotalsBySeller(month);
   const mine = totals.find((t) => t.sellerId === sellerId);
   return { sum: mine?.sum ?? 0, count: mine?.count ?? 0 };
 }
 
-/** Продажи всех продавцов за текущий месяц (для админа). */
-export async function monthSalesBySeller() {
-  const totals = await monthTotalsBySeller();
+/** Продажи всех продавцов за месяц (для админа). */
+export async function monthSalesBySeller(month?: Date) {
+  const totals = await monthTotalsBySeller(month);
   const users = await prisma.crmUser.findMany({
     where: { id: { in: totals.map((t) => t.sellerId) } },
     select: { id: true, name: true },

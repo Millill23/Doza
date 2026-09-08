@@ -2,6 +2,7 @@ import { prisma } from "./index";
 import { earnPoints } from "./loyalty";
 import { getCashbackRates } from "./promos";
 import { justRanLow, lowStockMessage } from "./stock-rules";
+import { writeOffStock, getSpillPercent } from "./stock";
 
 /**
  * Оплата заказов через bePaid.
@@ -284,34 +285,22 @@ export async function settlePaidOrder(
 
   let consumedMl = 0;
   const ranLow: { productId: number; afterMl: number }[] = [];
+  const spillPercent = await getSpillPercent();
 
   for (const [productId, ml] of perProduct) {
-    const before = await prisma.inventory.findUnique({
-      where: { productId },
-      select: { quantityMl: true },
-    });
-    const beforeMl = before?.quantityMl ?? 0;
-
-    const updated = await prisma.inventory.upsert({
-      where: { productId },
-      update: { quantityMl: { increment: -ml } },
-      create: { productId, quantityMl: -ml },
-      select: { quantityMl: true },
-    });
-    await prisma.inventoryLog.create({
-      data: {
-        productId,
-        deltaMl: -ml,
-        reason: "order_paid",
-        refType: "order",
-        refId: order.id,
-        // Списал не сотрудник, а факт оплаты.
-        userId: null,
-      },
+    const res = await writeOffStock({
+      productId,
+      ml,
+      reason: "order_paid",
+      refType: "order",
+      refId: order.id,
+      // Списал не сотрудник, а факт оплаты.
+      userId: null,
+      spillPercent,
     });
     consumedMl += ml;
-    if (justRanLow(beforeMl, updated.quantityMl)) {
-      ranLow.push({ productId, afterMl: updated.quantityMl });
+    if (justRanLow(res.beforeMl, res.afterMl)) {
+      ranLow.push({ productId, afterMl: res.afterMl });
     }
   }
 

@@ -12,6 +12,7 @@ import { priceCart } from "@doza/db/pricing";
 import { createSmsCode, verifySmsCode } from "@doza/db/sms-codes";
 import { lookupCertificate, redeemCertificate } from "@doza/db/certificates";
 import { justRanLow, lowStockMessage } from "@doza/db/stock-rules";
+import { writeOffStock, getSpillPercent } from "@doza/db/stock";
 import { findUsablePromoCode } from "@doza/db/promo-codes";
 
 /** Перенос строки в тексте уведомления. */
@@ -398,37 +399,26 @@ export async function createOfflineSale(input: CreateSaleInput) {
   }
 
   const ranLow: { name: string; afterMl: number }[] = [];
+  const spillPercent = await getSpillPercent();
   for (const [productId, ml] of mlPerProduct) {
-    const before = await prisma.inventory.findUnique({
-      where: { productId },
-      select: { quantityMl: true },
+    // В журнале остатков фиксируем того, кто фактически провёл операцию.
+    const after = await writeOffStock({
+      productId,
+      ml,
+      reason: "offline_sale",
+      refType: "offline_sale",
+      refId: sale.id,
+      userId: actorId,
+      spillPercent,
     });
-    const beforeMl = before?.quantityMl ?? 0;
-    const after = await prisma.inventory.upsert({
-      where: { productId },
-      update: { quantityMl: { increment: -ml } },
-      create: { productId, quantityMl: -ml },
-      select: { quantityMl: true },
-    });
-    await prisma.inventoryLog.create({
-      data: {
-        productId,
-        deltaMl: -ml,
-        reason: "offline_sale",
-        refType: "offline_sale",
-        refId: sale.id,
-        // В журнале остатков фиксируем того, кто фактически провёл операцию.
-        userId: actorId,
-      },
-    });
-    if (justRanLow(beforeMl, after.quantityMl)) {
+    if (justRanLow(after.beforeMl, after.afterMl)) {
       const p = await prisma.product.findUnique({
         where: { id: productId },
         select: { name: true, brand: { select: { name: true } } },
       });
       ranLow.push({
         name: p ? `${p.brand.name} ${p.name}` : `товар ${productId}`,
-        afterMl: after.quantityMl,
+        afterMl: after.afterMl,
       });
     }
   }

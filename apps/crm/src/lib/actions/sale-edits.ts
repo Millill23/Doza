@@ -45,7 +45,10 @@ export async function cancelOfflineSale(saleId: number, reason: string) {
   let certReturned = 0;
 
   await prisma.$transaction(async (tx) => {
-    // 1. Возврат остатков
+    // 1. Возврат остатков. Возвращаем отлитое; технологические потери за этот
+    // чек назад не начисляем — это доли миллилитра, а раскручивать накопленный
+    // хвост назад значит городить обратную арифметику ради погрешности,
+    // которая меньше цены деления.
     for (const item of sale.items) {
       const delta = item.volumeMl * item.qty;
       await tx.inventory.upsert({

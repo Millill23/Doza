@@ -52,7 +52,7 @@ export function productFaq(p: ProductDetail): { q: string; a: string }[] {
 
   faq.push({
     q: `Сколько стоит ${title}?`,
-    a: `Цена ${title} — от ${byn(p.priceFrom)}. Доступные объёмы: ${volumes}. Оплата при получении, предоплата не требуется.`,
+    a: `Цена ${title} — от ${byn(p.priceFrom)}. Доступные объёмы: ${volumes}. Оплата картой онлайн при оформлении заказа.`,
   });
 
   const notes = [p.notesTop, p.notesMid, p.notesBase].filter(Boolean);
@@ -74,7 +74,7 @@ export function productFaq(p: ProductDetail): { q: string; a: string }[] {
 
   faq.push({
     q: `Как купить ${p.name} на распив?`,
-    a: `Выберите нужный объём (3, 5 или 10 мл), добавьте в корзину и оформите заказ. Доставка по Беларуси почтой или самовывоз, оплата при получении.`,
+    a: `Выберите нужный объём (3, 5 или 10 мл), добавьте в корзину и оформите заказ. Доставка по Беларуси почтой или самовывоз, оплата картой онлайн при оформлении.`,
   });
 
   return faq;
@@ -94,7 +94,7 @@ export function productMeta(p: ProductDetail): SeoMeta {
   const notes = [p.notesTop, p.notesMid].filter(Boolean).join(", ");
   const description = `Купить ${p.brand} ${p.name} (${g}) на распив от ${byn(
     p.priceFrom,
-  )}. ${notes ? `Ноты: ${notes}. ` : ""}Оригинал, объёмы 3, 5 и 10 мл. Оплата при получении, доставка по Беларуси.`;
+  )}. ${notes ? `Ноты: ${notes}. ` : ""}Оригинал, объёмы 3, 5 и 10 мл. Оплата картой онлайн, доставка по Беларуси.`;
   const url = `${SITE_URL}/product/${p.slug}`;
 
   const productLd = {
@@ -111,7 +111,12 @@ export function productMeta(p: ProductDetail): SeoMeta {
       url,
       priceCurrency: "BYN",
       price: p.priceFrom.toFixed(2),
-      availability: "https://schema.org/InStock",
+      // Поисковикам говорим правду о наличии: карточка распроданного аромата
+      // остаётся в выдаче, и «в наличии» в сниппете приводит человека к кнопке
+      // «Закончился».
+      availability: p.soldOut
+        ? "https://schema.org/OutOfStock"
+        : "https://schema.org/InStock",
       seller: { "@type": "Organization", name: COMPANY.legalName },
     },
   };

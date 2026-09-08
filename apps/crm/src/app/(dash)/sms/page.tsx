@@ -1,5 +1,10 @@
 import { prisma } from "@doza/db";
-import { SMS_KINDS, SMS_KIND_LIST, isSmsKind } from "@doza/db/sms-rules";
+import {
+  SMS_KINDS,
+  SMS_KIND_LIST,
+  isSmsKind,
+  SMS_LOG_KEEP_DAYS,
+} from "@doza/db/sms-rules";
 import { formatPhone } from "@doza/shared";
 import { requireRole } from "@/lib/session";
 import { getSmsSettings } from "@/lib/actions/sms";
@@ -68,7 +73,13 @@ export default async function SmsPage({
         />
       </div>
 
-      <h2 className="mb-3 font-serif text-xl text-ivory">Журнал отправок</h2>
+      <h2 className="mb-1 font-serif text-xl text-ivory">Журнал отправок</h2>
+      <p className="mb-3 text-xs text-ivory-faint">
+        Хранится {SMS_LOG_KEEP_DAYS} дней и чистится сам. По журналу считается
+        пауза между служебными сообщениями, поэтому совсем без него нельзя.
+        Приглашения к согласию остаются навсегда — по ним считается обещание не
+        писать человеку больше трёх раз.
+      </p>
       <div className="mb-4 flex flex-wrap gap-2">
         <a
           href="/sms"

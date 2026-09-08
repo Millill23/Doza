@@ -2,8 +2,18 @@ import { prisma } from "@doza/db";
 import { formatByn } from "@doza/shared";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
-import { myMonthSales, monthSalesBySeller, SOLD_ORDER } from "@/lib/analytics-data";
+import {
+  myMonthSales,
+  monthSalesBySeller,
+  salesMonths,
+  parseMonth,
+  monthKey,
+  monthLabel,
+  SOLD_ORDER,
+} from "@/lib/analytics-data";
+import { isSoldOut } from "@doza/db/stock-rules";
 import CommissionBar from "@/components/CommissionBar";
+import MonthPicker from "@/components/MonthPicker";
 
 export const dynamic = "force-dynamic";
 
@@ -76,32 +86,60 @@ function Kpi({
   );
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: { month?: string };
+}) {
   const session = await getSession();
   // Блогеру дашборд не показываем: там чужая выручка и чужие клиенты.
   if (session?.user?.role === "influencer") redirect("/my-sales");
   const userId = Number(session?.user?.id);
   const isAdmin = session?.user?.role === "admin";
-  const monthLabel = new Date().toLocaleDateString("ru-RU", {
-    month: "long",
-    year: "numeric",
-  });
 
-  const [s, mine, bySeller] = await Promise.all([
+  // Месяц из адреса: без параметра — текущий. Премия считается календарным
+  // месяцем, поэтому и смотреть её надо помесячно, а не «за 30 дней».
+  const month = parseMonth(searchParams.month);
+  const selected = monthKey(month);
+  const isCurrentMonth = selected === monthKey();
+
+  const [s, mine, bySeller, months] = await Promise.all([
     getStats(),
-    userId ? myMonthSales(userId) : Promise.resolve({ sum: 0, count: 0 }),
-    isAdmin ? monthSalesBySeller() : Promise.resolve([]),
+    userId ? myMonthSales(userId, month) : Promise.resolve({ sum: 0, count: 0 }),
+    isAdmin ? monthSalesBySeller(month) : Promise.resolve([]),
+    salesMonths(),
   ]);
+
+  // Выбранный месяц может быть старше первой продажи (адрес правят руками) —
+  // тогда он всё равно должен быть в списке, иначе селект покажет чужое.
+  const monthOptions = months.includes(selected) ? months : [...months, selected];
+  const labels = Object.fromEntries(
+    monthOptions.map((m) => [m, monthLabel(parseMonth(m))]),
+  );
 
   return (
     <div>
-      <h1 className="mb-1 font-serif text-3xl text-ivory">Дашборд</h1>
-      <p className="mb-8 text-sm text-ivory-faint">Сводка за последние 30 дней</p>
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="mb-1 font-serif text-3xl text-ivory">Дашборд</h1>
+          <p className="text-sm text-ivory-faint">Сводка за последние 30 дней</p>
+        </div>
+        <label className="flex items-center gap-2 text-xs uppercase tracking-wide text-gold-500">
+          Продажи за
+          <MonthPicker
+            months={monthOptions}
+            value={selected}
+            basePath="/"
+            labelOf={labels}
+          />
+        </label>
+      </div>
 
       {/* Мои продажи за месяц (мотивация продавца) */}
       <div className="mb-8 rounded-2xl border border-gold-600/30 bg-gradient-to-br from-ink-700 to-ink-800 p-6">
         <p className="mb-1 text-xs uppercase tracking-wide text-gold-500">
-          Мои продажи · {monthLabel}
+          {isCurrentMonth ? "Мои продажи" : "Мои продажи (закрытый месяц)"} ·{" "}
+          {labels[selected]}
         </p>
         <div className="flex flex-wrap items-end gap-8">
           <div>
@@ -118,10 +156,16 @@ export default async function DashboardPage() {
         <CommissionBar sum={mine.sum} />
       </div>
 
+      {isAdmin && bySeller.length === 0 && (
+        <div className="mb-8 rounded-2xl border border-ink-600/60 bg-ink-700 p-6 text-sm text-ivory-muted">
+          За {labels[selected]} закрытых продаж не было.
+        </div>
+      )}
+
       {isAdmin && bySeller.length > 0 && (
         <div className="mb-8 rounded-2xl border border-ink-600/60 bg-ink-700 p-6">
           <h2 className="mb-4 font-serif text-xl text-ivory">
-            Продажи по продавцам · {monthLabel}
+            Продажи по продавцам · {labels[selected]}
           </h2>
           <ul className="space-y-2">
             {bySeller.map((r) => (
@@ -172,6 +216,13 @@ export default async function DashboardPage() {
                 >
                   <span className="text-ivory">
                     {i.product.brand.name} — {i.product.name}
+                    {isSoldOut(i.quantityMl) && (
+                      // Продавцу важно знать не «мало», а «на сайте уже нельзя
+                      // купить»: это повод заказать флакон сегодня.
+                      <span className="ml-2 rounded-full border border-red-500/40 px-2 py-0.5 text-[11px] text-red-300">
+                        снят с продажи
+                      </span>
+                    )}
                   </span>
                   <span className="font-medium text-red-300">{i.quantityMl} мл</span>
                 </li>
