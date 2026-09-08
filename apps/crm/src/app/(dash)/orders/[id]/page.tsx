@@ -72,7 +72,7 @@ export default async function OrderDetailPage({
             </dl>
           </div>
 
-          {/* Данные посылки — их заполняет покупатель при оформлении, и именно
+          {/* Данные посылки – их заполняет покупатель при оформлении, и именно
               они попадают на бланк отправления. */}
           {order.deliveryType === "post" && (
             <div className="rounded-2xl border border-ink-600/60 bg-ink-700 p-6">
@@ -86,16 +86,16 @@ export default async function OrderDetailPage({
                     order.recipientMiddleName,
                   ]
                     .filter(Boolean)
-                    .join(" ") || "—"}
+                    .join(" ") || "–"}
                 </dd>
                 <dt className="text-ivory-faint">Индекс</dt>
-                <dd className="text-ivory">{order.postalCode ?? "—"}</dd>
+                <dd className="text-ivory">{order.postalCode ?? "–"}</dd>
                 <dt className="text-ivory-faint">Область</dt>
-                <dd className="text-ivory">{order.region ?? "—"}</dd>
+                <dd className="text-ivory">{order.region ?? "–"}</dd>
                 <dt className="text-ivory-faint">Город</dt>
-                <dd className="text-ivory">{order.city ?? "—"}</dd>
+                <dd className="text-ivory">{order.city ?? "–"}</dd>
                 <dt className="text-ivory-faint">Адрес</dt>
-                <dd className="text-ivory">{order.address ?? "—"}</dd>
+                <dd className="text-ivory">{order.address ?? "–"}</dd>
                 {order.deliveryService && (
                   <>
                     <dt className="text-ivory-faint">Служба</dt>
@@ -121,7 +121,7 @@ export default async function OrderDetailPage({
               {order.items.map((i) => (
                 <li key={i.id} className="flex items-center justify-between py-3 text-sm">
                   <span className="text-ivory">
-                    {i.product.brand.name} — {i.product.name}, {i.volumeMl} мл × {i.qty}
+                    {i.product.brand.name} – {i.product.name}, {i.volumeMl} мл × {i.qty}
                   </span>
                   <span className="text-gold-400">{formatByn(Number(i.priceByn) * i.qty)}</span>
                 </li>

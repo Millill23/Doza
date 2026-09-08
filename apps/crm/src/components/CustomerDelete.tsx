@@ -43,7 +43,7 @@ export default function CustomerDelete({
     <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4">
       <p className="mb-2 text-sm font-medium text-red-300">Удаление клиента</p>
       <ul className="mb-3 space-y-1 text-xs leading-relaxed text-ivory-muted">
-        <li>• Баллы ({balance.toFixed(2)} BYN), памятные даты и история лояльности — удалятся безвозвратно.</li>
+        <li>• Баллы ({balance.toFixed(2)} BYN), памятные даты и история лояльности – удалятся безвозвратно.</li>
         <li>• Покупки ({purchases}) останутся в отчётах, но потеряют привязку к клиенту.</li>
         <li>• Если клиент вернётся, его придётся регистрировать заново.</li>
       </ul>

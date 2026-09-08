@@ -15,7 +15,7 @@ const expired = data !== null && "expired" in data;
 const customer = data !== null && !("expired" in data) ? data : null;
 ---
 
-<Layout title="Согласие на обработку персональных данных — DOZA">
+<Layout title="Согласие на обработку персональных данных – DOZA">
   <section class="container-luxe max-w-2xl py-12">
     {
       customer && customer.alreadyConfirmed ? (
@@ -23,7 +23,7 @@ const customer = data !== null && !("expired" in data) ? data : null;
           <p class="mb-2 text-4xl">✓</p>
           <h1 class="mb-3 font-serif text-2xl text-ivory">Согласие уже получено</h1>
           <p class="text-sm text-ivory-muted">
-            Спасибо, {customer.name}! Баллы начисляются как обычно — ничего делать
+            Спасибо, {customer.name}! Баллы начисляются как обычно – ничего делать
             не нужно.
           </p>
           <a
@@ -47,7 +47,7 @@ const customer = data !== null && !("expired" in data) ? data : null;
             <p>
               Чтобы копить и тратить баллы, нам нужно хранить ваше имя и номер
               телефона. Закон Республики Беларусь «О защите персональных данных»
-              требует для этого вашего согласия — его вы и подтверждаете на этой
+              требует для этого вашего согласия – его вы и подтверждаете на этой
               странице.
             </p>
 
@@ -77,7 +77,7 @@ const customer = data !== null && !("expired" in data) ? data : null;
                   <dt class="text-xs uppercase tracking-wide text-gold-500">Как долго</dt>
                   <dd>
                     Пока вы участвуете в программе лояльности. Отозвать согласие
-                    можно в любой момент — напишите на {COMPANY.email} или скажите
+                    можно в любой момент – напишите на {COMPANY.email} или скажите
                     продавцу, и мы удалим ваши данные.
                   </dd>
                 </div>
@@ -85,8 +85,8 @@ const customer = data !== null && !("expired" in data) ? data : null;
             </div>
 
             <p class="text-xs text-ivory-faint">
-              Покупать можно и без согласия — на цены и обслуживание это не влияет.
-              Без него мы просто не сможем начислять вам баллы. Подробности — в
+              Покупать можно и без согласия – на цены и обслуживание это не влияет.
+              Без него мы просто не сможем начислять вам баллы. Подробности – в
               <a href="/privacy" target="_blank" class="text-gold-400 underline-offset-2 hover:underline">
                 Политике обработки персональных данных
               </a>.
@@ -104,7 +104,7 @@ const customer = data !== null && !("expired" in data) ? data : null;
           <p class="text-sm text-ivory-muted">
             {
               expired
-                ? `Ссылка действует ${CONSENT_TTL_DAYS} дней. Попросите новую у продавца или позвоните нам — отправим повторно.`
+                ? `Ссылка действует ${CONSENT_TTL_DAYS} дней. Попросите новую у продавца или позвоните нам – отправим повторно.`
                 : "Возможно, ссылка скопирована не полностью. Попросите новую у продавца или позвоните нам."
             }
           </p>

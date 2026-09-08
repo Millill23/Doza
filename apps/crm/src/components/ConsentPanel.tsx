@@ -4,7 +4,7 @@ import { ConsentRequestButton } from "@/components/ConsentControls";
 
 /**
  * Блок согласия на обработку ПД в карточке клиента: статус и отправка ссылки.
- * Само удаление — отдельным блоком внизу карточки, оно шире по смыслу.
+ * Само удаление – отдельным блоком внизу карточки, оно шире по смыслу.
  */
 export default function ConsentPanel({
   customerId,
@@ -62,7 +62,7 @@ export default function ConsentPanel({
       {overdue && (
         <p className="mt-3 border-t border-ink-600/60 pt-3 text-xs leading-relaxed text-ivory-faint">
           Клиент молчит дольше {ttlDays} дней. По 99-З хранить его данные для
-          лояльности больше нет основания — удалить можно внизу карточки.
+          лояльности больше нет основания – удалить можно внизу карточки.
         </p>
       )}
     </div>

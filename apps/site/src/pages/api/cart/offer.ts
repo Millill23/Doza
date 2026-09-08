@@ -18,7 +18,7 @@ export const POST: APIRoute = async ({ request }) => {
     const offers = await buildUpsell(items);
     return json({ ok: true, percent: UPSELL_PERCENT, offers });
   } catch (e) {
-    // Допродажа — необязательный шаг: если она не собралась, покупатель
+    // Допродажа – необязательный шаг: если она не собралась, покупатель
     // должен спокойно дойти до оплаты, а не упереться в ошибку.
     console.error("[upsell] не удалось собрать предложение:", e);
     return json({ ok: true, percent: UPSELL_PERCENT, offers: [] });

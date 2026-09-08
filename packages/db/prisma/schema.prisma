@@ -1,6 +1,6 @@
 generator client {
   provider      = "prisma-client-js"
-  // native — для локальной разработки (Windows); musl-openssl-3.0.x — для Alpine в Docker
+  // native – для локальной разработки (Windows); musl-openssl-3.0.x – для Alpine в Docker
   binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
@@ -68,7 +68,7 @@ enum CrmRole {
   admin
   seller
   marketer
-  /// Блогер с личным промокодом. Видит только свои продажи — время и сумму,
+  /// Блогер с личным промокодом. Видит только свои продажи – время и сумму,
   /// без имён покупателей и состава чеков. Заводит его только админ.
   influencer
 }
@@ -118,7 +118,7 @@ model Promo {
   createdAt       DateTime  @default(now()) @map("created_at")
 
   /// Заведена подборкой «Парфюм недели», а не руками. Удаление подборки
-  /// уносит и эти строки — иначе скидка пережила бы саму акцию.
+  /// уносит и эти строки – иначе скидка пережила бы саму акцию.
   weeklyPromoId   Int?         @map("weekly_promo_id")
   weeklyPromo     WeeklyPromo? @relation(fields: [weeklyPromoId], references: [id], onDelete: Cascade)
 
@@ -129,7 +129,7 @@ model Promo {
 
 /// Промокод: процентная скидка по слову, которое называет покупатель.
 ///
-/// Код хранится в верхнем регистре, а на входе приводится к нему же — человек
+/// Код хранится в верхнем регистре, а на входе приводится к нему же – человек
 /// набирает как придётся, и «leto20» должен работать так же, как «LETO20».
 ///
 /// Ограничения на число применений намеренно нет: коды раздают блогерам, и
@@ -138,7 +138,7 @@ model Promo {
 model PromoCode {
   id              Int      @id @default(autoincrement())
   code            String   @unique
-  /// Для чего заведён — видно в списке CRM. Не показывается покупателю.
+  /// Для чего заведён – видно в списке CRM. Не показывается покупателю.
   comment         String?
   discountPercent Decimal  @map("discount_percent") @db.Decimal(5, 2)
   startsAt        DateTime @map("starts_at")
@@ -157,10 +157,10 @@ model PromoCode {
   @@map("promo_codes")
 }
 
-/// «Парфюм недели» — подборка ароматов с одинаковой скидкой на неделю.
+/// «Парфюм недели» – подборка ароматов с одинаковой скидкой на неделю.
 ///
 /// Сама скидка живёт в обычных `Promo`: подборка их создаёт и удаляет вместе с
-/// собой. Так движку цен не нужно знать о ней ничего — он и так умеет считать
+/// собой. Так движку цен не нужно знать о ней ничего – он и так умеет считать
 /// акцию на товар, и подборка не заводит вторую механику скидок рядом с первой.
 model WeeklyPromo {
   id              Int      @id @default(autoincrement())
@@ -180,7 +180,7 @@ enum SuperPromoKind {
   n_plus_one
 }
 
-/// «Супер акции» — сложные механики на весь чек (в отличие от Promo, которая
+/// «Супер акции» – сложные механики на весь чек (в отличие от Promo, которая
 /// даёт процент на конкретный товар).
 model SuperPromo {
   id        Int                 @id @default(autoincrement())
@@ -290,7 +290,7 @@ model Customer {
   lastPurchaseSum Decimal?         @map("last_purchase_sum") @db.Decimal(10, 2)
 
   /// Согласие на обработку персональных данных для программы лояльности
-  /// (закон РБ №99-З). Сама покупка согласия не требует — данные для заказа
+  /// (закон РБ №99-З). Сама покупка согласия не требует – данные для заказа
   /// обрабатываются по основанию «исполнение договора». Согласие нужно только
   /// для хранения клиента в базе лояльности: баллы, VIP, персональные рассылки.
   consentStatus      ConsentStatus @default(pending) @map("consent_status")
@@ -322,7 +322,7 @@ enum ConsentStatus {
 ///
 /// Нужно, когда на смене работали двое под одним аккаунтом: чеки записаны на
 /// один `sourceSeller`, а по-честному выручку надо разнести. Влияет только на
-/// трекер продаж продавцов — сами чеки, остатки и баллы не трогаются.
+/// трекер продаж продавцов – сами чеки, остатки и баллы не трогаются.
 model SalesSplit {
   id             Int               @id @default(autoincrement())
   /// День, за который делится выручка.
@@ -356,7 +356,7 @@ model SalesSplitShare {
 enum GiftCertificateStatus {
   /// Выпущен и оплачен. Остаток можно тратить в кассе или обменять на баллы.
   new
-  /// Обменян на баллы — начисление разовое, остаток обнулён.
+  /// Обменян на баллы – начисление разовое, остаток обнулён.
   activated
   /// Остаток израсходован в кассе.
   spent
@@ -366,7 +366,7 @@ enum GiftCertificateStatus {
 
 /// Подарочный сертификат: выпускается в CRM с уникальным кодом.
 ///
-/// Использовать можно одним из двух способов — потратить остаток в кассе или
+/// Использовать можно одним из двух способов – потратить остаток в кассе или
 /// обменять на баллы. Способы не смешиваются: как только по коду прошло
 /// списание в кассе, обменять его на баллы уже нельзя, и наоборот. Иначе одну
 /// и ту же сумму можно получить дважды.
@@ -376,7 +376,7 @@ enum GiftCertificateStatus {
 /// Сертификат, купленный на сайте.
 ///
 /// Отдельная таблица, а не позиция в `order_items`: у сертификата нет ни
-/// товара, ни объёма, ни остатка на складе — общая таблица позиций
+/// товара, ни объёма, ни остатка на складе – общая таблица позиций
 /// превратилась бы в набор пустых колонок с оговорками.
 ///
 /// Сам `GiftCertificate` выпускается не здесь, а в момент оплаты: до неё
@@ -397,7 +397,7 @@ model OrderCertificate {
   /// Поздравление от дарителя.
   message        String?
 
-  /// Выпущенный сертификат — появляется после оплаты.
+  /// Выпущенный сертификат – появляется после оплаты.
   certificateId  Int?     @unique @map("certificate_id")
   certificate    GiftCertificate? @relation(fields: [certificateId], references: [id], onDelete: SetNull)
 
@@ -415,15 +415,15 @@ model GiftCertificate {
   /// Именно эта сумма начисляется, если активирует VIP-клиент.
   paidByn       Decimal               @map("paid_byn") @db.Decimal(10, 2)
   /// Неизрасходованный остаток. При выпуске равен номиналу, уменьшается при
-  /// оплате в кассе. Остаток не сгорает после покупки — покупатель донабирает
+  /// оплате в кассе. Остаток не сгорает после покупки – покупатель донабирает
   /// его в следующие визиты, пока не кончится срок.
   balanceByn    Decimal               @map("balance_byn") @db.Decimal(10, 2)
   status        GiftCertificateStatus @default(new)
 
-  /// Покупатель (если известен) — нужен для VIP-скидки при покупке.
+  /// Покупатель (если известен) – нужен для VIP-скидки при покупке.
   buyerId       Int?                  @map("buyer_id")
   buyer         Customer?             @relation("CertificateBuyer", fields: [buyerId], references: [id])
-  /// Кто выпустил. Пусто — покупка на сайте: там продавца нет.
+  /// Кто выпустил. Пусто – покупка на сайте: там продавца нет.
   issuedById    Int?                  @map("issued_by_id")
   issuedBy      CrmUser?              @relation("CertificateIssuedBy", fields: [issuedById], references: [id])
 
@@ -431,10 +431,10 @@ model GiftCertificate {
   /// историю браузера и в пересланное сообщение, а код должен открываться
   /// только на самой странице.
   publicToken   String?               @unique @map("public_token")
-  /// Поздравление от дарителя — показывается на странице подарка.
+  /// Поздравление от дарителя – показывается на странице подарка.
   giftMessage   String?               @map("gift_message")
   issuedAt      DateTime              @default(now()) @map("issued_at")
-  /// Срок жизни — 180 дней от выпуска, а не от активации: иначе сертификат,
+  /// Срок жизни – 180 дней от выпуска, а не от активации: иначе сертификат,
   /// пролежавший в столе два года, пришлось бы принимать по старой цене.
   expiresAt     DateTime              @map("expires_at")
 
@@ -467,7 +467,7 @@ model CertificateRedemption {
   saleId        Int             @map("sale_id")
   sale          OfflineSale     @relation(fields: [saleId], references: [id])
   amountByn     Decimal         @map("amount_byn") @db.Decimal(10, 2)
-  /// Остаток после списания — чтобы историю можно было читать, не пересчитывая.
+  /// Остаток после списания – чтобы историю можно было читать, не пересчитывая.
   balanceAfter  Decimal         @map("balance_after") @db.Decimal(10, 2)
   /// Отменено вместе с чеком: сумма возвращена на сертификат.
   revokedAt     DateTime?       @map("revoked_at")
@@ -543,19 +543,19 @@ enum DateRewardKind {
 /// Отдельная запись нужна по двум причинам. Во-первых, начисление обязано быть
 /// однократным: задача крутится каждый час, и без следа «уже выдано» клиент
 /// получал бы подарок двадцать четыре раза в сутки. Во-вторых, скидку покупатель
-/// вправе не использовать сразу — она ждёт его до конца срока, и это состояние
+/// вправе не использовать сразу – она ждёт его до конца срока, и это состояние
 /// нужно где-то хранить.
 model DateReward {
   id             Int            @id @default(autoincrement())
   customerId     Int            @map("customer_id")
   customer       Customer       @relation(fields: [customerId], references: [id])
   kind           DateRewardKind
-  /// Памятная дата, породившая скидку. null — день рождения.
+  /// Памятная дата, породившая скидку. null – день рождения.
   customerDateId Int?           @map("customer_date_id")
   customerDate   CustomerDate?  @relation(fields: [customerDateId], references: [id])
 
   /// Повод в виде строки: `birthday-2026` или `date-17-2026`. Именно по нему
-  /// работает защита от повторной выдачи — составной ключ с nullable-колонкой
+  /// работает защита от повторной выдачи – составной ключ с nullable-колонкой
   /// в Postgres не сработал бы, там NULL не равен NULL.
   occasionKey    String         @map("occasion_key")
 
@@ -566,7 +566,7 @@ model DateReward {
 
   validFrom      DateTime       @map("valid_from")
   validUntil     DateTime       @map("valid_until")
-  /// Когда скидку применили в кассе. null — ещё не использована.
+  /// Когда скидку применили в кассе. null – ещё не использована.
   usedAt         DateTime?      @map("used_at")
   usedSaleId     Int?           @map("used_sale_id")
   createdAt      DateTime       @default(now()) @map("created_at")
@@ -626,7 +626,7 @@ model Order {
   status          OrderStatus @default(new)
   deliveryType    DeliveryType @map("delivery_type")
 
-  /// Данные посылки. Заполняются только при доставке почтой — при самовывозе
+  /// Данные посылки. Заполняются только при доставке почтой – при самовывозе
   /// пусты. ФИО получателя хранится отдельно от имени клиента: посылка может
   /// идти другому человеку (подарок, родственник), и перезаписывать этим имя
   /// постоянного покупателя нельзя.
@@ -642,16 +642,16 @@ model Order {
   /// Отделение Европочты, куда едет посылка. Заполняется только для europost:
   /// адрес там не нужен, забирают по номеру отделения.
   europostOfficeCode String?   @map("europost_office_code")
-  /// Адрес отделения на момент заказа — чтобы он не «поехал», если отделение
+  /// Адрес отделения на момент заказа – чтобы он не «поехал», если отделение
   /// потом переедет или его уберут из справочника.
   europostOfficeText String?   @map("europost_office_text")
-  /// Телефон получателя. Для Европочты обязателен — по нему выдают посылку.
+  /// Телефон получателя. Для Европочты обязателен – по нему выдают посылку.
   recipientPhone  String?      @map("recipient_phone")
 
   comment         String?
   /// Сумма товаров со скидками, без доставки.
   totalByn        Decimal     @map("total_byn") @db.Decimal(10, 2)
-  /// Стоимость доставки. 0 — самовывоз или бесплатная доставка от порога.
+  /// Стоимость доставки. 0 – самовывоз или бесплатная доставка от порога.
   deliveryFeeByn  Decimal     @default(0) @map("delivery_fee_byn") @db.Decimal(10, 2)
   loyaltySpentByn Decimal     @default(0) @map("loyalty_spent_byn") @db.Decimal(10, 2)
   trackingNumber  String?     @map("tracking_number")
@@ -698,7 +698,7 @@ enum PaymentMethodKind {
 /// Попытка оплаты через bePaid.
 ///
 /// Одна на каждый переход к оплате: покупатель может вернуться и попробовать
-/// снова, и каждая попытка должна остаться в истории — иначе при разборе
+/// снова, и каждая попытка должна остаться в истории – иначе при разборе
 /// спорного платежа неоткуда узнать, что происходило.
 model Payment {
   id         Int               @id @default(autoincrement())
@@ -706,7 +706,7 @@ model Payment {
   order      Order             @relation(fields: [orderId], references: [id])
   method     PaymentMethodKind @default(card)
 
-  /// Токен платежа bePaid. По нему запрашивается настоящий статус — телу
+  /// Токен платежа bePaid. По нему запрашивается настоящий статус – телу
   /// уведомления доверять нельзя, оно ничем не подписано.
   token      String            @unique
   /// UID транзакции в шлюзе, появляется после обработки.
@@ -715,7 +715,7 @@ model Payment {
   status     String            @default("pending")
   /// Тестовая транзакция. В проде такие не засчитываются как оплата.
   isTest     Boolean           @default(false) @map("is_test")
-  /// Сообщение шлюза — пригодится, когда покупатель спросит, почему отказ.
+  /// Сообщение шлюза – пригодится, когда покупатель спросит, почему отказ.
   message    String?
   paidAt     DateTime?         @map("paid_at")
   createdAt  DateTime          @default(now()) @map("created_at")
@@ -726,7 +726,7 @@ model Payment {
 }
 
 /// Путь заказа: new → confirmed → decanted → packed → shipped.
-/// Возврат (`refunded`) возможен с любого шага — это решение админа, а не
+/// Возврат (`refunded`) возможен с любого шага – это решение админа, а не
 /// очередная ступень.
 ///
 /// `closed`, `rejected` и `returned` остались от прежней схемы с оплатой при
@@ -735,7 +735,7 @@ model Payment {
 /// Путь заказа: new → decanted → packed → shipped.
 ///
 /// Подтверждения больше нет. Магазин работает по предоплате и не перезванивает
-/// каждому покупателю: как только деньги пришли, заказ считается принятым —
+/// каждому покупателю: как только деньги пришли, заказ считается принятым –
 /// тогда же списываются остатки, начисляется кешбек и уходит SMS. Продавцу
 /// остаётся отлить, упаковать и отправить.
 enum OrderStatus {
@@ -744,7 +744,7 @@ enum OrderStatus {
   decanted
   packed
   shipped
-  /// Закрыт админом вручную — например, самовывоз состоялся.
+  /// Закрыт админом вручную – например, самовывоз состоялся.
   closed
   refunded
 
@@ -762,7 +762,7 @@ enum OrderStatus {
 /// обновляются фоново, а координаты нужны, чтобы показать отделение на карте.
 model EuropostOffice {
   id           Int      @id @default(autoincrement())
-  /// Номер отделения в системе Европочты — он же попадает в заказ.
+  /// Номер отделения в системе Европочты – он же попадает в заказ.
   code         String   @unique
   city         String
   address      String
@@ -770,7 +770,7 @@ model EuropostOffice {
   workingHours String?  @map("working_hours")
   latitude     Decimal? @db.Decimal(9, 6)
   longitude    Decimal? @db.Decimal(9, 6)
-  /// Отделение закрыли — из выбора убираем, но в старых заказах оставляем.
+  /// Отделение закрыли – из выбора убираем, но в старых заказах оставляем.
   isActive     Boolean  @default(true) @map("is_active")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
@@ -787,9 +787,9 @@ enum DeliveryService {
 /// Как покупатель забирает заказ. Выбирается при оформлении.
 enum DeliveryType {
   pickup
-  /// Белпочта — доставка по адресу, нужен полный адрес с индексом.
+  /// Белпочта – доставка по адресу, нужен полный адрес с индексом.
   belpochta
-  /// Европочта — выдача в отделении, нужен номер отделения, адрес не нужен.
+  /// Европочта – выдача в отделении, нужен номер отделения, адрес не нужен.
   europost
 
   /// Осталось от времён, когда почта была одна. В новых заказах не
@@ -849,7 +849,7 @@ model OfflineSale {
 model OfflineSaleCertificate {
   id           Int         @id @default(autoincrement())
   saleId       Int         @map("sale_id")
-  // onDelete: Cascade — так FK создан в миграции 20260728123000_gift_certificates.
+  // onDelete: Cascade – так FK создан в миграции 20260728123000_gift_certificates.
   // Объявлено явно, чтобы Prisma не считала это дрейфом и не пересоздавала связь.
   sale         OfflineSale @relation(fields: [saleId], references: [id], onDelete: Cascade)
   denomination Decimal     @db.Decimal(10, 2)

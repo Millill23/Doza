@@ -3,7 +3,7 @@ import { GENDER_LABELS } from "./types";
 import { COMPANY } from "./company";
 
 export const SITE_URL = "https://doza-parfum.by";
-export const SITE_NAME = "DOZA — парфюмерия на распив";
+export const SITE_NAME = "DOZA – парфюмерия на распив";
 
 /**
  * Коды подтверждения прав в вебмастерах (вставьте после регистрации домена).
@@ -52,15 +52,15 @@ export function productFaq(p: ProductDetail): { q: string; a: string }[] {
 
   faq.push({
     q: `Сколько стоит ${title}?`,
-    a: `Цена ${title} — от ${byn(p.priceFrom)}. Доступные объёмы: ${volumes}. Оплата картой онлайн при оформлении заказа.`,
+    a: `Цена ${title} – от ${byn(p.priceFrom)}. Доступные объёмы: ${volumes}. Оплата картой онлайн при оформлении заказа.`,
   });
 
   const notes = [p.notesTop, p.notesMid, p.notesBase].filter(Boolean);
   if (notes.length) {
     const parts: string[] = [];
-    if (p.notesTop) parts.push(`верхние — ${p.notesTop}`);
-    if (p.notesMid) parts.push(`средние — ${p.notesMid}`);
-    if (p.notesBase) parts.push(`базовые — ${p.notesBase}`);
+    if (p.notesTop) parts.push(`верхние – ${p.notesTop}`);
+    if (p.notesMid) parts.push(`средние – ${p.notesMid}`);
+    if (p.notesBase) parts.push(`базовые – ${p.notesBase}`);
     faq.push({
       q: `Какие ноты у аромата ${p.name}?`,
       a: `Пирамида аромата ${title}: ${parts.join("; ")}.`,
@@ -69,7 +69,7 @@ export function productFaq(p: ProductDetail): { q: string; a: string }[] {
 
   faq.push({
     q: `Это оригинальный парфюм?`,
-    a: `Да. Мы разливаем только оригинальную парфюмерию во флаконы нужного объёма. ${title} — ${GENDER_LABELS[p.gender].toLowerCase()} аромат.`,
+    a: `Да. Мы разливаем только оригинальную парфюмерию во флаконы нужного объёма. ${title} – ${GENDER_LABELS[p.gender].toLowerCase()} аромат.`,
   });
 
   faq.push({
@@ -80,16 +80,16 @@ export function productFaq(p: ProductDetail): { q: string; a: string }[] {
   return faq;
 }
 
-/** SEO-текст описания (если у товара нет своего описания — генерируем из полей). */
+/** SEO-текст описания (если у товара нет своего описания – генерируем из полей). */
 export function productSeoText(p: ProductDetail): string {
   if (p.description && p.description.length > 40) return p.description;
   const notes = [p.notesTop, p.notesMid, p.notesBase].filter(Boolean).join(", ");
   const g = GENDER_LABELS[p.gender].toLowerCase();
-  return `${p.brand} ${p.name} — ${g} аромат${notes ? ` с нотами: ${notes}` : ""}. Оригинальная парфюмерия на распив от ${byn(p.priceFrom)} — объёмы 3, 5 и 10 мл.`;
+  return `${p.brand} ${p.name} – ${g} аромат${notes ? ` с нотами: ${notes}` : ""}. Оригинальная парфюмерия на распив от ${byn(p.priceFrom)} – объёмы 3, 5 и 10 мл.`;
 }
 
 export function productMeta(p: ProductDetail): SeoMeta {
-  const title = `${p.brand} ${p.name} — парфюм на распив от ${byn(p.priceFrom)} | DOZA`;
+  const title = `${p.brand} ${p.name} – парфюм на распив от ${byn(p.priceFrom)} | DOZA`;
   const g = GENDER_LABELS[p.gender].toLowerCase();
   const notes = [p.notesTop, p.notesMid].filter(Boolean).join(", ");
   const description = `Купить ${p.brand} ${p.name} (${g}) на распив от ${byn(

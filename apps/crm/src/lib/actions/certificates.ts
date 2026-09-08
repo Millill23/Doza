@@ -22,14 +22,14 @@ async function getSetting(key: string, fallback: number): Promise<number> {
   return s ? Number(s.value) : fallback;
 }
 
-/** Баллы без лишних нулей: 80 вместо 80.00, но 83.33 — как есть. */
+/** Баллы без лишних нулей: 80 вместо 80.00, но 83.33 – как есть. */
 function fmt(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(2);
 }
 
 /**
  * Предпросмотр перед выпуском: какой код будет и сколько платит покупатель.
- * Код здесь только показывается — запись создаётся в `issueCertificate`.
+ * Код здесь только показывается – запись создаётся в `issueCertificate`.
  */
 export async function prepareCertificate(denomination: number, phoneRaw?: string) {
   await requireRole(["admin", "seller"]);
@@ -80,7 +80,7 @@ export async function issueCertificate(input: {
   if (!CERTIFICATE_DENOMINATIONS.includes(nominal as (typeof CERTIFICATE_DENOMINATIONS)[number]))
     throw new Error("Выберите номинал из списка");
 
-  // Цену считаем заново на сервере — присланной с клиента не доверяем.
+  // Цену считаем заново на сервере – присланной с клиента не доверяем.
   let buyerId: number | null = null;
   let vipPercent = 0;
   let vipCard: string | null = null;
@@ -103,7 +103,7 @@ export async function issueCertificate(input: {
       code: input.code,
       denomination: nominal,
       paidByn: paid,
-      // Тратить можно весь номинал, а не уплаченную сумму: VIP-скидка — это
+      // Тратить можно весь номинал, а не уплаченную сумму: VIP-скидка – это
       // скидка на покупку сертификата, а не уменьшение его ценности.
       balanceByn: nominal,
       expiresAt: newCertificateExpiry(),
@@ -146,7 +146,7 @@ export async function activateCertificateInCrm(input: {
   const phone = toStoredPhone(input.phone ?? "");
   if (phone.length < 9) throw new Error("Укажите корректный телефон клиента");
 
-  // Имя необязательно, но если введено — проверяем: оно уходит в SMS и TG.
+  // Имя необязательно, но если введено – проверяем: оно уходит в SMS и TG.
   const typed = (input.name ?? "").trim();
   const name = typed ? assertCustomerName(typed) : "";
   // Клиента заводим до активации: сертификат должен начислиться на кого-то.
@@ -167,7 +167,7 @@ export async function activateCertificateInCrm(input: {
       loyaltyDays: days,
     });
   } catch (e) {
-    // Отсутствие согласия — не поломка, а житейская ситуация: продавцу нужен
+    // Отсутствие согласия – не поломка, а житейская ситуация: продавцу нужен
     // не текст ошибки, а кнопка «отправить согласие» рядом с ней. Поэтому
     // возвращаем значением, а не исключением.
     if (e instanceof ConsentRequiredError)
@@ -177,7 +177,7 @@ export async function activateCertificateInCrm(input: {
         customerId: e.customerId,
         customerName: customer.name,
         message:
-          "Клиент не подтвердил согласие на обработку персональных данных, поэтому начислить баллы нельзя. Сертификат не тронут — отправьте клиенту ссылку, дождитесь подтверждения и активируйте снова. Либо расплатитесь этим сертификатом прямо в кассе: там согласие не требуется.",
+          "Клиент не подтвердил согласие на обработку персональных данных, поэтому начислить баллы нельзя. Сертификат не тронут – отправьте клиенту ссылку, дождитесь подтверждения и активируйте снова. Либо расплатитесь этим сертификатом прямо в кассе: там согласие не требуется.",
       };
     if (e instanceof CertificateError)
       return { ok: false as const, reason: "invalid" as const, message: e.message };
@@ -207,7 +207,7 @@ export async function activateCertificateInCrm(input: {
         `Клиент: ${tgEscape(result.customerName)} (${result.customerPhone})${result.isVip ? " ⭐VIP" : ""}\n` +
         `Начислено: <b>${fmt(result.awarded)}</b> баллов` +
         (result.isVip && result.awarded !== result.denomination
-          ? " (по цене покупки — VIP)"
+          ? " (по цене покупки – VIP)"
           : "") +
         `\nПродавец: ${tgEscape(seller?.name ?? activatedById)}`,
     );

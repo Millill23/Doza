@@ -79,7 +79,7 @@ export default async function CashPage() {
       id: p.id,
       name: p.name,
       brand: p.brand.name,
-      // Адресная акция товара или акция «на все товары» — что больше.
+      // Адресная акция товара или акция «на все товары» – что больше.
       discountPercent: Math.max(
         pickActivePromo(
           p.promos.map((pr) => ({

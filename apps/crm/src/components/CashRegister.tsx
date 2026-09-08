@@ -16,7 +16,7 @@ import {
   isValidLocalDigits,
   PHONE_ERROR,
 } from "@doza/shared/phone";
-// Тот же движок, что и на сервере — предпросмотр обязан совпадать с чеком.
+// Тот же движок, что и на сервере – предпросмотр обязан совпадать с чеком.
 import { priceCart } from "@doza/db/pricing";
 
 interface VolumeOpt {
@@ -56,7 +56,7 @@ function byn(n: number) {
   return `${n.toFixed(2)} BYN`;
 }
 
-/** Название сработавшей механики скидки — для строки «Скидка (…)». */
+/** Название сработавшей механики скидки – для строки «Скидка (…)». */
 const DISCOUNT_LABEL: Record<string, string> = {
   vip: "VIP",
   social: "за подписки",
@@ -111,7 +111,7 @@ export default function CashRegister({
   const [balance, setBalance] = useState(0);
   const [foundName, setFoundName] = useState<string | null>(null);
   const [foundId, setFoundId] = useState<number | null>(null);
-  /** Найденный клиент не подтвердил согласие — баллы ему не начислятся. */
+  /** Найденный клиент не подтвердил согласие – баллы ему не начислятся. */
   const [needsConsent, setNeedsConsent] = useState(false);
   /** Действующая разовая скидка клиента по памятной дате. */
   const [dateReward, setDateReward] = useState<{
@@ -121,13 +121,13 @@ export default function CashRegister({
   } | null>(null);
   /** Покупатель согласился её потратить сейчас. */
   const [useDate, setUseDate] = useState(false);
-  /** Искали и не нашли — предлагаем зарегистрировать. */
+  /** Искали и не нашли – предлагаем зарегистрировать. */
   const [notFound, setNotFound] = useState(false);
   const [vipCard, setVipCard] = useState<string | null>(null);
   const [vipPercent, setVipPercent] = useState(0);
   const [subscribe, setSubscribe] = useState(false);
   const [story, setStory] = useState(false);
-  /** Флакон почти пуст — продавец отдаёт остаток дешевле. */
+  /** Флакон почти пуст – продавец отдаёт остаток дешевле. */
   const [remnant, setRemnant] = useState(false);
   /** Промокод покупателя. Продавец выбирает из списка, а не печатает. */
   const [promoCode, setPromoCode] = useState("");
@@ -377,7 +377,7 @@ export default function CashRegister({
           })),
 
           // Отправляем номер, только если клиент реально найден: касса больше
-          // не заводит клиентов на лету — регистрация живёт в одном месте.
+          // не заводит клиентов на лету – регистрация живёт в одном месте.
           phone: foundName ? BELARUS_PREFIX + phone : undefined,
           loyaltySpend: effSpend,
           loyaltyOtp: otp || undefined,
@@ -416,8 +416,8 @@ export default function CashRegister({
             Сертификатом: {byn(done.certPaid)} · остаток{" "}
             <b>{byn(done.certRemaining ?? 0)}</b>
             {done.certRemaining
-              ? " — скажите покупателю, он потратит его в следующий раз"
-              : " — сертификат израсходован"}
+              ? " – скажите покупателю, он потратит его в следующий раз"
+              : " – сертификат израсходован"}
           </p>
         ) : null}
         {done.discountLabel && (
@@ -555,7 +555,7 @@ export default function CashRegister({
               value={phone}
               onChange={(v) => {
                 setPhone(v);
-                // Номер изменили — прошлый результат поиска больше не про него.
+                // Номер изменили – прошлый результат поиска больше не про него.
                 setFoundName(null);
                 setFoundId(null);
                 setNeedsConsent(false);
@@ -589,13 +589,13 @@ export default function CashRegister({
           {dateReward && (
             <div className="mt-2 rounded-lg border border-botanical-500/40 bg-botanical-500/5 p-3">
               <p className="text-xs font-medium text-botanical-300">
-                🎁 Скидка {dateReward.percent}% — «{dateReward.description}»
+                🎁 Скидка {dateReward.percent}% – «{dateReward.description}»
               </p>
               <p className="mt-0.5 text-[11px] text-ivory-faint">
                 Действует до{" "}
                 {new Date(dateReward.validUntil).toLocaleDateString("ru-RU")}.
                 Разовая: если покупатель не хочет тратить сейчас, оставьте
-                выключенной — скидка сохранится до конца срока.
+                выключенной – скидка сохранится до конца срока.
               </p>
               <button
                 type="button"
@@ -607,7 +607,7 @@ export default function CashRegister({
               {useDate && priced.kind !== "date" && (
                 <p className="mt-2 text-[11px] leading-snug text-amber-300">
                   Сейчас выгоднее{" "}
-                  {DISCOUNT_LABEL[priced.kind] || "другая скидка"} — эта останется
+                  {DISCOUNT_LABEL[priced.kind] || "другая скидка"} – эта останется
                   неиспользованной.
                 </p>
               )}
@@ -616,7 +616,7 @@ export default function CashRegister({
           {needsConsent && foundId && (
             <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
               <p className="mb-2 text-xs leading-relaxed text-amber-300">
-                Нет согласия на обработку данных — баллы за эту покупку не
+                Нет согласия на обработку данных – баллы за эту покупку не
                 начислятся. Отправьте ссылку и попросите подтвердить.
               </p>
               <ConsentRequestButton
@@ -673,13 +673,13 @@ export default function CashRegister({
           </div>
           {remnant && socialPercent > 0 && (
             <p className="mt-1.5 text-xs text-ivory-faint">
-              Остаток не складывается с подписками — применится то, что выгоднее
+              Остаток не складывается с подписками – применится то, что выгоднее
               клиенту.
             </p>
           )}
 
           {/* Промокод: продавец выбирает из списка, а не печатает со слов
-              покупателя — так не бывает опечаток и «кода, которого нет». */}
+              покупателя – так не бывает опечаток и «кода, которого нет». */}
           {promoCodes.length > 0 && (
             <div className="mt-4">
               <label className="mb-1.5 block text-xs uppercase tracking-wide text-gold-500">
@@ -748,7 +748,7 @@ export default function CashRegister({
           )}
           {socialPercent > 0 && vipPercent > 0 && (
             <p className="mt-1.5 text-xs text-ivory-faint">
-              Не суммируется с VIP — применится то, что выгоднее клиенту.
+              Не суммируется с VIP – применится то, что выгоднее клиенту.
             </p>
           )}
         </div>
@@ -836,7 +836,7 @@ export default function CashRegister({
         )}
 
         {/* Сертификат. Отдельно от блока баллов: платить им можно и без
-            телефона, и без согласия — это средство на предъявителя. */}
+            телефона, и без согласия – это средство на предъявителя. */}
         <div className="border-t border-ink-600/60 pt-4">
           <label className="mb-1.5 block text-xs uppercase tracking-wide text-gold-500">
             Сертификат
@@ -875,7 +875,7 @@ export default function CashRegister({
               <p className="mt-1 text-ivory-faint">
                 {certUse.applied > 0
                   ? `Спишем ${byn(certUse.applied)}, останется ${byn(certUse.remaining)} на следующую покупку.`
-                  : "Добавьте товары — списывать пока нечего."}
+                  : "Добавьте товары – списывать пока нечего."}
               </p>
             </div>
           )}

@@ -33,7 +33,7 @@ export default async function PreordersPage() {
       <h1 className="mb-1 font-serif text-3xl text-ivory">Предзаказы</h1>
       <p className="mb-8 text-sm text-ivory-faint">
         Заявки на целый флакон, которого нет в каталоге. Продавец фиксирует
-        пожелание и контакт клиента — дальше вручную. При создании приходит
+        пожелание и контакт клиента – дальше вручную. При создании приходит
         оповещение в Telegram.
       </p>
 

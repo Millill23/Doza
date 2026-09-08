@@ -7,7 +7,7 @@ import PeriodPicker from "@/components/PeriodPicker";
 
 export const dynamic = "force-dynamic";
 
-/** Сколько чеков показываем за раз. За период — больше: это уже выборка. */
+/** Сколько чеков показываем за раз. За период – больше: это уже выборка. */
 const PAGE_SIZE = 100;
 const PERIOD_SIZE = 500;
 
@@ -29,7 +29,7 @@ export default async function SalesPage({
 }) {
   await requireRole(["admin", "seller"]);
 
-  // Даты в адресе — те же, что в аналитике: одна и та же кнопка «7 дней»
+  // Даты в адресе – те же, что в аналитике: одна и та же кнопка «7 дней»
   // должна давать одинаковый период на обеих страницах.
   const fromDay = isDayString(searchParams.from) ? searchParams.from : "";
   const toDay = isDayString(searchParams.to) ? searchParams.to : "";
@@ -108,7 +108,7 @@ export default async function SalesPage({
                     </Link>
                   </td>
                   <td className="px-4 py-3 text-ivory-muted">{s.seller.name}</td>
-                  <td className="px-4 py-3 text-ivory-muted">{s.customer?.name ?? "—"}</td>
+                  <td className="px-4 py-3 text-ivory-muted">{s.customer?.name ?? "–"}</td>
                   <td className="px-4 py-3 text-ivory-muted">{s.items.length}</td>
                   <td className="px-4 py-3 text-gold-400">{formatByn(Number(s.totalByn))}</td>
                   <td className="px-4 py-3">

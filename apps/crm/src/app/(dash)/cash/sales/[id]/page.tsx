@@ -70,7 +70,7 @@ export default async function SaleDetailPage({
               {sale.items.map((i) => (
                 <li key={i.id} className="flex justify-between py-3 text-sm">
                   <span className="text-ivory">
-                    {i.product.brand.name} — {i.product.name}, {i.volumeMl} мл × {i.qty}
+                    {i.product.brand.name} – {i.product.name}, {i.volumeMl} мл × {i.qty}
                   </span>
                   <span className="text-gold-400">{formatByn(Number(i.priceByn) * i.qty)}</span>
                 </li>

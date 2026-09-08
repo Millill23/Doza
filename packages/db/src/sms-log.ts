@@ -17,7 +17,7 @@ import {
  * Единая точка отправки SMS: проверка настроек, лимитов и запись в журнал.
  *
  * Раньше каждое место слало напрямую через `sendSms`, поэтому не было ни
- * общего выключателя, ни истории, ни защиты от повторов — напоминания о
+ * общего выключателя, ни истории, ни защиты от повторов – напоминания о
  * согласии уходили людям ежедневно, и увидеть это можно было только со
  * стороны получателя.
  *
@@ -39,7 +39,7 @@ export interface SendSmsResult {
   error?: string;
 }
 
-/** Значение настройки-переключателя. `fallback` — если настройки ещё нет. */
+/** Значение настройки-переключателя. `fallback` – если настройки ещё нет. */
 async function isEnabled(key: string, fallback = true): Promise<boolean> {
   const s = await prisma.setting.findUnique({ where: { key } });
   if (!s) return fallback;
@@ -64,7 +64,7 @@ export async function sendTrackedSms(opts: {
   /** Дублирование в Telegram, если админ включил «прожектор». */
   notify?: (text: string) => Promise<unknown>;
   customerId?: number | null;
-  /** Сотрудник CRM, инициировавший отправку. null — сайт или система. */
+  /** Сотрудник CRM, инициировавший отправку. null – сайт или система. */
   userId?: number | null;
 }): Promise<SendSmsResult> {
   if (!(await isSmsKindEnabled(opts.kind))) {
@@ -86,7 +86,7 @@ export async function sendTrackedSms(opts: {
     return { ok: false, skipped: true, error };
   }
 
-  // Частота — здесь же, в единой точке отправки: проверка в самом запросе
+  // Частота – здесь же, в единой точке отправки: проверка в самом запросе
   // обходится любым другим путём к тому же коду.
   if (isThrottledKind(opts.kind)) {
     const verdict = canSendThrottledSms(await throttleState(opts.phone, opts.kind));
@@ -117,7 +117,7 @@ export async function sendTrackedSms(opts: {
   }
 
   // Пишем и удачные, и неудачные: по журналу считается пауза между повторами,
-  // а неудачные отправки — единственный след проблем со шлюзом.
+  // а неудачные отправки – единственный след проблем со шлюзом.
   await prisma.smsLog.create({
     data: {
       phone: opts.phone,
@@ -153,7 +153,7 @@ export async function sendTrackedSms(opts: {
  * Нужна там, где перед отправкой меняется состояние: сброс пароля сначала
  * спрашивает разрешение и только потом переписывает пароль. Иначе частые
  * запросы меняли бы владельцу пароль снова и снова, а SMS с новым не уходила
- * бы — и человек оказывался заперт снаружи собственного кабинета.
+ * бы – и человек оказывался заперт снаружи собственного кабинета.
  */
 export async function checkSmsAllowed(
   kind: SmsKind,
@@ -169,7 +169,7 @@ export async function checkSmsAllowed(
 /**
  * Сколько служебных сообщений этой категории ушло на номер и когда последнее.
  *
- * Считаем и неудачные попытки тоже: иначе сломанный шлюз превращается в дыру —
+ * Считаем и неудачные попытки тоже: иначе сломанный шлюз превращается в дыру –
  * сообщения не уходят, счётчик стоит, а запросы летят без счёта.
  */
 async function throttleState(phone: string, kind: SmsKind) {
@@ -198,7 +198,7 @@ export async function consentSendState(phone: string): Promise<ConsentSendState>
 /**
  * Убрать из журнала всё, что старше срока хранения.
  *
- * Вызывается фоновой задачей. Сообщения о согласии не трогаем — см.
+ * Вызывается фоновой задачей. Сообщения о согласии не трогаем – см.
  * {@link SMS_LOG_KEEP_FOREVER}.
  */
 export async function pruneSmsLog(

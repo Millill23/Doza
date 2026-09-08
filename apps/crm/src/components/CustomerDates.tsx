@@ -64,7 +64,7 @@ export default function CustomerDates({
               className="flex items-center justify-between rounded-lg border border-ink-600/60 bg-ink-800 px-3 py-2 text-sm"
             >
               <span className="text-ivory">
-                {new Date(d.date).toLocaleDateString("ru-RU")} — {d.description}
+                {new Date(d.date).toLocaleDateString("ru-RU")} – {d.description}
               </span>
               <button
                 onClick={() =>

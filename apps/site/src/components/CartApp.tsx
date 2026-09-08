@@ -42,17 +42,17 @@ import {
 import { BELARUS_PREFIX as PREFIX } from "@doza/shared/phone";
 import OfficePicker, { type Office } from "./OfficePicker";
 
-/** Стоимость доставки — считает сервер, здесь только показываем. */
+/** Стоимость доставки – считает сервер, здесь только показываем. */
 interface DeliveryInfo {
   fee: number;
   missingForFree: number;
   free: boolean;
   hint: string | null;
-  /** Есть ли что везти. false — в заказе только электронные сертификаты. */
+  /** Есть ли что везти. false – в заказе только электронные сертификаты. */
   needed?: boolean;
 }
 
-/** Общий вид поля ввода — их в форме доставки восемь. */
+/** Общий вид поля ввода – их в форме доставки восемь. */
 const FIELD =
   "h-11 w-full rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ivory placeholder:text-ivory-faint focus:border-gold-500 focus:outline-none";
 
@@ -91,7 +91,7 @@ function writeCart(cart: CartItem[]) {
 
 export default function CartApp() {
   const [cart, setCart] = useState<CartItem[]>([]);
-  /** Сертификаты — отдельным списком: у них нет ни объёма, ни остатка. */
+  /** Сертификаты – отдельным списком: у них нет ни объёма, ни остатка. */
   const [gifts, setGifts] = useState<GiftCartItem[]>([]);
   const [mounted, setMounted] = useState(false);
 
@@ -101,7 +101,7 @@ export default function CartApp() {
   const [delivery, setDelivery] = useState<DeliveryTypeValue>("pickup");
   const [comment, setComment] = useState("");
 
-  // Данные посылки — только для доставки почтой.
+  // Данные посылки – только для доставки почтой.
   const [lastName, setLastName] = useState("");
   const [firstName, setFirstName] = useState("");
   const [middleName, setMiddleName] = useState("");
@@ -123,17 +123,17 @@ export default function CartApp() {
   const [promo, setPromo] = useState<{ code: string; percent: number } | null>(null);
   const [promoError, setPromoError] = useState<string | null>(null);
   /**
-   * Код для пересчёта — с задержкой. Иначе запрос улетал бы на каждую букву, и
+   * Код для пересчёта – с задержкой. Иначе запрос улетал бы на каждую букву, и
    * покупатель видел бы «такого промокода нет», ещё не дописав свой.
    */
   const [promoCodeDebounced, setPromoCodeDebounced] = useState("");
-  /** Суммы со скидками — считает сервер, здесь мы их только показываем. */
+  /** Суммы со скидками – считает сервер, здесь мы их только показываем. */
   const [quote, setQuote] = useState<Quote | null>(null);
-  /** Товарная часть заказа — без сертификатов. По ней считаются баллы. */
+  /** Товарная часть заказа – без сертификатов. По ней считаются баллы. */
   const [goodsNet, setGoodsNet] = useState(0);
   /** Есть ли что предложить добрать: от этого зависит, куда ведёт кнопка. */
   const [hasOffer, setHasOffer] = useState(false);
-  /** Стоимость доставки и подсказка про порог — считает сервер. */
+  /** Стоимость доставки и подсказка про порог – считает сервер. */
   const [deliveryInfo, setDeliveryInfo] = useState<DeliveryInfo | null>(null);
 
   // Получатель для Европочты: посылку выдают по ФИО и телефону в отделении.
@@ -196,7 +196,7 @@ export default function CartApp() {
           setPhone(toLocalDigits(data.session.phone));
         }
       } catch {
-        /* показываем цены из корзины — заказ всё равно пересчитает сервер */
+        /* показываем цены из корзины – заказ всё равно пересчитает сервер */
       }
     })();
     return () => {
@@ -215,13 +215,13 @@ export default function CartApp() {
   const discount = quote?.discount ?? 0;
 
 
-  // Везти нечего — только электронные сертификаты. Сервер считает так же.
+  // Везти нечего – только электронные сертификаты. Сервер считает так же.
   const shipping = deliveryInfo?.needed ?? true;
   const deliveryFee = deliveryInfo?.fee ?? 0;
   // Баллами платят за товар, но не за доставку: иначе бесплатная доставка
   // получалась бы за чужой счёт.
   // Баллами платят за товар, но не за сертификат: он обменивается обратно в
-  // баллы при активации, и круг замкнулся бы — купил за баллы, активировал,
+  // баллы при активации, и круг замкнулся бы – купил за баллы, активировал,
   // получил их обратно со свежим сроком.
   const maxSpend = Math.min(balance, goodsNet);
   const effectiveSpend = usePoints ? Math.min(pointsToSpend || maxSpend, maxSpend) : 0;
@@ -243,7 +243,7 @@ export default function CartApp() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    // У вошедшего в кабинет номер берётся из аккаунта — проверять поле не нужно.
+    // У вошедшего в кабинет номер берётся из аккаунта – проверять поле не нужно.
     if (!account && !isValidLocalDigits(phone)) {
       setError(PHONE_ERROR);
       return;
@@ -302,7 +302,7 @@ export default function CartApp() {
       loyaltySpend: effectiveSpend,
     };
 
-    // Есть что предложить — сначала показываем предложение. Форма уже
+    // Есть что предложить – сначала показываем предложение. Форма уже
     // проверена, поэтому дальше покупателю останется только нажать «оплатить».
     if (hasOffer) {
       saveCheckout(form);
@@ -328,7 +328,7 @@ export default function CartApp() {
       window.location.href = res.redirectUrl;
       return;
     }
-    // Заказ полностью покрыт баллами — платить нечего.
+    // Заказ полностью покрыт баллами – платить нечего.
     setDoneOrderId(res.orderId);
   }
 
@@ -396,9 +396,9 @@ export default function CartApp() {
               </p>
               <p className="mt-0.5 text-xs text-ivory-faint">
                 {g.sendBySms
-                  ? "Электронный — ссылка уйдёт в SMS" +
+                  ? "Электронный – ссылка уйдёт в SMS" +
                     (g.recipientName ? " для " + g.recipientName : "")
-                  : "Бумажная карточка — отправим почтой"}
+                  : "Бумажная карточка – отправим почтой"}
               </p>
               <button
                 type="button"
@@ -474,8 +474,8 @@ export default function CartApp() {
         <h2 className="font-serif text-2xl text-ivory">Оформление заказа</h2>
 
         {account ? (
-          /* Вошёл в кабинет — имя и телефон берём из аккаунта. Спрашивать их
-             заново незачем, а главное — скидка по карте положена именно этому
+          /* Вошёл в кабинет – имя и телефон берём из аккаунта. Спрашивать их
+             заново незачем, а главное – скидка по карте положена именно этому
              аккаунту, а не тому номеру, который наберут в поле. */
           <div className="rounded-lg border border-ink-600/60 bg-ink-800/40 p-4">
             <p className="text-sm text-ivory">
@@ -519,7 +519,7 @@ export default function CartApp() {
               <PhoneInput id="f-phone" value={phone} onChange={setPhone} required />
               {/*
                 По набранному номеру мы больше ничего не показываем. Раньше
-                здесь появлялось «С возвращением, имя! Баланс баллов…» — то
+                здесь появлялось «С возвращением, имя! Баланс баллов…» – то
                 есть имя и баланс владельца номера видел любой, кто этот номер
                 набрал. И баллы с него же и списывались.
               */}
@@ -528,7 +528,7 @@ export default function CartApp() {
                 <a href="/login" className="text-gold-400 hover:text-gold-300">
                   Войдите в кабинет
                 </a>{" "}
-                — скидка и баллы применятся к заказу.
+                – скидка и баллы применятся к заказу.
               </p>
             </div>
           </>
@@ -557,7 +557,7 @@ export default function CartApp() {
               </button>
             ))}
           </div>
-          {/* Подсказку показываем только когда до бесплатной реально близко —
+          {/* Подсказку показываем только когда до бесплатной реально близко –
               иначе это не помощь, а уговор купить лишнего. */}
           {deliveryInfo?.hint && (
             <p className="mt-2 rounded-lg border border-gold-600/30 bg-gold-500/5 p-2.5 text-xs leading-relaxed text-gold-400">
@@ -573,7 +573,7 @@ export default function CartApp() {
               Данные для доставки
             </h3>
             <p className="text-xs leading-relaxed text-ivory-faint">
-              ФИО получателя нужно полностью — по нему посылку выдают в
+              ФИО получателя нужно полностью – по нему посылку выдают в
               отделении.
             </p>
 
@@ -634,7 +634,7 @@ export default function CartApp() {
             </h3>
             <p className="text-xs leading-relaxed text-ivory-faint">
               Посылку выдают в отделении по паспорту, поэтому ФИО нужно
-              полностью, а телефон — тот, на который придёт извещение.
+              полностью, а телефон – тот, на который придёт извещение.
             </p>
 
             <div className="grid gap-2">
@@ -689,7 +689,7 @@ export default function CartApp() {
           />
           {promo && (
             <p className="mt-1.5 text-xs text-botanical-300">
-              Промокод {promo.code} применён — скидка {promo.percent}%. Если у
+              Промокод {promo.code} применён – скидка {promo.percent}%. Если у
               вас есть скидка выгоднее, посчитаем по ней.
             </p>
           )}
@@ -698,7 +698,7 @@ export default function CartApp() {
           )}
         </div>
 
-        {/* Баллы — только вошедшему в кабинет: сервер спишет их лишь по сессии. */}
+        {/* Баллы – только вошедшему в кабинет: сервер спишет их лишь по сессии. */}
         {account && balance > 0 && (
           <div className="rounded-lg border border-botanical-500/40 bg-botanical-700/20 p-3">
             <label className="flex cursor-pointer items-center gap-2.5 text-sm text-ivory">
@@ -759,11 +759,11 @@ export default function CartApp() {
         </div>
 
         {/*
-          Акцепт оферты — это согласие с условиями сделки, им блокировать заказ
+          Акцепт оферты – это согласие с условиями сделки, им блокировать заказ
           можно. Согласие на обработку персональных данных сюда не входит: по
           99-З данные для приёма и доставки заказа обрабатываются по основанию
           «исполнение договора». Отдельное согласие нужно только для программы
-          лояльности, и его мы спрашиваем ссылкой в SMS — покупку оно не держит.
+          лояльности, и его мы спрашиваем ссылкой в SMS – покупку оно не держит.
         */}
         <label className="flex cursor-pointer items-start gap-2.5 text-xs leading-relaxed text-ivory-muted">
           <input

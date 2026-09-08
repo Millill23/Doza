@@ -2,7 +2,7 @@ import { useState } from "react";
 
 /**
  * Кнопка подтверждения согласия на обработку ПД.
- * Само нажатие и есть согласие — по 99-З это активное осознанное действие.
+ * Само нажатие и есть согласие – по 99-З это активное осознанное действие.
  */
 export default function ConsentForm({ token }: { token: string }) {
   const [loading, setLoading] = useState(false);
@@ -34,7 +34,7 @@ export default function ConsentForm({ token }: { token: string }) {
         <p className="mb-2 text-4xl">✓</p>
         <h2 className="mb-2 font-serif text-2xl text-ivory">Спасибо!</h2>
         <p className="text-sm text-ivory-muted">
-          Согласие получено — теперь мы начисляем вам баллы за покупки.
+          Согласие получено – теперь мы начисляем вам баллы за покупки.
         </p>
         <a
           href="/catalog"

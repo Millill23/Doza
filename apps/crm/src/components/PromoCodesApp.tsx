@@ -94,7 +94,7 @@ export default function PromoCodesApp({
           <h1 className="font-serif text-3xl text-ivory">Промокоды</h1>
           <p className="mt-1 max-w-xl text-sm text-ivory-faint">
             Скидка по слову, которое называет покупатель. С другими скидками не
-            складывается — применится то, что выгоднее клиенту.
+            складывается – применится то, что выгоднее клиенту.
           </p>
         </div>
         <button
@@ -124,7 +124,7 @@ export default function PromoCodesApp({
                 className={inputCls + " uppercase"}
               />
               <p className="mt-1 text-xs text-ivory-faint">
-                Регистр и пробелы не важны — покупатель наберёт как получится.
+                Регистр и пробелы не важны – покупатель наберёт как получится.
               </p>
             </div>
             <div>
@@ -229,14 +229,14 @@ export default function PromoCodesApp({
                       −{c.discountPercent}%
                     </td>
                     <td className="px-4 py-3 text-ivory-muted">
-                      {day(c.startsAt)} — {day(c.endsAt)}
+                      {day(c.startsAt)} – {day(c.endsAt)}
                       {expired && <div className="text-xs text-ivory-faint">истёк</div>}
                       {!c.isActive && (
                         <div className="text-xs text-ivory-faint">выключен</div>
                       )}
                     </td>
                     <td className="px-4 py-3 text-ivory-muted">
-                      {c.influencer?.name ?? "—"}
+                      {c.influencer?.name ?? "–"}
                     </td>
                     <td className="px-4 py-3 text-ivory-muted">{c.uses}</td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">

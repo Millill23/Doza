@@ -8,7 +8,7 @@ interface Props {
   image: string;
   volumes: ProductVolume[];
   discountPercent?: number;
-  /** Остаток ниже порога — аромат снят с продажи. */
+  /** Остаток ниже порога – аромат снят с продажи. */
   soldOut?: boolean;
 }
 
@@ -135,7 +135,7 @@ export default function VolumeSelector({
               </span>
             )
           ) : (
-            <span className="font-serif text-3xl text-gold-gradient">—</span>
+            <span className="font-serif text-3xl text-gold-gradient">–</span>
           )}
         </div>
 
@@ -165,7 +165,7 @@ export default function VolumeSelector({
 
       <p className="text-center text-xs font-light text-ivory-faint">
         {soldOut
-          ? "Флакон допит. Закажем новый — вернём аромат на витрину."
+          ? "Флакон закончился, скоро он снова будет в наличии."
           : "Оплата картой онлайн на защищённой странице банка."}
       </p>
     </div>

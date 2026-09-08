@@ -36,11 +36,11 @@ test("каждое поле обязательно", () => {
   }
 });
 
-test("отчество обязательно — почта не выдаст посылку без него", () => {
+test("отчество обязательно – почта не выдаст посылку без него", () => {
   assert.match(validateDelivery({ ...ok, middleName: "  " })!, /отчество/i);
 });
 
-test("индекс — ровно шесть цифр", () => {
+test("индекс – ровно шесть цифр", () => {
   assert.equal(isValidPostalCode("220030"), true);
   assert.equal(isValidPostalCode("22003"), false, "пять цифр");
   assert.equal(isValidPostalCode("2200301"), false, "семь цифр");

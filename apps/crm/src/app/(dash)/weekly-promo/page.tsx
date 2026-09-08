@@ -6,7 +6,7 @@ import WeeklyPromoApp from "@/components/WeeklyPromoApp";
 export const dynamic = "force-dynamic";
 
 /**
- * «Парфюм недели» — подборка, которую покупатель видит кнопкой в каталоге.
+ * «Парфюм недели» – подборка, которую покупатель видит кнопкой в каталоге.
  *
  * Раньше её собирали руками, заводя акцию на каждый аромат по отдельности.
  */
@@ -43,7 +43,7 @@ export default async function WeeklyPromoPage() {
       }
       products={products.map((p) => ({
         id: p.id,
-        label: p.brand.name + " — " + p.name,
+        label: p.brand.name + " – " + p.name,
       }))}
       history={history.map((h) => ({
         id: h.id,

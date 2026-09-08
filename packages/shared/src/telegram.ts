@@ -1,6 +1,6 @@
 /**
  * Уведомления в Telegram через Bot API (plain HTTP POST).
- * Общая реализация для сайта и CRM — раньше в каждом приложении была своя
+ * Общая реализация для сайта и CRM – раньше в каждом приложении была своя
  * копия, и правки приходилось дублировать.
  *
  * Тихо пропускается, если токен/chat_id не заданы (удобно в dev).
@@ -29,7 +29,7 @@ function recipients(chatIdOverride?: string): string[] {
   const channel = process.env.TELEGRAM_CHAT_ID;
   if (channel) list.push(channel);
 
-  // TELEGRAM_EXTRA_CHAT_IDS — список через запятую: копия уведомлений
+  // TELEGRAM_EXTRA_CHAT_IDS – список через запятую: копия уведомлений
   // конкретным людям помимо канала.
   const extra = process.env.TELEGRAM_EXTRA_CHAT_IDS ?? "";
   for (const id of extra.split(",")) {
@@ -52,7 +52,7 @@ async function sendTo(token: string, chatId: string, text: string): Promise<void
       }),
     });
     if (!res.ok) {
-      // Тело ответа помогает понять причину (чаще всего — битая HTML-разметка
+      // Тело ответа помогает понять причину (чаще всего – битая HTML-разметка
       // или бот не может писать этому пользователю, пока тот не начал диалог).
       const body = await res.text().catch(() => "");
       console.error(`[telegram] chat ${chatId}: ${res.status} ${body.slice(0, 300)}`);

@@ -19,14 +19,14 @@ export const dynamic = "force-dynamic";
  *
  * Рассылка идёт строго в {@link REWARD_NOTIFY_HOUR} по Минску: поздравление в
  * семь утра или в полночь раздражает, а не радует. Планировщик дёргает роут
- * чаще раза в час — чтобы короткий перезапуск контейнера не съел нужное окно, —
+ * чаще раза в час – чтобы короткий перезапуск контейнера не съел нужное окно, –
  * а в остальные часы роут просто ничего не делает.
  *
  * Повторно ничего не выдаст: на каждый повод заводится запись с уникальным
  * ключом, и `issueTodayRewards` возвращает только созданное в этот раз. SMS
  * шлём ровно по этому списку, иначе клиент получал бы поздравление каждый час.
  *
- * `?force=1` — выдать вне расписания. Нужно, чтобы проверить работу задачи
+ * `?force=1` – выдать вне расписания. Нужно, чтобы проверить работу задачи
  * после деплоя, не дожидаясь одиннадцати.
  */
 export async function GET(request: Request) {
@@ -60,7 +60,7 @@ export async function GET(request: Request) {
     const until = r.validUntil?.toLocaleDateString("ru-RU");
     const text =
       r.kind === "birthday"
-        ? `${r.customerName}, с днём рождения! Дарим ${r.points} баллов — потратьте их на любимый аромат. DOZA`
+        ? `${r.customerName}, с днём рождения! Дарим ${r.points} баллов – потратьте их на любимый аромат. DOZA`
         : r.passed
           // Выдали вдогонку: «скоро ваша дата» было бы неправдой.
           ? `${r.customerName}, поздравляем с датой «${r.description}»! Дарим скидку ${r.percent}% до ${until}. DOZA`
@@ -84,11 +84,11 @@ export async function GET(request: Request) {
   if (issued.length > 0) {
     const lines = issued.map((r) =>
       r.kind === "birthday"
-        ? `🎂 ${tgEscape(r.customerName)} — день рождения, начислено ${r.points} баллов`
-        : `🎁 ${tgEscape(r.customerName)} — «${tgEscape(r.description ?? "")}», скидка ${r.percent}% до ${r.validUntil?.toLocaleDateString("ru-RU")}`,
+        ? `🎂 ${tgEscape(r.customerName)} – день рождения, начислено ${r.points} баллов`
+        : `🎁 ${tgEscape(r.customerName)} – «${tgEscape(r.description ?? "")}», скидка ${r.percent}% до ${r.validUntil?.toLocaleDateString("ru-RU")}`,
     );
     // Недоставленные SMS показываем здесь же: подарок начислен, а человек
-    // о нём не знает — это надо чинить руками, и узнать об этом надо сразу.
+    // о нём не знает – это надо чинить руками, и узнать об этом надо сразу.
     if (failures.length > 0) {
       lines.push("", "⚠️ <b>SMS не ушли:</b>", ...failures.map(tgEscape));
     }

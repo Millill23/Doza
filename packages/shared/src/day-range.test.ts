@@ -8,7 +8,7 @@ import { startOfDay, endOfDay, toDayString, isDayString } from "./day-range.ts";
 
 test("день собирается в местном времени, а не в UTC", () => {
   // Ровно та ошибка, ради которой модуль и появился: new Date("2026-08-10")
-  // разбирается как полночь UTC и в UTC+3 даёт 03:00 — день «съезжает».
+  // разбирается как полночь UTC и в UTC+3 даёт 03:00 – день «съезжает».
   const start = startOfDay("2026-08-10");
   assert.equal(start.getFullYear(), 2026);
   assert.equal(start.getMonth(), 7);

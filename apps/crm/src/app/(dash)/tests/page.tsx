@@ -14,7 +14,7 @@ export default async function TestsPage() {
   await requireRole(["admin"]);
 
   // Только живые сертификаты: отправлять ссылку на использованный или
-  // просроченный незачем — проверять будет нечего.
+  // просроченный незачем – проверять будет нечего.
   const certificates = await prisma.giftCertificate.findMany({
     where: { balanceByn: { gt: 0 }, expiresAt: { gt: new Date() } },
     orderBy: { issuedAt: "desc" },

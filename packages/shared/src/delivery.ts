@@ -1,7 +1,7 @@
 /**
  * Данные посылки: области, индекс, ФИО получателя.
  *
- * Чистая логика без БД — те же правила должны действовать и в браузере (чтобы
+ * Чистая логика без БД – те же правила должны действовать и в браузере (чтобы
  * подсказать сразу), и на сервере (потому что браузеру верить нельзя).
  */
 
@@ -22,7 +22,7 @@ export function isBelarusRegion(value: string): value is BelarusRegion {
   return (BELARUS_REGIONS as readonly string[]).includes(value);
 }
 
-/** Почтовый индекс Беларуси — ровно шесть цифр. */
+/** Почтовый индекс Беларуси – ровно шесть цифр. */
 export function isValidPostalCode(value: string): boolean {
   return /^\d{6}$/.test(value.trim());
 }
@@ -52,7 +52,7 @@ export function validateDelivery(d: Partial<DeliveryDetails>): string | null {
   if (!has(d.firstName)) return "Укажите имя получателя";
   if (!has(d.middleName)) return "Укажите отчество получателя";
   if (!isValidPostalCode(d.postalCode ?? ""))
-    return "Почтовый индекс — шесть цифр, например 220030";
+    return "Почтовый индекс – шесть цифр, например 220030";
   if (!isBelarusRegion((d.region ?? "").trim())) return "Выберите область";
   if (!has(d.city)) return "Укажите населённый пункт";
   if (!has(d.address)) return "Укажите улицу, дом и квартиру";

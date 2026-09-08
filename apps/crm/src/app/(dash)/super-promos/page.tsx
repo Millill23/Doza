@@ -6,7 +6,7 @@ import SuperPromoActions from "@/components/SuperPromoActions";
 export const dynamic = "force-dynamic";
 
 function fmt(d: Date | null): string {
-  if (!d) return "—";
+  if (!d) return "–";
   // Акции задаются по дням, часы не показываем.
   return d.toLocaleDateString("ru-RU", {
     day: "2-digit",
@@ -36,7 +36,7 @@ export default async function SuperPromosPage() {
 
   const opts = products.map((p) => ({
     id: p.id,
-    label: `${p.brand.name} — ${p.name}`,
+    label: `${p.brand.name} – ${p.name}`,
   }));
 
   const now = new Date();

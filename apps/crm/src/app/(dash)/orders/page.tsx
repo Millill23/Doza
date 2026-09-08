@@ -8,7 +8,7 @@ import { orderStatusLabel, type OrderStatusValue } from "@doza/db/order-rules";
 export const dynamic = "force-dynamic";
 
 // Только рабочие статусы: `closed`/`rejected`/`returned` остались в базе от
-// прежней схемы, но фильтровать по ним больше нечего — новых таких не будет.
+// прежней схемы, но фильтровать по ним больше нечего – новых таких не будет.
 const STATUSES: (OrderStatusValue | "all")[] = [
   "all",
   "new",
@@ -98,7 +98,7 @@ export default async function OrdersPage({
                     <span className={`rounded-full border px-2.5 py-1 text-xs ${ORDER_STATUS_STYLE[o.status]}`}>
                       {orderStatusLabel(o.status, o.deliveryType)}
                     </span>
-                    {/* Неоплаченный заказ собирать нельзя — видно сразу в списке. */}
+                    {/* Неоплаченный заказ собирать нельзя – видно сразу в списке. */}
                     {o.paymentStatus !== "paid" && (
                       <span className="mt-1 block text-[11px] text-amber-300">
                         {o.paymentStatus === "pending" ? "ждёт оплаты" : "не оплачен"}

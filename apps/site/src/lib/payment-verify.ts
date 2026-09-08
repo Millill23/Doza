@@ -17,7 +17,7 @@ import { onOrderPaid } from "./order-paid";
  *
  * Единственный путь, которым заказ становится оплаченным. И вебхук, и возврат
  * покупателя на сайт зовут именно эту функцию: уведомление bePaid ничем не
- * подписано, а `status` в адресе возврата покупатель может поправить руками —
+ * подписано, а `status` в адресе возврата покупатель может поправить руками –
  * поэтому оба события служат лишь поводом сходить за настоящим статусом.
  */
 export async function verifyAndApply(token: string): Promise<ApplyResult | null> {
@@ -60,7 +60,7 @@ export async function verifyAndApply(token: string): Promise<ApplyResult | null>
     rejectReason: verdict.ok ? undefined : verdict.reason,
   });
 
-  // Всё, что происходит с оплатой, делается ровно один раз — на переходе
+  // Всё, что происходит с оплатой, делается ровно один раз – на переходе
   // заказа в оплаченный. `justPaid` выставляется условным UPDATE, поэтому
   // повторные уведомления bePaid сюда не попадают.
   if (result?.justPaid) {

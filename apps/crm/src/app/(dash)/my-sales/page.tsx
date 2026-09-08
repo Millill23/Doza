@@ -90,7 +90,7 @@ export default async function MySalesPage() {
 
       {codes.length === 0 ? (
         <p className="mt-6 rounded-2xl border border-ink-600/60 bg-ink-700 p-8 text-center text-sm text-ivory-faint">
-          За вами пока не закреплён промокод. Напишите нам — заведём.
+          За вами пока не закреплён промокод. Напишите нам – заведём.
         </p>
       ) : (
         <>

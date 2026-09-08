@@ -71,7 +71,7 @@ export async function setSmsKind(kind: string, enabled: boolean) {
   // не зарегистрируется и не спишет баллы, а выглядеть это будет как поломка.
   if (SMS_KINDS[kind].required && !enabled)
     throw new Error(
-      `«${SMS_KINDS[kind].label}» отключить нельзя — без этого сообщения сценарий не работает`,
+      `«${SMS_KINDS[kind].label}» отключить нельзя – без этого сообщения сценарий не работает`,
     );
 
   const key = smsKindSettingKey(kind);

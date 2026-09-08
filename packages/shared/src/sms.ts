@@ -1,7 +1,7 @@
 /**
  * Отправка SMS через sms-assistent.by (API PLAIN).
  * Креды берутся из окружения: SMS_LOGIN, SMS_PASSWORD, SMS_SENDER.
- * Тихо пропускается (ok:false), если креды не заданы — удобно для dev.
+ * Тихо пропускается (ok:false), если креды не заданы – удобно для dev.
  */
 
 const SEND_URL = "https://userarea.sms-assistent.by/api/v1/send_sms/plain";

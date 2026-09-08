@@ -88,7 +88,7 @@ export default function TestsApp({ certificates }: { certificates: Cert[] }) {
           Сертификат ссылкой в SMS
         </h2>
         <p className="mt-1 max-w-2xl text-sm text-ivory-faint">
-          Отправляет ссылку на страницу подарка — ту самую, что уходит при
+          Отправляет ссылку на страницу подарка – ту самую, что уходит при
           покупке электронного сертификата на сайте. Новый сертификат не
           выпускается: берётся уже существующий, чтобы кнопка «проверить» не
           печатала подарки.
@@ -97,7 +97,7 @@ export default function TestsApp({ certificates }: { certificates: Cert[] }) {
         {certificates.length === 0 ? (
           <p className="mt-4 rounded-lg border border-ink-600 bg-ink-800/60 p-4 text-sm text-ivory-muted">
             Нет живых сертификатов. Выпустите один в разделе «Сертификаты» или
-            купите на сайте — тогда его можно будет отправить отсюда.
+            купите на сайте – тогда его можно будет отправить отсюда.
           </p>
         ) : (
           <>
@@ -183,7 +183,7 @@ export default function TestsApp({ certificates }: { certificates: Cert[] }) {
               <input
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Появится на странице подарка. Пусто — оставим прежнее"
+                placeholder="Появится на странице подарка. Пусто – оставим прежнее"
                 className={inputCls}
               />
             </div>

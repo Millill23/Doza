@@ -1,5 +1,5 @@
 /**
- * Уведомления в Telegram. Реализация общая с сайтом — в @doza/shared/telegram.
+ * Уведомления в Telegram. Реализация общая с сайтом – в @doza/shared/telegram.
  * Здесь только реэкспорт, чтобы не править импорты по всему приложению.
  */
 export { notifyTelegram, tgEscape } from "@doza/shared/telegram";

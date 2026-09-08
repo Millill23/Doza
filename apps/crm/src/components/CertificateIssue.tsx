@@ -91,7 +91,7 @@ export default function CertificateIssue({
       </div>
 
       <label className="mb-1.5 block text-xs uppercase tracking-wide text-gold-500">
-        Телефон покупателя (необязательно — подтянет VIP-скидку)
+        Телефон покупателя (необязательно – подтянет VIP-скидку)
       </label>
       <input
         value={phone}

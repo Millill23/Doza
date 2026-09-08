@@ -52,7 +52,7 @@ export interface StatusChangeInput {
   /** Обязательны при переходе в «отправлен» для посылки. */
   trackingNumber?: string;
   /**
-   * null — продавец ещё не выбрал службу. Это разрешённое состояние: угадывать
+   * null – продавец ещё не выбрал службу. Это разрешённое состояние: угадывать
    * за него нельзя, название службы уходит покупателю в SMS.
    */
   deliveryService?: DeliveryServiceValue | null;
@@ -84,9 +84,9 @@ export async function changeOrderStatus(input: StatusChangeInput) {
     );
 
   // Магазин работает по стопроцентной предоплате: неоплаченный заказ в работу
-  // не берём. Вернуть деньги за него тоже не потребуется — их и не списывали.
+  // не берём. Вернуть деньги за него тоже не потребуется – их и не списывали.
   if (order.paymentStatus !== "paid")
-    throw new Error("Заказ не оплачен — брать его в работу нельзя");
+    throw new Error("Заказ не оплачен – брать его в работу нельзя");
 
   const needsTracking = requiresTracking(next, order.deliveryType);
   const tracking = (input.trackingNumber ?? "").trim();
@@ -97,7 +97,7 @@ export async function changeOrderStatus(input: StatusChangeInput) {
   }
 
   // Остатки и кешбек здесь не трогаем: и то и другое проводится в момент
-  // оплаты (`settlePaidOrder`). Смена статуса — это про работу продавца, а не
+  // оплаты (`settlePaidOrder`). Смена статуса – это про работу продавца, а не
   // про деньги и склад.
 
   await prisma.order.update({
@@ -110,7 +110,7 @@ export async function changeOrderStatus(input: StatusChangeInput) {
     },
   });
 
-  // SMS — после сохранения статуса: сбой отправки не должен откатывать уже
+  // SMS – после сохранения статуса: сбой отправки не должен откатывать уже
   // упакованную и переданную почте посылку.
   if (needsTracking && service) {
     try {
@@ -126,7 +126,7 @@ export async function changeOrderStatus(input: StatusChangeInput) {
     }
   }
 
-  // Самовывоз: посылки нет, но человека надо позвать — иначе он не узнает,
+  // Самовывоз: посылки нет, но человека надо позвать – иначе он не узнает,
   // что заказ собран, вообще ниоткуда.
   if (notifiesReady(next, order.deliveryType)) {
     try {
@@ -152,7 +152,7 @@ export async function changeOrderStatus(input: StatusChangeInput) {
  *
  * Откат зависит от того, докуда дошёл заказ: кешбек отбирается, если его уже
  * начислили, остатки возвращаются, если парфюм уже отлили. Откатывать то,
- * чего не было, нельзя — иначе возврат подарит баллы или создаст товар из
+ * чего не было, нельзя – иначе возврат подарит баллы или создаст товар из
  * воздуха.
  */
 export async function refundOrder(orderId: number, reasonRaw: string) {
@@ -182,7 +182,7 @@ export async function refundOrder(orderId: number, reasonRaw: string) {
     const payment = order.payments.find((p) => p.uid);
     if (!payment?.uid)
       throw new Error(
-        "Не найдена транзакция оплаты — верните деньги вручную в кабинете bePaid",
+        "Не найдена транзакция оплаты – верните деньги вручную в кабинете bePaid",
       );
 
     const res = await refundPayment({
@@ -253,7 +253,7 @@ export async function refundOrder(orderId: number, reasonRaw: string) {
  *
  * Для случаев, которые не ложатся в цепочку: покупатель забрал самовывозом,
  * договорились по телефону, заказ доехал и вопрос исчерпан. Ни денег, ни
- * склада это не трогает — они уже проведены при оплате.
+ * склада это не трогает – они уже проведены при оплате.
  */
 export async function closeOrder(orderId: number) {
   await requireRole(["admin"]);
@@ -275,12 +275,12 @@ export async function closeOrder(orderId: number) {
 }
 
 /**
- * Служба доставки и трек-номер — можно поправить после отправки.
+ * Служба доставки и трек-номер – можно поправить после отправки.
  *
  * Если заказ уже отправлен и данные действительно изменились, покупателю
  * уходит уточняющая SMS. Раньше правка была молчаливой, и получалось худшее из
  * возможного: в CRM одна служба доставки, у человека на руках SMS с другой, и
- * увидеть это расхождение было неоткуда. Так и случилось — заказ ушёл
+ * увидеть это расхождение было неоткуда. Так и случилось – заказ ушёл
  * Белпочтой, а покупателю сообщили про Европочту.
  */
 export async function setTracking(

@@ -29,7 +29,7 @@ export default function PeriodPicker({
 }: {
   from: string;
   to: string;
-  /** Куда возвращать с выбранным периодом. По умолчанию — аналитика. */
+  /** Куда возвращать с выбранным периодом. По умолчанию – аналитика. */
   basePath?: string;
 }) {
   const router = useRouter();

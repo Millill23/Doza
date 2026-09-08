@@ -35,7 +35,7 @@ export default function OrderActions({
   const [pending, startTransition] = useTransition();
   const [track, setTrack] = useState(tracking ?? "");
   // Без предвыбора. Раньше здесь стояла «Европочта», подсвеченная как
-  // выбранная, — продавец мог отправить заказ, ни разу её не тронув, и
+  // выбранная, – продавец мог отправить заказ, ни разу её не тронув, и
   // покупателю уходила SMS с чужой службой доставки. Серверная проверка
   // «выберите службу» при этом не срабатывала никогда: значение всегда
   // приходило.
@@ -98,7 +98,7 @@ export default function OrderActions({
 
         {!paid && status === "new" ? (
           <p className="text-sm text-red-300">
-            Заказ не оплачен — в работу не берётся.
+            Заказ не оплачен – в работу не берётся.
           </p>
         ) : done ? (
           <p className="text-sm text-ivory-faint">
@@ -137,7 +137,7 @@ export default function OrderActions({
                 <p className="text-xs text-ivory-faint">
                   {service
                     ? `Покупателю уйдёт SMS: «${DELIVERY_SERVICE_LABEL[service]}» и этот номер.`
-                    : "Выберите службу доставки — она попадёт в SMS покупателю."}
+                    : "Выберите службу доставки – она попадёт в SMS покупателю."}
                 </p>
               </div>
             )}
@@ -205,13 +205,13 @@ export default function OrderActions({
             </button>
           </div>
           <p className="mt-1 text-xs text-ivory-faint">
-            Если что-то изменится, покупателю уйдёт SMS с уточнением — у него на
+            Если что-то изменится, покупателю уйдёт SMS с уточнением – у него на
             руках уже лежит прежнее сообщение.
           </p>
         </div>
       )}
 
-      {/* Закрыть — для случаев вне цепочки: самовывоз состоялся, вопрос
+      {/* Закрыть – для случаев вне цепочки: самовывоз состоялся, вопрос
           исчерпан. Ни денег, ни склада не трогает. */}
       {isAdmin && canClose(status) && (
         <div className="border-t border-ink-600/60 pt-5">
@@ -246,7 +246,7 @@ export default function OrderActions({
           ) : (
             <div className="space-y-2">
               <p className="text-sm text-ivory-muted">
-                Деньги вернутся покупателю на карту, баллы и остатки — в базу.
+                Деньги вернутся покупателю на карту, баллы и остатки – в базу.
                 Отменить это нельзя.
               </p>
               <input

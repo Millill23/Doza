@@ -56,7 +56,7 @@ export default function FinderApp({ products }: Props) {
       })
       .sort((a, b) => b.score - a.score);
 
-    // если выбраны семьи — берём с положительным скором; иначе просто по гендеру
+    // если выбраны семьи – берём с положительным скором; иначе просто по гендеру
     const positive = scored.filter((s) => s.score > 0);
     const final = (chosen.length ? positive : scored).slice(0, 6);
     return final.map((s) => s.p);

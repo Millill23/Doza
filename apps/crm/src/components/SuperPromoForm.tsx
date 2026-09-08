@@ -45,7 +45,7 @@ export default function SuperPromoForm({ products }: { products: ProductOpt[] })
     <div className="rounded-2xl border border-ink-600/60 bg-ink-700 p-6">
       <h2 className="mb-1 font-serif text-xl text-ivory">Новая супер-акция</h2>
       <p className="mb-4 text-xs text-ivory-faint">
-        Каждый {n}-й товар в чеке — бесплатно. Бесплатным становится самый
+        Каждый {n}-й товар в чеке – бесплатно. Бесплатным становится самый
         дешёвый товар из участвующих.
       </p>
 
@@ -70,10 +70,10 @@ export default function SuperPromoForm({ products }: { products: ProductOpt[] })
             onChange={(e) => setGroupSize(e.target.value)}
             className={field}
           >
-            <option value="2">2 — каждый 2-й (1+1=2)</option>
-            <option value="3">3 — каждый 3-й (1+1=3)</option>
-            <option value="4">4 — каждый 4-й</option>
-            <option value="5">5 — каждый 5-й</option>
+            <option value="2">2 – каждый 2-й (1+1=2)</option>
+            <option value="3">3 – каждый 3-й (1+1=3)</option>
+            <option value="4">4 – каждый 4-й</option>
+            <option value="5">5 – каждый 5-й</option>
           </select>
         </div>
         <div>

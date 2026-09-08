@@ -6,7 +6,7 @@ import PromoDelete from "@/components/PromoDelete";
 export const dynamic = "force-dynamic";
 
 function fmt(d: Date | null): string {
-  if (!d) return "—";
+  if (!d) return "–";
   // Акции задаются по дням, часы не показываем.
   return d.toLocaleDateString("ru-RU", {
     day: "2-digit",
@@ -32,7 +32,7 @@ export default async function PromosPage() {
 
   const opts = products.map((p) => ({
     id: p.id,
-    label: `${p.brand.name} — ${p.name}`,
+    label: `${p.brand.name} – ${p.name}`,
   }));
 
   const now = new Date();
@@ -83,16 +83,16 @@ export default async function PromosPage() {
                   >
                     <td className="px-4 py-3 text-ivory">
                       {p.product ? (
-                        `${p.product.brand.name} — ${p.product.name}`
+                        `${p.product.brand.name} – ${p.product.name}`
                       ) : (
                         <span className="text-gold-400">Все товары</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-botanical-300">
-                      {p.discountPercent ? `−${Number(p.discountPercent)}%` : "—"}
+                      {p.discountPercent ? `−${Number(p.discountPercent)}%` : "–"}
                     </td>
                     <td className="px-4 py-3 text-gold-400">
-                      {p.cashbackPercent ? `${Number(p.cashbackPercent)}%` : "—"}
+                      {p.cashbackPercent ? `${Number(p.cashbackPercent)}%` : "–"}
                     </td>
                     <td className="px-4 py-3 text-xs text-ivory-faint">
                       {fmt(p.startsAt)} → {fmt(p.endsAt)}

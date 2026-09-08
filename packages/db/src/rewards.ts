@@ -20,7 +20,7 @@ import {
  * заводится запись с уникальным ключом `occasionKey`, поэтому повторный запуск
  * (а задача дёргается ежечасно) ничего не продублирует.
  *
- * Правила дат и окон — в `reward-rules.ts`.
+ * Правила дат и окон – в `reward-rules.ts`.
  */
 
 export * from "./reward-rules";
@@ -51,14 +51,14 @@ export interface IssuedReward {
   percent?: number;
   points?: number;
   validUntil?: Date;
-  /** Годовщина уже прошла — подарок выдан вдогонку. */
+  /** Годовщина уже прошла – подарок выдан вдогонку. */
   passed?: boolean;
 }
 
 /**
  * Выдать подарки за сегодняшний день.
  *
- * Возвращает только реально созданные награды — по ним вызывающий код шлёт
+ * Возвращает только реально созданные награды – по ним вызывающий код шлёт
  * SMS. Уже выданные молча пропускаются, поэтому сообщения не дублируются.
  */
 export async function issueTodayRewards(
@@ -68,7 +68,7 @@ export async function issueTodayRewards(
   const issued: IssuedReward[] = [];
 
   // ─── Дни рождения ────────────────────────────────────────────────────────
-  // Согласие обязательно: подарок — это часть программы лояльности, а не
+  // Согласие обязательно: подарок – это часть программы лояльности, а не
   // исполнение договора. Без согласия `earnPoints` всё равно откажет.
   const withBirthday = await prisma.customer.findMany({
     where: { birthday: { not: null }, consentStatus: "confirmed" },
@@ -106,7 +106,7 @@ export async function issueTodayRewards(
       id: created.id,
     });
     if (!ok) {
-      // Баллы не начислились — снимаем запись, чтобы подарок не пропал совсем.
+      // Баллы не начислились – снимаем запись, чтобы подарок не пропал совсем.
       await prisma.dateReward.delete({ where: { id: created.id } });
       continue;
     }
@@ -156,7 +156,7 @@ export async function issueTodayRewards(
       percent: cfg.datePercent,
       validUntil: w.validUntil,
       // Задача могла отстать (простой, сбой) и выдать подарок уже после самой
-      // даты. Тогда «скоро ваша дата» — неправда, и текст нужен другой.
+      // даты. Тогда «скоро ваша дата» – неправда, и текст нужен другой.
       passed: anniversaryPassed(dt.date, year, today),
     });
   }
@@ -175,7 +175,7 @@ export interface ActiveReward {
  * Действующая неиспользованная скидка клиента.
  *
  * Если их вдруг несколько (две памятные даты рядом), берём ту, что сгорает
- * раньше — иначе ближняя пропадёт, пока покупатель тратит дальнюю.
+ * раньше – иначе ближняя пропадёт, пока покупатель тратит дальнюю.
  */
 export async function activeDateReward(
   customerId: number,
@@ -206,7 +206,7 @@ export async function activeDateReward(
 /**
  * Пометить скидку использованной.
  *
- * Условный UPDATE (…WHERE used_at IS NULL) — защита от гонки: если два
+ * Условный UPDATE (…WHERE used_at IS NULL) – защита от гонки: если два
  * продавца одновременно пробьют чек по одному клиенту, скидку спишет только
  * один, а второй получит false и не даст её дважды.
  */
@@ -221,7 +221,7 @@ export async function consumeDateReward(
   return res.count === 1;
 }
 
-/** Вернуть скидку клиенту — при отмене продажи. */
+/** Вернуть скидку клиенту – при отмене продажи. */
 export async function releaseDateReward(saleId: number): Promise<void> {
   await prisma.dateReward.updateMany({
     where: { usedSaleId: saleId },
@@ -239,5 +239,5 @@ export async function customerRewards(customerId: number) {
   });
 }
 
-/** Сегодняшняя граница дня — для отчётов задачи. */
+/** Сегодняшняя граница дня – для отчётов задачи. */
 export const startOfToday = () => atMidnight(new Date());

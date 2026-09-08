@@ -35,7 +35,7 @@ export async function createSuperPromo(input: CreateSuperPromoInput) {
   if (!allProducts && productIds.length === 0)
     throw new Error("Выберите товары или отметьте «все товары»");
 
-  // Выбирается только дата: начало — с 00:00 указанного дня, окончание —
+  // Выбирается только дата: начало – с 00:00 указанного дня, окончание –
   // до конца указанного дня включительно.
   const startsAt = isDayString(input.startsAt) ? startOfDay(input.startsAt) : null;
   const endsAt = isDayString(input.endsAt) ? endOfDay(input.endsAt) : null;

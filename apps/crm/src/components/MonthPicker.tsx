@@ -28,7 +28,7 @@ export default function MonthPicker({
       value={value}
       onChange={(e) => {
         const m = e.target.value;
-        // Текущий месяц — это адрес без параметра: так ссылка на дашборд
+        // Текущий месяц – это адрес без параметра: так ссылка на дашборд
         // остаётся живой и завтра, и в следующем месяце.
         router.push(m === months[0] ? basePath : `${basePath}?month=${m}`);
       }}

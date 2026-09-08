@@ -52,7 +52,7 @@ export default function CommissionBar({
         </span>
       </div>
 
-      {/* Сама полоска. Зелёная — цвет «выполнено», тот же, что у подтверждений
+      {/* Сама полоска. Зелёная – цвет «выполнено», тот же, что у подтверждений
           по всей CRM; на золотом фоне карточки она читается как результат, а
           не как украшение. */}
       <div
@@ -64,7 +64,7 @@ export default function CommissionBar({
         aria-label="Прогресс до следующей ступени премии"
       >
         {/* Оттенки берём из палитры проекта: botanical-600 и -400 в ней нет, и
-            классы с ними просто не применялись — полоска выглядела пустой. */}
+            классы с ними просто не применялись – полоска выглядела пустой. */}
         <div
           className="h-full rounded-full bg-gradient-to-r from-botanical-500 to-botanical-300 shadow-[0_0_10px_rgba(143,166,122,0.45)] transition-[width] duration-500"
           style={{ width: `${Math.round(p.fill * 100)}%` }}
@@ -74,7 +74,7 @@ export default function CommissionBar({
       {!compact && (
         <div className="mt-1.5 flex justify-between text-[11px] text-ivory-faint">
           <span>{short(p.segmentFrom)}</span>
-          {/* Ступени целиком — чтобы продавец видел, куда ещё можно дойти, а не
+          {/* Ступени целиком – чтобы продавец видел, куда ещё можно дойти, а не
               только следующий шаг. */}
           <span>
             {COMMISSION_TIERS.map((t, i) => (

@@ -8,7 +8,7 @@ type Role = "admin" | "seller" | "marketer" | "influencer";
 
 const NAV: { href: string; label: string; roles: Role[] }[] = [
   { href: "/", label: "Дашборд", roles: ["admin", "seller", "marketer"] },
-  // Блогер видит ровно один раздел: свои продажи. Ни дашборда, ни клиентов —
+  // Блогер видит ровно один раздел: свои продажи. Ни дашборда, ни клиентов –
   // это чужие персональные данные, и ему они ни к чему.
   { href: "/my-sales", label: "Продажи", roles: ["influencer"] },
   { href: "/orders", label: "Заказы", roles: ["admin", "seller"] },

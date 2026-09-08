@@ -63,21 +63,21 @@ test("валидация отсекает мусор", () => {
 
 // ── Правило начисления ──────────────────────────────────────────────────────
 
-test("не-VIP активирует — начисляется номинал", () => {
+test("не-VIP активирует – начисляется номинал", () => {
   assert.equal(
     certificateAward({ denomination: 100, paidByn: 80, activatorIsVip: false }),
     100,
   );
 });
 
-test("VIP активирует — начисляется уплаченная сумма", () => {
+test("VIP активирует – начисляется уплаченная сумма", () => {
   assert.equal(
     certificateAward({ denomination: 100, paidByn: 80, activatorIsVip: true }),
     80,
   );
 });
 
-test("сертификат куплен без скидки — VIP получает столько же, сколько все", () => {
+test("сертификат куплен без скидки – VIP получает столько же, сколько все", () => {
   assert.equal(
     certificateAward({ denomination: 100, paidByn: 100, activatorIsVip: true }),
     100,
@@ -124,9 +124,9 @@ test("срок считается от выпуска и равен 180 дням
   );
 });
 
-test("осталось дней: считается вверх, после срока — ноль", () => {
+test("осталось дней: считается вверх, после срока – ноль", () => {
   assert.equal(daysLeft(new Date(NOW.getTime() + 10 * DAY), NOW), 10);
-  assert.equal(daysLeft(new Date(NOW.getTime() + 0.5 * DAY), NOW), 1, "полдня — ещё день");
+  assert.equal(daysLeft(new Date(NOW.getTime() + 0.5 * DAY), NOW), 1, "полдня – ещё день");
   assert.equal(daysLeft(new Date(NOW.getTime() - DAY), NOW), 0);
 });
 
@@ -176,21 +176,21 @@ test("просроченный сертификат на баллы не мен�
 
 // ── Списание с остатком ─────────────────────────────────────────────────────
 
-test("чек меньше сертификата — остаток сохраняется", () => {
+test("чек меньше сертификата – остаток сохраняется", () => {
   const r = applyCertificate({ balance: 300, due: 153 });
   assert.equal(r.applied, 153);
   assert.equal(r.remaining, 147);
   assert.equal(r.toPay, 0);
 });
 
-test("чек больше сертификата — разницу доплачивают деньгами", () => {
+test("чек больше сертификата – разницу доплачивают деньгами", () => {
   const r = applyCertificate({ balance: 50, due: 153 });
   assert.equal(r.applied, 50);
   assert.equal(r.remaining, 0);
   assert.equal(r.toPay, 103);
 });
 
-test("чек ровно на остаток — сертификат закрывается в ноль", () => {
+test("чек ровно на остаток – сертификат закрывается в ноль", () => {
   const r = applyCertificate({ balance: 147, due: 147 });
   assert.equal(r.applied, 147);
   assert.equal(r.remaining, 0);

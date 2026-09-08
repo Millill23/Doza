@@ -11,7 +11,7 @@ import { requireRole } from "@/lib/session";
 
 /**
  * Согласия на обработку ПД (99-З): рассылка ссылок и удаление тех, кто не
- * ответил. Начисление баллов гейтится в `earnPoints` — здесь только про то,
+ * ответил. Начисление баллов гейтится в `earnPoints` – здесь только про то,
  * как получить согласие и что делать с молчунами.
  */
 
@@ -33,7 +33,7 @@ export async function sendConsentRequest(
 export interface BulkConsentResult {
   total: number;
   sent: number;
-  /** Пропущены из-за паузы или исчерпанного лимита — это норма, не ошибка. */
+  /** Пропущены из-за паузы или исчерпанного лимита – это норма, не ошибка. */
   skipped: number;
   failed: number;
 }
@@ -90,7 +90,7 @@ export async function getConsentSendAllowance(customerId: number) {
   return v.allowed ? { allowed: true } : { allowed: false, reason: v.reason };
 }
 
-/** Статус согласия — для поллинга из кассы, пока клиент читает SMS. */
+/** Статус согласия – для поллинга из кассы, пока клиент читает SMS. */
 export async function getConsentStatus(customerId: number) {
   await requireRole(["admin", "seller", "marketer"]);
   const c = await prisma.customer.findUnique({

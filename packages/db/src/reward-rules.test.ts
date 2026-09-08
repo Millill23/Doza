@@ -18,7 +18,7 @@ import {
   todayInMinsk,
 } from "./reward-rules.ts";
 
-/** Локальный день — в таком виде приходит «сегодня». */
+/** Локальный день – в таком виде приходит «сегодня». */
 const d = (y: number, m: number, day: number) => new Date(y, m - 1, day);
 /** Дата из колонки `@db.Date`: Prisma отдаёт её полуночью UTC. */
 const stored = (y: number, m: number, day: number) =>
@@ -26,7 +26,7 @@ const stored = (y: number, m: number, day: number) =>
 
 test("день исходной даты читается в UTC, а не в местном времени", () => {
   // Колонка `date` возвращается как 1990-05-17T00:00:00Z. Локальные геттеры на
-  // отрицательном смещении дали бы 16 мая — и подарок уехал бы на сутки.
+  // отрицательном смещении дали бы 16 мая – и подарок уехал бы на сутки.
   assert.deepEqual(anniversaryIn(stored(1990, 5, 17), 2026), d(2026, 5, 17));
   assert.equal(isBirthdayToday(stored(1990, 5, 17), d(2026, 5, 17)), true);
   assert.equal(issueYearFor(stored(1995, 8, 17), d(2026, 8, 14), 3, 7), 2026);
@@ -59,7 +59,7 @@ test("выдача открывается за 3 дня до даты", () => {
   assert.equal(issueYearFor(src, d(2026, 5, 13), 3, 7), null, "рано");
 });
 
-test("пропущенный день навёрстывается — выдаём в любой день окна", () => {
+test("пропущенный день навёрстывается – выдаём в любой день окна", () => {
   // Сутки простоя задачи не должны стоить клиенту подарка на год: раньше
   // выдача была привязана строго ко дню открытия окна.
   const src = stored(1990, 5, 17);
@@ -97,7 +97,7 @@ test("формулировка SMS зависит от того, прошла л
 test("день рождения определяется по дню и месяцу, а не по году", () => {
   assert.equal(isBirthdayToday(stored(1990, 5, 17), d(2026, 5, 17)), true);
   assert.equal(isBirthdayToday(stored(1990, 5, 17), d(2026, 5, 18)), false);
-  // Родился 29 февраля — в 2027-м поздравляем 28-го, и только один раз.
+  // Родился 29 февраля – в 2027-м поздравляем 28-го, и только один раз.
   assert.equal(isBirthdayToday(stored(2000, 2, 29), d(2027, 2, 28)), true);
   assert.equal(isBirthdayToday(stored(2000, 2, 29), d(2027, 3, 1)), false);
 });
@@ -142,16 +142,16 @@ test("час считается по Минску, а не по времени �
 });
 
 test("рассылка только в 11 утра по Минску", () => {
-  assert.equal(isRewardNotifyHour(new Date("2026-08-14T08:00:00Z")), true, "11:00 — да");
-  assert.equal(isRewardNotifyHour(new Date("2026-08-14T08:59:00Z")), true, "11:59 — ещё да");
-  assert.equal(isRewardNotifyHour(new Date("2026-08-14T07:59:00Z")), false, "10:59 — рано");
-  assert.equal(isRewardNotifyHour(new Date("2026-08-14T09:00:00Z")), false, "12:00 — поздно");
-  // В контейнере с UTC 11:00 по серверу — это 14:00 в Минске, слать нельзя.
+  assert.equal(isRewardNotifyHour(new Date("2026-08-14T08:00:00Z")), true, "11:00 – да");
+  assert.equal(isRewardNotifyHour(new Date("2026-08-14T08:59:00Z")), true, "11:59 – ещё да");
+  assert.equal(isRewardNotifyHour(new Date("2026-08-14T07:59:00Z")), false, "10:59 – рано");
+  assert.equal(isRewardNotifyHour(new Date("2026-08-14T09:00:00Z")), false, "12:00 – поздно");
+  // В контейнере с UTC 11:00 по серверу – это 14:00 в Минске, слать нельзя.
   assert.equal(isRewardNotifyHour(new Date("2026-08-14T11:00:00Z")), false);
 });
 
 test("сегодняшний день берётся по Минску", () => {
-  // 21:30 UTC — в Минске уже следующие сутки. Наивный расчёт поздравил бы днём раньше.
+  // 21:30 UTC – в Минске уже следующие сутки. Наивный расчёт поздравил бы днём раньше.
   const d1 = todayInMinsk(new Date("2026-08-14T21:30:00Z"));
   assert.equal(d1.getDate(), 15);
   assert.equal(d1.getMonth(), 7);

@@ -104,7 +104,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       })
     : null;
 
-  // Имя уходит в SMS и Telegram, телефон становится идентификатором клиента —
+  // Имя уходит в SMS и Telegram, телефон становится идентификатором клиента –
   // проверяем оба, не полагаясь на маску в браузере.
   let name: string;
   let phone: string;
@@ -117,7 +117,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   if (!DELIVERY_CHOICES.includes(deliveryType))
     return bad("Выберите способ получения");
 
-  // Данные посылки проверяем и здесь: браузерная проверка — подсказка, а не
+  // Данные посылки проверяем и здесь: браузерная проверка – подсказка, а не
   // гарантия. Неполный адрес всплывёт только на почте, когда деньги уже взяты.
   let shipTo: DeliveryDetails | null = null;
   if (shipping && needsPostalAddress(deliveryType)) {
@@ -144,7 +144,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     try {
       recipientPhone = assertBelarusPhone(e.phone ?? "");
     } catch {
-      return bad("Укажите телефон получателя — по нему выдают посылку");
+      return bad("Укажите телефон получателя – по нему выдают посылку");
     }
 
     const code = (e.officeCode ?? "").trim();
@@ -153,7 +153,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     // посылку повезут по нему.
     const found = await prisma.europostOffice.findUnique({ where: { code } });
     if (!found || !found.isActive)
-      return bad("Такого отделения нет в списке — выберите другое");
+      return bad("Такого отделения нет в списке – выберите другое");
 
     office = { code: found.code, text: found.address };
     recipient = {
@@ -166,7 +166,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   if (items.length === 0 && certificates.length === 0) return bad("Корзина пуста");
 
   // Телефон получателя подарка проверяем здесь: формат номера живёт в общем
-  // пакете, а правила сертификата — в @doza/db, который от него не зависит.
+  // пакете, а правила сертификата – в @doza/db, который от него не зависит.
   // Ошибиться тут дорого: SMS с чужим подарком уйдёт постороннему человеку.
   for (const c of certificates) {
     if (!c.sendBySms) continue;
@@ -180,13 +180,13 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     }
   }
 
-  // Пересчёт цен на сервере — клиентским ценам не доверяем. Тот же расчёт, что
+  // Пересчёт цен на сервере – клиентским ценам не доверяем. Тот же расчёт, что
   // показывала корзина, поэтому сумма на платёжной странице совпадёт с той,
   // которую покупатель видел.
   const vipPercent = await vipPercentFor(sessionCustomerId);
 
   // Промокод проверяем на сервере: в браузере он всего лишь текст в поле.
-  // Неверный код — отказ, а не тихое оформление по полной цене: покупатель
+  // Неверный код – отказ, а не тихое оформление по полной цене: покупатель
   // рассчитывал на скидку и должен узнать об этом до оплаты.
   const promoLookup = await findUsablePromoCode(body.promoCode ?? "");
   if (promoLookup && !promoLookup.ok) return bad(promoLookup.error);
@@ -209,7 +209,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   const certificatesTotal =
     Math.round(quote.certificates.reduce((s, c) => s + c.priceByn, 0) * 100) / 100;
 
-  // Доставка. Порог считается по сумме товаров до списания баллов: баллы —
+  // Доставка. Порог считается по сумме товаров до списания баллов: баллы –
   // способ оплаты, а не уменьшение заказа.
   const delivery = shipping
     ? deliveryCost({ type: deliveryType, goodsTotal: total })
@@ -223,7 +223,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   const customer = await prisma.customer.upsert({
     where: { phone },
     // Имя записываем только при создании. Раньше оно перезаписывалось на
-    // каждом заказе — и любой, кто знал чужой номер, мог переименовать чужую
+    // каждом заказе – и любой, кто знал чужой номер, мог переименовать чужую
     // карточку, просто оформив заказ на этот телефон. Своё имя покупатель
     // меняет в личном кабинете.
     update: {},
@@ -242,11 +242,11 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   // Списание баллов (FIFO), не больше баланса и суммы заказа.
   //
   // Только вошедшему в кабинет. Раньше баллы списывались с того, чей номер
-  // набран в форме, — и любой, кто знал чужой телефон, оплачивал свой заказ
+  // набран в форме, – и любой, кто знал чужой телефон, оплачивал свой заказ
   // чужими баллами. Проверять телефон бессмысленно: это просто цифры в поле.
   // Ровно так же закрыта скидка по VIP-карте.
   // Баллами платят только за товар. Сертификат за баллы купить нельзя: он
-  // обменивается обратно в баллы при активации, и получался бы вечный круг —
+  // обменивается обратно в баллы при активации, и получался бы вечный круг –
   // купил за 300 баллов, активировал, получил 300 обратно со свежим сроком.
   // Срок сгорания баллов при этом обнулялся бы бесконечно, а сами баллы
   // превращались в инструмент, который можно передать другому человеку.
@@ -258,7 +258,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     const balance = await getBalance(customer.id);
     const allowed = Math.min(requested, balance, goodsTotal);
     if (allowed > 0) {
-      // заказ ещё не создан — спишем после создания, чтобы привязать ref
+      // заказ ещё не создан – спишем после создания, чтобы привязать ref
       loyaltySpent = Math.round(allowed * 100) / 100;
     }
   }
@@ -349,7 +349,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   try {
     const checkout = await createCardCheckout({
       amountByn: toPay,
-      description: `Заказ №${order.id} — DOZA`,
+      description: `Заказ №${order.id} – DOZA`,
       trackingId: String(order.id),
       customer: { firstName: name, phone: `+${phone}` },
       positions: orderItems.map((i) => ({
@@ -371,7 +371,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     });
     redirectUrl = checkout.redirectUrl;
   } catch (e) {
-    // Платёжная страница не создалась — заказ есть, но оплатить его нечем.
+    // Платёжная страница не создалась – заказ есть, но оплатить его нечем.
     // Возвращаем баллы сразу, иначе они зависнут списанными.
     console.error("[orders] не удалось создать платёж:", e);
     await refundOrderPoints(order.id);

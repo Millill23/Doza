@@ -22,14 +22,14 @@ export const POST: APIRoute = async ({ request }) => {
 
   const customer = await prisma.customer.findUnique({ where: { phone } });
 
-  // Не раскрываем, зарегистрирован ли номер — всегда ok.
+  // Не раскрываем, зарегистрирован ли номер – всегда ok.
   // Пароль выдаём тем, у кого он уже есть, ЛИБО кого админ подтвердил лично
-  // (phoneVerified: VIP/офлайн-регистрация) — так VIP получает первый вход.
+  // (phoneVerified: VIP/офлайн-регистрация) – так VIP получает первый вход.
   // Случайные покупатели из кассы (phoneVerified=false) сюда не попадают.
   if (customer && (customer.passwordHash || customer.phoneVerified)) {
     // Сначала спрашиваем разрешение у ограничителя и только потом меняем
     // пароль. Иначе частые запросы меняли бы владельцу пароль снова и снова,
-    // а SMS с новым не уходила бы — человек оказывался бы заперт снаружи.
+    // а SMS с новым не уходила бы – человек оказывался бы заперт снаружи.
     const allowed = await checkSmsAllowed("password_reset", phone);
     if (allowed.allowed) {
       const newPass = genPassword();

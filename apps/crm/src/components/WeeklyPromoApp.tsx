@@ -66,7 +66,7 @@ export default function WeeklyPromoApp({
   active: Active | null;
   products: Product[];
   history: HistoryRow[];
-  /** Сколько дней предлагать по умолчанию — просто заготовка для поля «по». */
+  /** Сколько дней предлагать по умолчанию – просто заготовка для поля «по». */
   defaultDays: number;
 }) {
   const [pending, startTransition] = useTransition();
@@ -74,7 +74,7 @@ export default function WeeklyPromoApp({
 
   const [name, setName] = useState("Парфюм недели");
   const [percent, setPercent] = useState(20);
-  // Даты задаёт админ, как в обычных акциях: «неделя» — обычный случай, а не
+  // Даты задаёт админ, как в обычных акциях: «неделя» – обычный случай, а не
   // жёсткое правило, и подборку на выходные или на две недели должно быть
   // видно из формы, а не пересчитывать в уме.
   const [from, setFrom] = useState(isoDay());
@@ -135,7 +135,7 @@ export default function WeeklyPromoApp({
       <h1 className="font-serif text-3xl text-ivory">Парфюм недели</h1>
       <p className="mt-1 max-w-2xl text-sm text-ivory-faint">
         Подборка ароматов с одинаковой скидкой. В каталоге на сайте появляется
-        отдельной кнопкой. Скидка не складывается с другими — покупателю
+        отдельной кнопкой. Скидка не складывается с другими – покупателю
         посчитается то, что для него выгоднее.
       </p>
 
@@ -187,7 +187,7 @@ export default function WeeklyPromoApp({
         {active && (
           <p className="mb-4 text-xs text-ivory-faint">
             Текущая подборка выключится: двух «Парфюмов недели» сразу быть не
-            должно — в каталоге одна кнопка.
+            должно – в каталоге одна кнопка.
           </p>
         )}
 
@@ -300,7 +300,7 @@ export default function WeeklyPromoApp({
                     {h.count} {plural(h.count)}
                   </td>
                   <td className="px-5 py-2.5 text-ivory-faint">
-                    {day(h.startsAt)} — {day(h.endsAt)}
+                    {day(h.startsAt)} – {day(h.endsAt)}
                   </td>
                   <td className="px-5 py-2.5 text-right">
                     {h.isActive ? (

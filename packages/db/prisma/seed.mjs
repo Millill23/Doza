@@ -38,7 +38,7 @@ const DATA = [
     description: "Свежий и брутальный фужерный аромат. Искрящийся бергамот и мощный амброксан создают магнетический след." },
   { slug: "creed-aventus", brand: "Creed", name: "Aventus", gender: "male", image: IMG.gold, base: 140,
     notesTop: "Ананас, чёрная смородина", notesMid: "Берёза, пачули", notesBase: "Дубовый мох, амбра, мускус",
-    description: "Легендарный фруктово-шипровый аромат успеха. Сочный ананас и дымная берёза — символ силы и уверенности." },
+    description: "Легендарный фруктово-шипровый аромат успеха. Сочный ананас и дымная берёза – символ силы и уверенности." },
   { slug: "ysl-libre", brand: "Yves Saint Laurent", name: "Libre", gender: "female", image: IMG.classic, base: 88,
     notesTop: "Мандарин, лаванда", notesMid: "Жасмин, флёрдоранж", notesBase: "Ваниль, мускус, амбра",
     description: "Дерзкий цветочный аромат свободы: лавандовая прохлада во встрече с тёплым жасмином и ванилью." },
@@ -116,7 +116,7 @@ async function main() {
         inventory: { create: { quantityMl: 500 } },
       },
     });
-    console.log(`  ✓ ${d.brand} — ${d.name} (#${product.id})`);
+    console.log(`  ✓ ${d.brand} – ${d.name} (#${product.id})`);
   }
 
   console.log("✅ Seed complete.");

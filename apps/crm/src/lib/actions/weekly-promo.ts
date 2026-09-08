@@ -8,7 +8,7 @@ import { requireRole } from "@/lib/session";
 /**
  * «Парфюм недели»: подборка ароматов с одинаковой скидкой.
  *
- * Скидка заводится обычными акциями на каждый товар — так витрина и касса
+ * Скидка заводится обычными акциями на каждый товар – так витрина и касса
  * считают её уже существующим кодом, и вторая механика скидок рядом с первой
  * не появляется.
  */
@@ -17,7 +17,7 @@ export async function saveWeeklyPromo(input: {
   name: string;
   discountPercent: number;
   productIds: number[];
-  /** День начала в виде ГГГГ-ММ-ДД — как в обычных акциях. */
+  /** День начала в виде ГГГГ-ММ-ДД – как в обычных акциях. */
   startsAt: string;
   /** День окончания включительно: подборка живёт до конца этого дня. */
   endsAt: string;
@@ -27,12 +27,12 @@ export async function saveWeeklyPromo(input: {
   const name = (input.name ?? "").trim() || "Парфюм недели";
   const percent = Number(input.discountPercent);
   if (!Number.isFinite(percent) || percent <= 0 || percent > 100)
-    throw new Error("Скидка — от 1 до 100 процентов");
+    throw new Error("Скидка – от 1 до 100 процентов");
 
   const ids = [...new Set((input.productIds ?? []).map(Number))].filter(Boolean);
   if (ids.length === 0) throw new Error("Выберите хотя бы один аромат");
 
-  // Выбирается только дата: начало — с 00:00 указанного дня, окончание — до
+  // Выбирается только дата: начало – с 00:00 указанного дня, окончание – до
   // конца указанного дня включительно. Ровно как в обычных акциях: продавец не
   // должен помнить, что «по 7 сентября» где-то значит «до 7 сентября 00:00».
   if (!isDayString(input.startsAt) || !isDayString(input.endsAt))
@@ -50,7 +50,7 @@ export async function saveWeeklyPromo(input: {
     endsAt,
   });
 
-  // Каталог кэшируется на сайте — но он отдельное приложение, поэтому здесь
+  // Каталог кэшируется на сайте – но он отдельное приложение, поэтому здесь
   // обновляем только страницы CRM.
   revalidatePath("/weekly-promo");
   revalidatePath("/promos");

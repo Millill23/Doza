@@ -22,7 +22,7 @@ export interface OfflineRegInput {
  *
  * Одноразового кода здесь больше нет: вместо него клиенту уходит ссылка на
  * согласие с обработкой персональных данных (99-З). Переход по ней заодно
- * подтверждает владение номером — то же, что давал код, но с юридически
+ * подтверждает владение номером – то же, что давал код, но с юридически
  * значимым согласием в придачу.
  *
  * Продажу это не задерживает: клиент заводится сразу, продавец работает
@@ -96,14 +96,14 @@ export async function registerVip(
   if (taken && taken.phone !== phone)
     throw new Error(`Карта №${card} уже привязана к другому клиенту`);
 
-  // Был ли клиент VIP до этого — чтобы не поздравлять повторно, когда админ
+  // Был ли клиент VIP до этого – чтобы не поздравлять повторно, когда админ
   // просто исправляет имя или перевыпускает карту.
   const before = await prisma.customer.findUnique({
     where: { phone },
     select: { vipCardNumber: true },
   });
 
-  // phoneVerified: true — админ регистрирует лично, клиент сможет получить
+  // phoneVerified: true – админ регистрирует лично, клиент сможет получить
   // пароль на сайте через «восстановить пароль» и зайти в свой аккаунт.
   const customer = await prisma.customer.upsert({
     where: { phone },
@@ -113,7 +113,7 @@ export async function registerVip(
 
   if (!before?.vipCardNumber) await sendVipWelcomeSms(phone, name, customer.id);
 
-  // VIP — это программа лояльности, значит нужно согласие на обработку ПД.
+  // VIP – это программа лояльности, значит нужно согласие на обработку ПД.
   // Отдельным сообщением после поздравления, чтобы не смешивать две темы.
   const fresh = await prisma.customer.findUnique({
     where: { id: customer.id },
@@ -131,7 +131,7 @@ export async function registerVip(
 
 /**
  * Поздравительная SMS новому VIP-клиенту.
- * Сбой отправки не должен ломать регистрацию — только пишем в лог.
+ * Сбой отправки не должен ломать регистрацию – только пишем в лог.
  */
 async function sendVipWelcomeSms(
   phone: string,
@@ -168,7 +168,7 @@ export async function attachVipCard(customerId: number, cardRaw: string) {
     where: { id: customerId },
     data: { vipCardNumber: card },
   });
-  // Клиент стал VIP только что — поздравляем.
+  // Клиент стал VIP только что – поздравляем.
   if (before && !before.vipCardNumber)
     await sendVipWelcomeSms(before.phone, before.name, customerId);
   revalidatePath(`/customers/${customerId}`);
@@ -176,7 +176,7 @@ export async function attachVipCard(customerId: number, cardRaw: string) {
 
 /**
  * Изменить имя и/или телефон клиента. Только админ.
- * Телефон — это идентификатор клиента (баллы, заказы, вход в кабинет),
+ * Телефон – это идентификатор клиента (баллы, заказы, вход в кабинет),
  * поэтому проверяем, что он не занят другим.
  */
 export async function updateCustomer(
@@ -252,11 +252,11 @@ export async function removeCustomerDate(id: number, customerId: number) {
 /**
  * Полностью удалить клиента. Только админ.
  *
- * Заказы и продажи не удаляются: их хранение — самостоятельное правовое
+ * Заказы и продажи не удаляются: их хранение – самостоятельное правовое
  * основание (исполнение договора и бухгалтерский учёт), оно не зависит от
  * присутствия клиента в базе лояльности. Но связь с ним рвётся, а всё, что
- * существовало только ради лояльности — баллы, журнал, памятные даты,
- * привязка сертификатов — удаляется вместе с клиентом.
+ * существовало только ради лояльности – баллы, журнал, памятные даты,
+ * привязка сертификатов – удаляется вместе с клиентом.
  *
  * Нужно и для отзыва согласия (по 99-З это требование прекратить обработку),
  * и для обычной уборки: дубли, ошибочные записи, тестовые клиенты.
@@ -274,7 +274,7 @@ export async function deleteCustomer(customerId: number) {
     // Журнал ссылается на партии, поэтому его удаляем первым.
     await tx.loyaltyLog.deleteMany({ where: { customerId } });
     await tx.loyaltyBatch.deleteMany({ where: { customerId } });
-    // Награды по датам ссылаются и на клиента, и на сами даты — снимаем их
+    // Награды по датам ссылаются и на клиента, и на сами даты – снимаем их
     // раньше дат, иначе внешний ключ не даст удалить.
     await tx.dateReward.deleteMany({ where: { customerId } });
     await tx.customerDate.deleteMany({ where: { customerId } });

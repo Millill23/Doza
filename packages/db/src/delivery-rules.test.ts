@@ -33,10 +33,10 @@ test("от порога доставка бесплатна", () => {
   const c = deliveryCost({ type: "belpochta", goodsTotal: FREE_DELIVERY_FROM });
   assert.equal(c.fee, 0);
   assert.equal(c.free, true);
-  assert.equal(freeDeliveryHint(c), null, "уже бесплатно — молчим");
+  assert.equal(freeDeliveryHint(c), null, "уже бесплатно – молчим");
 });
 
-test("ровно на копейку ниже порога — платно", () => {
+test("ровно на копейку ниже порога – платно", () => {
   const c = deliveryCost({ type: "belpochta", goodsTotal: FREE_DELIVERY_FROM - 0.01 });
   assert.equal(c.fee, DELIVERY_FEE);
   assert.equal(c.missingForFree, 0.01);
@@ -66,13 +66,13 @@ test("отрицательная сумма трактуется как ноль
 
 // ── Какие поля спрашивать ───────────────────────────────────────────────────
 
-test("почтой — да, самовывозом — нет", () => {
+test("почтой – да, самовывозом – нет", () => {
   assert.equal(isPostDelivery("pickup"), false);
   assert.equal(isPostDelivery("belpochta"), true);
   assert.equal(isPostDelivery("europost"), true);
 });
 
-test("Белпочте нужен адрес, Европочте — отделение", () => {
+test("Белпочте нужен адрес, Европочте – отделение", () => {
   // У Европочты посылку забирают в отделении, улица там ни к чему.
   assert.equal(needsPostalAddress("belpochta"), true);
   assert.equal(needsOffice("belpochta"), false);

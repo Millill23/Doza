@@ -16,13 +16,13 @@ export function checkCronKey(request: Request): NextResponse | null {
 
   if (!secret) {
     console.error(
-      "[cron] CRON_SECRET не задан — фоновые задачи не выполняются. " +
+      "[cron] CRON_SECRET не задан – фоновые задачи не выполняются. " +
         "Добавьте переменную в .env и перезапустите контейнеры.",
     );
     return NextResponse.json(
       {
         ok: false,
-        error: "CRON_SECRET не задан на сервере — задача не может выполниться",
+        error: "CRON_SECRET не задан на сервере – задача не может выполниться",
       },
       { status: 500 },
     );

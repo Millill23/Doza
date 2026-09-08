@@ -14,7 +14,7 @@ import {
  * Расчёт корзины на сайте.
  *
  * Один код и для предпросмотра в корзине, и для оформления заказа: если считать
- * их порознь, покупатель увидит одну сумму, а спишется другая — и разберётся
+ * их порознь, покупатель увидит одну сумму, а спишется другая – и разберётся
  * в этом уже банк.
  *
  * Цены берутся из базы, а не из корзины браузера: в localStorage они лежат с
@@ -25,7 +25,7 @@ export interface QuoteItem {
   productId: number;
   volumeMl: number;
   qty: number;
-  /** Позиция взята из допродажи. Слово браузера — сервер это перепроверит. */
+  /** Позиция взята из допродажи. Слово браузера – сервер это перепроверит. */
   fromUpsell?: boolean;
 }
 
@@ -33,14 +33,14 @@ export interface QuotedLine {
   productId: number;
   volumeMl: number;
   qty: number;
-  /** Цена единицы после скидок — она и уходит в позицию заказа. */
+  /** Цена единицы после скидок – она и уходит в позицию заказа. */
   priceByn: number;
   label: string;
 }
 
 export interface QuotedCertificate {
   denomination: number;
-  /** Цена для покупателя — с VIP-скидкой, если она есть. */
+  /** Цена для покупателя – с VIP-скидкой, если она есть. */
   priceByn: number;
   sendBySms: boolean;
   recipientPhone: string | null;
@@ -72,7 +72,7 @@ async function setting(key: string, fallback: number): Promise<number> {
 /**
  * Скидка по VIP-карте для клиента.
  *
- * Принимает id из сессии, а не телефон из формы. Телефон в поле ввода — это
+ * Принимает id из сессии, а не телефон из формы. Телефон в поле ввода – это
  * просто набранные цифры: назвав чужой номер, можно было бы получить чужую
  * скидку. Карта привязана к аккаунту, поэтому и скидка даётся тому, кто в этот
  * аккаунт вошёл.
@@ -90,7 +90,7 @@ export async function vipPercentFor(customerId: number | null): Promise<number> 
 /**
  * Посчитать корзину.
  *
- * Скидки не складываются — движок `priceCart` тот же, что и в кассе, и выбирает
+ * Скидки не складываются – движок `priceCart` тот же, что и в кассе, и выбирает
  * вариант, выгодный покупателю: VIP либо акция, но не обе сразу.
  */
 export async function quoteCart(
@@ -99,7 +99,7 @@ export async function quoteCart(
     vipPercent?: number;
     promoCodePercent?: number;
     checkStock?: boolean;
-    /** Сертификаты в корзине — считаются отдельно от товаров. */
+    /** Сертификаты в корзине – считаются отдельно от товаров. */
     certificates?: CertificateOrderLine[];
   } = {},
 ): Promise<CartQuote> {
@@ -111,14 +111,14 @@ export async function quoteCart(
   // всплывать после того, как посчитаны цены и проверены остатки.
   //
   // Номер получателя требуем только при оформлении (`checkStock`): в
-  // предпросмотре корзины его нет — телефон незачем гонять на сервер при
+  // предпросмотре корзины его нет – телефон незачем гонять на сервер при
   // каждом пересчёте.
   const certVerdict = validateCertificateLines(certLines, {
     requireRecipient: opts.checkStock === true,
   });
   if (!certVerdict.ok) throw new CartError(certVerdict.error);
 
-  // Скидки на сертификат не действуют — кроме VIP, ровно как в кассе.
+  // Скидки на сертификат не действуют – кроме VIP, ровно как в кассе.
   // Иначе промокод превращал бы сертификат в способ печатать деньги: купил на
   // 300 за 240, потратил 300.
   const certificates: QuotedCertificate[] = certLines.map((c) => ({
@@ -132,7 +132,7 @@ export async function quoteCart(
   const certTotal =
     Math.round(certificates.reduce((s, c) => s + c.priceByn, 0) * 100) / 100;
 
-  // Заказ только из сертификатов — товарной части нет, считать нечего.
+  // Заказ только из сертификатов – товарной части нет, считать нечего.
   if (items.length === 0) {
     return {
       lines: [],
@@ -169,11 +169,11 @@ export async function quoteCart(
 
   const byKey = new Map(volumes.map((v) => [`${v.productId}:${v.volumeMl}`, v]));
 
-  // Акция «на все товары» не привязана к товару — достаём отдельно.
+  // Акция «на все товары» не привязана к товару – достаём отдельно.
   const globalPromo = await getGlobalPromo();
 
   // Что мы вправе продать со скидкой допродажи. Считаем сами, по своей
-  // таблице похожих: пометка в корзине — заявка, а не разрешение.
+  // таблице похожих: пометка в корзине – заявка, а не разрешение.
   const offered = new Set(
     items.some((i) => i.fromUpsell) ? await offerableProductIds(items) : [],
   );
@@ -218,7 +218,7 @@ export async function quoteCart(
   }
 
   // Наличие. Проверяем перед тем, как вести человека на страницу банка:
-  // оплаченный заказ на аромат, которого нет, — это возврат денег, объяснения
+  // оплаченный заказ на аромат, которого нет, – это возврат денег, объяснения
   // и подорванное доверие вместо продажи.
   if (opts.checkStock) {
     const stockLines: StockLine[] = lines.map((l, i) => ({
@@ -249,14 +249,14 @@ export async function quoteCart(
       productId: l.productId,
       volumeMl: meta[i].volumeMl,
       qty: l.qty,
-      // Цена единицы — из итога по позиции: так сумма позиций всегда сходится
+      // Цена единицы – из итога по позиции: так сумма позиций всегда сходится
       // с тем, что покупатель видел в корзине.
       priceByn: Math.round((priced.lineNet[i] / l.qty) * 100) / 100,
       label: meta[i].label,
     })),
     certificates,
     // Сертификаты добавляются к суммам, но скидкой не затрагиваются: размер
-    // скидки — это скидка на товары, и раздувать её сертификатом нельзя.
+    // скидки – это скидка на товары, и раздувать её сертификатом нельзя.
     gross: Math.round((priced.gross + certTotal) * 100) / 100,
     net: Math.round((priced.net + certTotal) * 100) / 100,
     discount: priced.discount,

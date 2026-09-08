@@ -46,7 +46,7 @@ export default function PromoForm({ products }: { products: ProductOpt[] }) {
             disabled={allProducts}
             className={`${field} disabled:opacity-40`}
           >
-            <option value={0}>— выберите товар —</option>
+            <option value={0}>– выберите товар –</option>
             {products.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.label}

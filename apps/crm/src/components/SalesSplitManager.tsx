@@ -56,7 +56,7 @@ export default function SalesSplitManager() {
         setAccounts(data.accounts);
         setSellers(data.sellers);
         setSplits(data.splits);
-        // Если разделение уже задано — подставляем его для редактирования
+        // Если разделение уже задано – подставляем его для редактирования
         const first = data.splits[0];
         if (first) {
           setSource(first.sourceSellerId);
@@ -146,7 +146,7 @@ export default function SalesSplitManager() {
               >
                 {accounts.map((a) => (
                   <option key={a.sellerId} value={a.sellerId}>
-                    {a.name} — {byn(a.sum)}
+                    {a.name} – {byn(a.sum)}
                   </option>
                 ))}
               </select>
@@ -177,7 +177,7 @@ export default function SalesSplitManager() {
                       className={`${field} w-24 text-right`}
                     />
                     <span className="w-28 text-right text-xs text-ivory-faint">
-                      {pct > 0 ? byn(part) : "—"}
+                      {pct > 0 ? byn(part) : "–"}
                     </span>
                   </div>
                 );

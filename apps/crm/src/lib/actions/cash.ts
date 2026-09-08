@@ -36,7 +36,7 @@ function fail(error: string) {
 export async function requestLoyaltySpendOtp(phoneRaw: string, amount: number) {
   const session = await requireRole(["admin", "seller"]);
   // Приводим к хранимому виду: поле ввода отдаёт девять цифр без префикса, и
-  // прежний `normalizePhone` пропускал их как есть — поиск шёл по «291234567»,
+  // прежний `normalizePhone` пропускал их как есть – поиск шёл по «291234567»,
   // клиент не находился, а продавец видел лишь «ошибка сервера».
   const phone = toStoredPhone(phoneRaw);
 
@@ -47,7 +47,7 @@ export async function requestLoyaltySpendOtp(phoneRaw: string, amount: number) {
   if (amount <= 0) return fail("Укажите количество баллов");
 
   const customer = await prisma.customer.findUnique({ where: { phone } });
-  if (!customer) return fail("Клиент не найден — проверьте номер");
+  if (!customer) return fail("Клиент не найден – проверьте номер");
   const balance = await getBalance(customer.id);
   if (balance <= 0) return fail("У клиента нет баллов");
 
@@ -79,7 +79,7 @@ const DISCOUNT_LABEL: Record<string, string> = {
   none: "",
 };
 
-/** Баллы в SMS: без лишних нулей (12 вместо 12.00, но 12.5 — как есть). */
+/** Баллы в SMS: без лишних нулей (12 вместо 12.00, но 12.5 – как есть). */
 function fmtPoints(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/, "");
 }
@@ -121,7 +121,7 @@ export async function lookupCustomer(phoneRaw: string) {
   return {
     found: true as const,
     id: customer.id,
-    /** Действующая скидка по памятной дате — продавец предлагает её покупателю. */
+    /** Действующая скидка по памятной дате – продавец предлагает её покупателю. */
     dateReward: reward
       ? {
           id: reward.id,
@@ -134,7 +134,7 @@ export async function lookupCustomer(phoneRaw: string) {
     balance,
     vipCard: customer.vipCardNumber,
     vipPercent,
-    // Без согласия баллы не начисляются — продавец должен это видеть до того,
+    // Без согласия баллы не начисляются – продавец должен это видеть до того,
     // как пробьёт чек и пообещает покупателю бонусы.
     hasConsent: customer.consentStatus === "confirmed",
   };
@@ -150,7 +150,7 @@ interface CreateSaleInput {
   socialSubscribe?: boolean;
   /** Скидка 5% за отметку в сторис. */
   socialStory?: boolean;
-  /** Скидка за остаток во флаконе — продавец ставит вручную. */
+  /** Скидка за остаток во флаконе – продавец ставит вручную. */
   remnant?: boolean;
   /** Промокод, названный покупателем. Продавец выбирает его из списка. */
   promoCode?: string;
@@ -158,7 +158,7 @@ interface CreateSaleInput {
   useDateReward?: boolean;
   /**
    * Код подарочного сертификата. Оплата им не требует ни телефона, ни
-   * согласия на обработку данных — сертификат на предъявителя.
+   * согласия на обработку данных – сертификат на предъявителя.
    */
   certificateCode?: string;
   /** Оформить продажу от лица другого продавца (только админ). */
@@ -170,7 +170,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
   const session = await requireRole(["admin", "seller"]);
   const actorId = Number(session.user.id);
 
-  // Продажу можно записать на другого продавца — но только админу.
+  // Продажу можно записать на другого продавца – но только админу.
   let sellerId = actorId;
   let createdById: number | null = null;
   if (input.sellerId && Number(input.sellerId) !== actorId) {
@@ -187,7 +187,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
     createdById = actorId; // фиксируем, кто фактически пробил чек
   }
 
-  // Сертификаты продаются в отдельном разделе «Сертификаты», не через кассу —
+  // Сертификаты продаются в отдельном разделе «Сертификаты», не через кассу –
   // поэтому и списать баллы на их покупку здесь невозможно.
   const items = Array.isArray(input.items) ? input.items : [];
   if (items.length === 0) throw new Error("Корзина пуста");
@@ -219,7 +219,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
   let vipCard: string | null = null;
   if (input.phone) {
     // Касса только привязывает чек к существующему клиенту. Заводить нового
-    // отсюда нельзя: регистрация — единая точка в разделе «Клиенты», иначе в
+    // отсюда нельзя: регистрация – единая точка в разделе «Клиенты», иначе в
     // базе плодятся безымянные «Покупатели» без согласия и памятных дат.
     const phone = toStoredPhone(input.phone);
     const customer = await prisma.customer.findUnique({ where: { phone } });
@@ -230,7 +230,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
     }
   }
 
-  // Скидки. Правило: акции НЕ складываются — движок сравнивает сценарии
+  // Скидки. Правило: акции НЕ складываются – движок сравнивает сценарии
   // (VIP / за подписки / супер-акция) и берёт выгодный покупателю.
   const vipPct = vipCard ? await getSetting("vip_discount_percent", 20) : 0;
 
@@ -238,15 +238,15 @@ export async function createOfflineSale(input: CreateSaleInput) {
     input.socialSubscribe ? getSetting("social_subscribe_percent", 5) : 0,
     input.socialStory ? getSetting("social_story_percent", 5) : 0,
   ]);
-  // Подписка и сторис — одна механика, поэтому суммируются между собой.
+  // Подписка и сторис – одна механика, поэтому суммируются между собой.
   const socialPct = subscribePct + storyPct;
 
-  // Остаток во флаконе — своя механика: с соцскидками не складывается,
+  // Остаток во флаконе – своя механика: с соцскидками не складывается,
   // движок возьмёт то, что выгоднее покупателю.
   const remnantPct = input.remnant ? await getSetting("remnant_percent", 20) : 0;
 
   // Промокод проверяем на сервере, даже если продавец выбрал его из списка:
-  // список мог устареть за время, пока чек собирали, а срок кода — истечь.
+  // список мог устареть за время, пока чек собирали, а срок кода – истечь.
   const promoLookup = await findUsablePromoCode(input.promoCode ?? "");
   if (promoLookup && !promoLookup.ok) throw new Error(promoLookup.error);
   const promoCode = promoLookup?.ok ? promoLookup.promo : null;
@@ -313,7 +313,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
   const saleTotal = netTotal;
   const totalDiscount = Math.round((total - netTotal) * 100) / 100;
 
-  // Списание баллов — требует подтверждения кодом из SMS
+  // Списание баллов – требует подтверждения кодом из SMS
   let loyaltySpent = 0;
   if (customerId && input.loyaltySpend && input.loyaltySpend > 0) {
     const phone = toStoredPhone(input.phone ?? "");
@@ -337,7 +337,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
     if (!found.ok) throw new Error(found.reason ?? "Сертификат недоступен");
     if (dueAfterPoints <= 0)
       throw new Error(
-        "Чек уже покрыт баллами — списывать с сертификата нечего. Уберите одно из двух.",
+        "Чек уже покрыт баллами – списывать с сертификата нечего. Уберите одно из двух.",
       );
   }
 
@@ -366,7 +366,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
     },
   });
 
-  // Оплата сертификатом. Списываем после создания чека: списание без чека —
+  // Оплата сертификатом. Списываем после создания чека: списание без чека –
   // это деньги, которые некуда вернуть при отмене.
   let certPaid = 0;
   let certRemaining = 0;
@@ -448,7 +448,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
       });
     }
     const days = await getSetting("loyalty_days", 180);
-    // Процент берётся по каждому товару отдельно — включая повышенный кешбек
+    // Процент берётся по каждому товару отдельно – включая повышенный кешбек
     // акции, как обещает витрина.
     const rates = await getCashbackRates(resolved.map((r) => r.productId));
     // Кешбек считается со всей суммы покупки и не зависит от способа оплаты:
@@ -504,7 +504,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
       where: { id: { in: resolved.map((r) => r.productId) } },
       select: { id: true, name: true, brand: { select: { name: true } } },
     });
-    // Всё, что пришло от людей (названия, имена), экранируем — иначе символ
+    // Всё, что пришло от людей (названия, имена), экранируем – иначе символ
     // «<» в данных ломает разметку и Telegram отклоняет сообщение целиком.
     const nameMap = new Map(
       prods.map((p) => [p.id, tgEscape(`${p.brand.name} ${p.name}`)]),
@@ -518,7 +518,7 @@ export async function createOfflineSale(input: CreateSaleInput) {
     const lines = resolved
       .map(
         (r) =>
-          `• ${nameMap.get(r.productId) ?? "?"} — ${r.volumeMl} мл ×${r.qty} = ${(
+          `• ${nameMap.get(r.productId) ?? "?"} – ${r.volumeMl} мл ×${r.qty} = ${(
             r.priceByn * r.qty
           ).toFixed(2)} BYN`,
       )
@@ -553,25 +553,25 @@ export async function createOfflineSale(input: CreateSaleInput) {
     saleId: sale.id,
     total: saleTotal,
     discount: totalDiscount,
-    /** Какая механика сработала — показываем продавцу в итогах чека. */
+    /** Какая механика сработала – показываем продавцу в итогах чека. */
     discountKind: priced.discount > 0 ? priced.kind : "none",
-    /** Разовая скидка по дате списана — продавцу стоит это сказать покупателю. */
+    /** Разовая скидка по дате списана – продавцу стоит это сказать покупателю. */
     dateRewardUsed,
     discountLabel: priced.discount > 0 ? (DISCOUNT_LABEL[priced.kind] ?? "") : "",
     freeUnits: priced.freeUnits,
     earned,
-    /** Кешбек не начислен — клиент не подтвердил согласие на обработку ПД. */
+    /** Кешбек не начислен – клиент не подтвердил согласие на обработку ПД. */
     cashbackBlocked,
     loyaltySpent,
     /** Оплачено сертификатом по этому чеку. */
     certPaid,
-    /** Что осталось на сертификате — продавец называет это покупателю. */
+    /** Что осталось на сертификате – продавец называет это покупателю. */
     certRemaining,
     toPay: Math.round((saleTotal - loyaltySpent - certPaid) * 100) / 100,
   };
 }
 
-/** Проверить код сертификата при покупателе — до закрытия чека. */
+/** Проверить код сертификата при покупателе – до закрытия чека. */
 export async function checkCertificate(code: string) {
   await requireRole(["admin", "seller"]);
   return lookupCertificate(code);

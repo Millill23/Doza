@@ -64,7 +64,7 @@ export default function SmsSettingsPanel({
             </span>
             <span className="mt-1 block text-xs leading-relaxed text-ivory-faint">
               Общий рубильник. Снимите галочку, чтобы мгновенно прекратить любые
-              отправки — включая коды подтверждения. Клиенты не смогут
+              отправки – включая коды подтверждения. Клиенты не смогут
               зарегистрироваться и списать баллы, пока он выключен.
             </span>
           </span>
@@ -95,14 +95,14 @@ export default function SmsSettingsPanel({
             </span>
             <span className="mt-1 block text-xs leading-relaxed text-ivory-faint">
               Временный «прожектор»: видно каждое сообщение сразу, как оно
-              уходит. Включите на час, посмотрите — и выключите, иначе канал
+              уходит. Включите на час, посмотрите – и выключите, иначе канал
               заполнится служебными кодами.
             </span>
           </span>
         </label>
         {telegram && (
           <p className="mt-3 text-xs text-botanical-300">
-            Включено — уведомления идут в канал.
+            Включено – уведомления идут в канал.
           </p>
         )}
       </div>

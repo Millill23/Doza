@@ -26,7 +26,7 @@ test("подтвердивший клиент не бывает просроче
 });
 
 test("без отправленного запроса удалять нельзя", () => {
-  // Человек не знал, что от него чего-то ждут — молчание не его вина.
+  // Человек не знал, что от него чего-то ждут – молчание не его вина.
   assert.equal(
     isConsentOverdue({ consentStatus: "pending", consentRequestedAt: null }, NOW),
     false,
@@ -39,7 +39,7 @@ test("просрочка наступает строго после срока",
     consentRequestedAt: daysAgo(d),
   });
   assert.equal(isConsentOverdue(pending(CONSENT_TTL_DAYS - 1), NOW), false);
-  // Ровно 30 дней — ещё не просрочка, у клиента есть весь последний день.
+  // Ровно 30 дней – ещё не просрочка, у клиента есть весь последний день.
   assert.equal(isConsentOverdue(pending(CONSENT_TTL_DAYS), NOW), false);
   assert.equal(isConsentOverdue(pending(CONSENT_TTL_DAYS + 1), NOW), true);
 });
@@ -71,7 +71,7 @@ test("тексты SMS содержат ссылку и влезают в два
   for (const kind of ["invite", "reminder"] as const) {
     const text = CONSENT_SMS[kind](link);
     assert.ok(text.includes(link), `${kind}: нет ссылки`);
-    // Кириллица кодируется UCS-2 — 70 знаков на сегмент. Держимся в двух,
+    // Кириллица кодируется UCS-2 – 70 знаков на сегмент. Держимся в двух,
     // иначе рассылка по всей базе дорожает в полтора раза.
     assert.ok(text.length <= 140, `${kind}: ${text.length} знаков, больше двух SMS`);
   }

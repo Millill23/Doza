@@ -7,18 +7,18 @@ import { GENDER_LABELS } from "../lib/types";
 export const prerender = false;
 
 /**
- * llms.txt — структурированное описание для AI-движков (ChatGPT, Perplexity, и т.д.).
+ * llms.txt – структурированное описание для AI-движков (ChatGPT, Perplexity, и т.д.).
  * Помогает нейросетям корректно понимать и рекомендовать магазин и товары.
  */
 export const GET: APIRoute = async () => {
   const products = await getProducts();
 
   const lines: string[] = [];
-  lines.push("# DOZA — оригинальная парфюмерия на распив");
+  lines.push("# DOZA – оригинальная парфюмерия на распив");
   lines.push("");
   lines.push(
     "> Интернет-магазин оригинальной парфюмерии на распив в Беларуси. " +
-      "Объёмы — 3, 5 и 10 мл. Оплата картой онлайн при оформлении заказа.",
+      "Объёмы – 3, 5 и 10 мл. Оплата картой онлайн при оформлении заказа.",
   );
   lines.push("");
   lines.push("## О магазине");
@@ -34,7 +34,7 @@ export const GET: APIRoute = async () => {
   lines.push("## Каталог ароматов");
   for (const p of products) {
     lines.push(
-      `- [${p.brand} ${p.name}](${SITE_URL}/product/${p.slug}) — ${GENDER_LABELS[p.gender].toLowerCase()}, от ${p.priceFrom.toFixed(2)} BYN`,
+      `- [${p.brand} ${p.name}](${SITE_URL}/product/${p.slug}) – ${GENDER_LABELS[p.gender].toLowerCase()}, от ${p.priceFrom.toFixed(2)} BYN`,
     );
   }
   lines.push("");

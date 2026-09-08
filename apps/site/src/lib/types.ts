@@ -20,7 +20,7 @@ export interface ProductCard {
   cashbackPercent: number;
   /** true, если кешбэк повышен относительно глобального */
   cashbackBoosted: boolean;
-  /** Остаток ушёл ниже порога — аромат снят с продажи. */
+  /** Остаток ушёл ниже порога – аромат снят с продажи. */
   soldOut: boolean;
 }
 

@@ -54,7 +54,7 @@ function toCard(
     .map((v) => Number(v.priceByn));
   const override =
     p.loyaltyPercentOverride != null ? Number(p.loyaltyPercentOverride) : null;
-  // Адресная акция товара + акция «на все товары» — берётся лучшая, не сумма.
+  // Адресная акция товара + акция «на все товары» – берётся лучшая, не сумма.
   const promo = mergePromos(
     pickActivePromo(
       (p.promos ?? []).map((pr) => ({
@@ -66,7 +66,7 @@ function toCard(
     ),
     globalPromo,
   );
-  // Общее правило с кассой: что обещано в карточке — то и начислится.
+  // Общее правило с кассой: что обещано в карточке – то и начислится.
   const cashbackPercent = effectiveCashbackPercent({
     globalPercent,
     productOverride: override,
@@ -160,7 +160,7 @@ export async function getProduct(slug: string): Promise<ProductDetail | null> {
 
   // Похожие берём из подобранных: их считает `seed-similar.mjs` по пирамиде
   // нот, и админ правит руками в CRM. Прежняя выборка «тот же бренд или пол,
-  // первые четыре» ставила рядом что попало — унисекс за 12 рублей соседствовал
+  // первые четыре» ставила рядом что попало – унисекс за 12 рублей соседствовал
   // с нишевым за 125 только потому, что их id шли подряд.
   const links = await prisma.productSimilar.findMany({
     where: { productId: p.id },
@@ -221,7 +221,7 @@ export async function getFinderProducts(): Promise<FinderProduct[]> {
     notesMid: string | null;
     notesBase: string | null;
   })[])
-    // Подбор ведёт к одной карточке и обещает попадание — советовать аромат,
+    // Подбор ведёт к одной карточке и обещает попадание – советовать аромат,
     // который нельзя купить, значит обмануть на последнем шаге.
     .filter((p) => !isSoldOut(p.inventory?.quantityMl ?? 0))
     .map((p) => ({

@@ -19,7 +19,7 @@ export default function CustomerEdit({
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const [name, setName] = useState(initialName);
-  // В поле живут только 9 цифр — префикс рисует PhoneInput.
+  // В поле живут только 9 цифр – префикс рисует PhoneInput.
   const [phone, setPhone] = useState(toLocalDigits(initialPhone));
   const [err, setErr] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -67,7 +67,7 @@ export default function CustomerEdit({
       </div>
 
       <p className="mt-2 text-xs text-ivory-faint">
-        Телефон — идентификатор клиента: к нему привязаны баллы, заказы и вход в
+        Телефон – идентификатор клиента: к нему привязаны баллы, заказы и вход в
         личный кабинет.
       </p>
 

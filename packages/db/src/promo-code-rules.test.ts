@@ -42,7 +42,7 @@ test("действующий код проходит", () => {
   assert.equal(promoCodeError("ok"), null);
 });
 
-test("до начала и после конца — не проходит", () => {
+test("до начала и после конца – не проходит", () => {
   assert.equal(promoCodeStatus(живой, new Date("2026-07-31T23:00:00Z")), "not_started");
   assert.equal(promoCodeStatus(живой, new Date("2026-09-01T00:00:01Z")), "expired");
 });

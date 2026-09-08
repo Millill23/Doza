@@ -112,7 +112,7 @@ export default function CertificateActivate() {
 
       {err && <p className="mb-3 text-sm text-red-300">{err}</p>}
 
-      {/* Нет согласия — объясняем, что делать, и даём сделать это отсюда же.
+      {/* Нет согласия – объясняем, что делать, и даём сделать это отсюда же.
           Сертификат при этом не потрачен: код остаётся рабочим. */}
       {blocked && (
         <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4">

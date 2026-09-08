@@ -2,8 +2,8 @@
  * Подарочные сертификаты: работа с базой.
  *
  * Активировать сертификат можно двумя путями (продавец в CRM и клиент сам в
- * личном кабинете), поэтому сама операция живёт здесь — чтобы оба пути не
- * разъехались. Чистые правила (коды, размер начисления) — в `certificate-rules.ts`.
+ * личном кабинете), поэтому сама операция живёт здесь – чтобы оба пути не
+ * разъехались. Чистые правила (коды, размер начисления) – в `certificate-rules.ts`.
  */
 
 import crypto from "node:crypto";
@@ -29,7 +29,7 @@ export * from "./certificate-rules";
 export class CertificateError extends Error {}
 
 /**
- * Клиент не подтвердил согласие на обработку ПД — баллы начислить нельзя.
+ * Клиент не подтвердил согласие на обработку ПД – баллы начислить нельзя.
  *
  * Отдельный класс, а не просто текст: продавцу мало сообщения, ему нужна рядом
  * кнопка «отправить согласие», а для неё интерфейсу нужно знать и причину, и
@@ -38,7 +38,7 @@ export class CertificateError extends Error {}
 export class ConsentRequiredError extends CertificateError {
   constructor(readonly customerId: number) {
     super(
-      "Клиент не подтвердил согласие на обработку персональных данных — начислить баллы нельзя.",
+      "Клиент не подтвердил согласие на обработку персональных данных – начислить баллы нельзя.",
     );
   }
 }
@@ -60,7 +60,7 @@ function toState(cert: {
 
 /**
  * Подобрать код, которого ещё нет в базе.
- * Коллизия при 32^8 ≈ 1.1e12 вариантов крайне маловероятна, но проверяем —
+ * Коллизия при 32^8 ≈ 1.1e12 вариантов крайне маловероятна, но проверяем –
  * уникальный индекс всё равно не даст создать дубль.
  */
 export async function reserveUniqueCode(attempts = 10): Promise<string> {
@@ -95,7 +95,7 @@ export interface ActivationResult {
  *
  * Смена статуса и начисление выполняются одной транзакцией, а статус меняется
  * условным UPDATE (…WHERE status = 'new'): если два продавца активируют один код
- * одновременно, выиграет только один — двойного начисления не будет.
+ * одновременно, выиграет только один – двойного начисления не будет.
  */
 export async function activateCertificate(opts: {
   code: string;
@@ -128,15 +128,15 @@ export async function activateCertificate(opts: {
   });
 
   await prisma.$transaction(async (tx) => {
-    // Условный UPDATE — защита от повторной активации при гонке.
+    // Условный UPDATE – защита от повторной активации при гонке.
     // Условие по остатку, а не только по статусу: если параллельно прошла
-    // оплата в кассе, остаток уже не полный — обменивать нечего.
+    // оплата в кассе, остаток уже не полный – обменивать нечего.
     const claimed = await tx.giftCertificate.updateMany({
       where: { id: cert.id, status: "new", balanceByn: cert.denomination },
       data: {
         status: "activated",
         // Остаток обнуляем: номинал ушёл баллами, и платить им в кассе больше
-        // нельзя — иначе магазин отдаст одну сумму дважды.
+        // нельзя – иначе магазин отдаст одну сумму дважды.
         balanceByn: 0,
         customerId: customer.id,
         activatedById: opts.activatedById ?? null,
@@ -152,7 +152,7 @@ export async function activateCertificate(opts: {
       id: cert.id,
     }, { tx, reason: `Активация сертификата ${code}` });
 
-    // Без согласия на обработку ПД баллы не начисляются — а значит сертификат
+    // Без согласия на обработку ПД баллы не начисляются – а значит сертификат
     // сгорел бы впустую. Роняем транзакцию: код остаётся неактивированным,
     // клиент даёт согласие и активирует его заново.
     if (!accrued) throw new ConsentRequiredError(customer.id);
@@ -180,7 +180,7 @@ export function newCertificateExpiry(): Date {
 
 export interface CertificateLookup {
   ok: boolean;
-  /** Причина отказа — показываем продавцу. */
+  /** Причина отказа – показываем продавцу. */
   reason?: string;
   id?: number;
   code?: string;
@@ -194,12 +194,12 @@ export interface CertificateLookup {
  *
  * Отдельно от списания: продавец сначала проверяет код при покупателе и видит
  * остаток, и только потом закрывает чек. Отказ возвращаем значением, а не
- * исключением — «сертификат просрочен» это не сбой, а нормальный ответ.
+ * исключением – «сертификат просрочен» это не сбой, а нормальный ответ.
  */
 export async function lookupCertificate(codeRaw: string): Promise<CertificateLookup> {
   const code = normalizeCertificateCode(codeRaw);
   if (!isValidCertificateCode(code))
-    return { ok: false, reason: "Код состоит из 8 символов — проверьте ввод" };
+    return { ok: false, reason: "Код состоит из 8 символов – проверьте ввод" };
 
   const cert = await prisma.giftCertificate.findUnique({ where: { code } });
   if (!cert) return { ok: false, reason: "Сертификат с таким кодом не найден" };
@@ -230,11 +230,11 @@ export interface RedeemResult {
  * Списать с сертификата в счёт продажи.
  *
  * Списание идёт условным UPDATE по текущему остатку: если тем же кодом в этот
- * момент платят на второй кассе, выиграет только одна операция — иначе остаток
+ * момент платят на второй кассе, выиграет только одна операция – иначе остаток
  * можно потратить дважды.
  *
  * Вызывается уже после создания продажи, поэтому `saleId` обязателен: списание
- * без чека — это потерянные деньги, которые некуда вернуть.
+ * без чека – это потерянные деньги, которые некуда вернуть.
  */
 export async function redeemCertificate(opts: {
   code: string;
@@ -269,7 +269,7 @@ export async function redeemCertificate(opts: {
     });
     if (claimed.count !== 1)
       throw new CertificateError(
-        "Сертификатом только что воспользовались — проверьте остаток заново",
+        "Сертификатом только что воспользовались – проверьте остаток заново",
       );
 
     await tx.certificateRedemption.create({
@@ -326,7 +326,7 @@ export async function revokeSaleRedemptions(
 /**
  * Выпустить сертификаты, купленные на сайте.
  *
- * Вызывается один раз — когда заказ стал оплаченным. До оплаты сертификата не
+ * Вызывается один раз – когда заказ стал оплаченным. До оплаты сертификата не
  * существует: код, показанный раньше, был бы подарком всякому, кто дошёл до
  * корзины и закрыл вкладку.
  *
@@ -335,7 +335,7 @@ export async function revokeSaleRedemptions(
  */
 export async function issueOrderCertificates(opts: {
   orderId: number;
-  /** Адрес сайта без слеша на конце — для ссылки на страницу подарка. */
+  /** Адрес сайта без слеша на конце – для ссылки на страницу подарка. */
   siteUrl: string;
   sendGiftSms?: (opts: {
     phone: string;
@@ -361,7 +361,7 @@ export async function issueOrderCertificates(opts: {
         code,
         denomination: row.denomination,
         paidByn: row.priceByn,
-        // Тратить можно весь номинал, а не уплаченную сумму: VIP-скидка —
+        // Тратить можно весь номинал, а не уплаченную сумму: VIP-скидка –
         // это скидка на покупку сертификата, а не уменьшение его ценности.
         balanceByn: row.denomination,
         expiresAt: newCertificateExpiry(),
@@ -392,7 +392,7 @@ export async function issueOrderCertificates(opts: {
           certificateId: cert.id,
         });
       } catch (e) {
-        // Сертификат уже выпущен и оплачен — сбой SMS его не отменяет.
+        // Сертификат уже выпущен и оплачен – сбой SMS его не отменяет.
         // Ссылку всегда можно переслать из CRM.
         console.error("[certificates] SMS с подарком не отправлена:", e);
       }
@@ -439,7 +439,7 @@ export async function findCertificateByToken(token: string) {
  *
  * Сертификаты, выпущенные продавцом в CRM до появления онлайн-продажи, живут
  * без токена: их код передавали из рук в руки. Чтобы отправить такой ссылкой,
- * токен нужно завести — но только один раз, иначе прежняя ссылка перестанет
+ * токен нужно завести – но только один раз, иначе прежняя ссылка перестанет
  * работать у того, кому её уже отправили.
  */
 export async function ensureGiftToken(certificateId: number): Promise<string> {

@@ -5,7 +5,7 @@ import { getCustomerId } from "../lib/customer-auth";
 /**
  * Шапка сайта.
  *
- * На узком экране ссылки скрыты — с телефона в каталог и к сертификатам ведут
+ * На узком экране ссылки скрыты – с телефона в каталог и к сертификатам ведут
  * кнопки на самих страницах, а не тесная строка меню.
  */
 
@@ -21,7 +21,7 @@ const links = [
 /**
  * Сертификаты стоят отдельно от остальных ссылок: это не раздел каталога, а
  * отдельный товар, и теряться среди «Мужские / Женские / Унисекс» ему нельзя.
- * На широком экране — короткой подписью, чтобы строка не переполнялась.
+ * На широком экране – короткой подписью, чтобы строка не переполнялась.
  */
 const GIFT = {
   href: "/gift-card",
@@ -46,7 +46,7 @@ if (customerId) {
 >
   <nav class="container-luxe flex h-16 items-center justify-between gap-4">
     <!-- Логотип -->
-    <a href="/" class="flex items-center gap-2" aria-label="DOZA — на главную">
+    <a href="/" class="flex items-center gap-2" aria-label="DOZA – на главную">
       <span
         class="font-serif text-2xl font-semibold tracking-luxe text-gold-gradient"
         >DOZA</span
@@ -155,7 +155,7 @@ if (customerId) {
     function update() {
       var badge = document.getElementById("cart-badge");
       if (!badge) return;
-      // Сертификаты лежат отдельным ключом, но для покупателя корзина одна —
+      // Сертификаты лежат отдельным ключом, но для покупателя корзина одна –
       // счётчик обязан считать и их, иначе добавленный подарок «пропадает».
       var total =
         count("doza_cart", function (s, i) {

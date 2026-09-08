@@ -43,14 +43,14 @@ test("повтор разрешён после паузы", () => {
   );
 });
 
-test("граница паузы: ровно неделя ещё рано, неделя и час — можно", () => {
+test("граница паузы: ровно неделя ещё рано, неделя и час – можно", () => {
   const exact = new Date(NOW.getTime() - CONSENT_RESEND_COOLDOWN_DAYS * 86_400_000);
   assert.equal(canSendConsentSms({ sent: 1, lastSentAt: exact }, NOW).allowed, true);
   const almost = new Date(exact.getTime() + 3_600_000);
   assert.equal(canSendConsentSms({ sent: 1, lastSentAt: almost }, NOW).allowed, false);
 });
 
-test("лимит сообщений исчерпан — не шлём даже после паузы", () => {
+test("лимит сообщений исчерпан – не шлём даже после паузы", () => {
   const v = canSendConsentSms(
     { sent: CONSENT_MAX_MESSAGES, lastSentAt: daysAgo(365) },
     NOW,
@@ -60,7 +60,7 @@ test("лимит сообщений исчерпан — не шлём даже 
 });
 
 test("служебные категории помечены и их нельзя выключить по смыслу", () => {
-  // Коды подтверждения и пароль — без них ломается сценарий, а не «меньше спама».
+  // Коды подтверждения и пароль – без них ломается сценарий, а не «меньше спама».
   for (const k of ["otp_register", "otp_loyalty_spend", "password_reset"] as const) {
     assert.equal(SMS_KINDS[k].required, true, `${k} должен быть служебным`);
   }
@@ -79,7 +79,7 @@ test("у каждой категории свой ключ настройки и
 // ── Частота служебных SMS ───────────────────────────────────────────────────
 
 test("ограничиваем только код регистрации и сброс пароля", () => {
-  // Уведомления о заказе и поздравления шлёт магазин по своей воле —
+  // Уведомления о заказе и поздравления шлёт магазин по своей воле –
   // придерживать их незачем.
   assert.equal(isThrottledKind("otp_register"), true);
   assert.equal(isThrottledKind("password_reset"), true);
@@ -113,7 +113,7 @@ test("через минуту можно снова", () => {
   assert.equal(v.allowed, true);
 });
 
-test("двадцать за сутки — потолок", () => {
+test("двадцать за сутки – потолок", () => {
   const давно = new Date("2026-08-31T10:00:00Z");
   const now = new Date("2026-08-31T12:00:00Z");
   // Пауза выдержана, но суточный лимит выбран.

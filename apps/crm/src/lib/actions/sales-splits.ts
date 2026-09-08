@@ -124,7 +124,7 @@ export async function saveSalesSplit(input: {
   return { ok: true };
 }
 
-/** Убрать разделение — выручка вернётся исходному аккаунту. */
+/** Убрать разделение – выручка вернётся исходному аккаунту. */
 export async function deleteSalesSplit(day: string, sourceSellerId: number) {
   await requireRole(["admin"]);
   const date = new Date(`${day}T00:00:00.000Z`);

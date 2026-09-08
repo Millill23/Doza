@@ -8,7 +8,7 @@ import { formatByn } from "@doza/shared";
  * Покупка подарочного сертификата.
  *
  * Бумажную карточку везём почтой вместе с духами, электронную отправляем
- * ссылкой в SMS — тогда доставка не нужна вовсе.
+ * ссылкой в SMS – тогда доставка не нужна вовсе.
  */
 
 const MESSAGE_MAX = 200;
@@ -89,7 +89,7 @@ export default function GiftCardApp({
           Отправить электронную версию сертификата в SMS
           <span className="mt-0.5 block text-xs font-light text-ivory-faint">
             Получатель откроет ссылку и увидит сертификат с кодом. Бумажную
-            карточку тогда не везём — доставка не нужна.
+            карточку тогда не везём – доставка не нужна.
           </span>
         </span>
       </label>
@@ -125,7 +125,7 @@ export default function GiftCardApp({
               maxLength={MESSAGE_MAX}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Напишите пару слов — они появятся на странице сертификата"
+              placeholder="Напишите пару слов – они появятся на странице сертификата"
               className="w-full rounded-lg border border-ink-600 bg-ink-800 px-3 py-2 text-sm text-ivory placeholder:text-ivory-faint focus:border-gold-500 focus:outline-none"
             />
             <p className="mt-1 text-right text-xs text-ivory-faint">
@@ -148,7 +148,7 @@ export default function GiftCardApp({
         </span>
       </div>
       <p className="text-xs leading-relaxed text-ivory-faint">
-        Если у вас VIP-карта, войдите в кабинет — сертификат обойдётся дешевле,
+        Если у вас VIP-карта, войдите в кабинет – сертификат обойдётся дешевле,
         а потратить его можно будет на полный номинал.
       </p>
 

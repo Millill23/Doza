@@ -72,7 +72,7 @@ test("сколько осталось до следующей ступени", (
   assert.equal(commissionProgress(11500).left, 500);
 });
 
-test("все ступени взяты — полоска полная и расти некуда", () => {
+test("все ступени взяты – полоска полная и расти некуда", () => {
   const p = commissionProgress(15000);
   assert.equal(p.fill, 1);
   assert.equal(p.nextPercent, null);

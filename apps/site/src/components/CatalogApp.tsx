@@ -30,7 +30,7 @@ function formatByn(amount: number): string {
  * Склонение: 1 аромат, 3 аромата, 5 ароматов.
  *
  * Русские числительные не сводятся к «один или много»: «3 ароматов» читается
- * как недоделка, а витрина — не место для недоделок.
+ * как недоделка, а витрина – не место для недоделок.
  */
 function plural(n: number): string {
   const ten = n % 100;
@@ -71,7 +71,7 @@ export default function CatalogApp({
   useEffect(() => {
     const onScroll = () => {
       const top = gridTopRef.current?.getBoundingClientRect().top ?? 0;
-      // 200px запаса — чтобы кнопка не мигала у самой границы
+      // 200px запаса – чтобы кнопка не мигала у самой границы
       setShowToTop(top < -200);
     };
     onScroll();
@@ -81,11 +81,11 @@ export default function CatalogApp({
 
   function scrollToGridTop() {
     // Отступ под липкие шапку и панель фильтров задан у якоря через
-    // scroll-mt-* — браузер сам учтёт его при прокрутке.
+    // scroll-mt-* – браузер сам учтёт его при прокрутке.
     gridTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  // Синхронизация фильтров в URL — чтобы «назад» возвращал к отфильтрованному каталогу
+  // Синхронизация фильтров в URL – чтобы «назад» возвращал к отфильтрованному каталогу
   useEffect(() => {
     const params = new URLSearchParams();
     if (query.trim()) params.set("q", query.trim());
@@ -123,7 +123,7 @@ export default function CatalogApp({
       const set = new Set(weekly.productIds);
       list = list.filter((p) => set.has(p.id));
     }
-    // Распроданное — в конец списка, сохраняя порядок внутри групп. Убирать
+    // Распроданное – в конец списка, сохраняя порядок внутри групп. Убирать
     // такие карточки совсем нельзя: аромат вернётся, а по названию его ищут и
     // приходят из поиска. Но первым экраном должно быть то, что можно купить.
     return [...list].sort((a, b) => Number(a.soldOut) - Number(b.soldOut));
@@ -170,7 +170,7 @@ export default function CatalogApp({
     </div>
   );
 
-  // ── Контролы фильтров (пол + бренды) — переиспользуются ───────────────────
+  // ── Контролы фильтров (пол + бренды) – переиспользуются ───────────────────
   const filterControls = (
     <>
       <div>
@@ -337,10 +337,10 @@ export default function CatalogApp({
 
   return (
     <>
-      {/* Подборка недели — над каталогом и во всю ширину: это витринная
+      {/* Подборка недели – над каталогом и во всю ширину: это витринная
           вывеска, а не ещё один пункт в списке фильтров. Кнопки нет вовсе,
           когда подборка не идёт: пустая вывеска хуже отсутствующей. */}
-      {/* Сертификаты — ссылкой прямо в каталоге. В шапке они есть только на
+      {/* Сертификаты – ссылкой прямо в каталоге. В шапке они есть только на
           широком экране, а с телефона именно каталог и есть вход в магазин. */}
       <a
         href="/gift-card"
@@ -381,7 +381,7 @@ export default function CatalogApp({
             </span>
             <span className="mt-0.5 block text-sm font-light text-ivory-muted">
               {weekly.productIds.length} {plural(weekly.productIds.length)} со
-              скидкой {weekly.percent}% — только на этой неделе
+              скидкой {weekly.percent}% – только на этой неделе
             </span>
           </span>
           <span
@@ -400,7 +400,7 @@ export default function CatalogApp({
     <div className="grid gap-8 lg:grid-cols-[260px_1fr]">
       {/* ── Десктоп: сайдбар ──
           Собственная прокрутка: колёсико над фильтром листает фильтр, над
-          витриной — страницу. overscroll-contain не даёт прокрутке
+          витриной – страницу. overscroll-contain не даёт прокрутке
           «перескочить» на страницу, когда список брендов закончился. */}
       <aside className="hidden space-y-8 lg:sticky lg:top-24 lg:block lg:max-h-[calc(100vh-8rem)] lg:self-start lg:overflow-y-auto lg:overscroll-contain lg:pr-3">
         <div>
@@ -416,7 +416,7 @@ export default function CatalogApp({
       <div>
         {/* Мобильная панель: поиск + кнопка «Фильтры».
             Липнет под шапкой (top-16 = высота header), чтобы фильтр оставался
-            под рукой при прокрутке витрины. Отрицательные отступы + padding —
+            под рукой при прокрутке витрины. Отрицательные отступы + padding –
             чтобы фон перекрывал карточки на всю ширину контейнера. */}
         <div className="sticky top-16 z-20 -mx-4 mb-4 border-b border-ink-600/40 bg-ink-900/95 px-4 py-3 backdrop-blur-md lg:hidden">
           <div className="flex gap-2">
@@ -440,8 +440,8 @@ export default function CatalogApp({
           </div>
         </div>
 
-        {/* Якорь начала витрины — сюда возвращает кнопка «наверх».
-            scroll-mt-* — запас под липкие шапку и панель фильтров. */}
+        {/* Якорь начала витрины – сюда возвращает кнопка «наверх».
+            scroll-mt-* – запас под липкие шапку и панель фильтров. */}
         <div ref={gridTopRef} className="scroll-mt-[9.5rem] lg:scroll-mt-24" />
 
         <p className="mb-5 text-sm font-light text-ivory-faint">

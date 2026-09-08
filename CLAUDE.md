@@ -1,4 +1,4 @@
-# DOZA — Project Overview
+# DOZA – Project Overview
 
 Интернет-магазин парфюмерии на розлив (doza-parfum.by) + CRM-система.
 
@@ -6,8 +6,8 @@
 
 ```
 apps/
-  site/   → Astro SSR — публичный сайт (doza-parfum.by)
-  crm/    → Next.js App Router — CRM (crm.doza-parfum.by)
+  site/   → Astro SSR – публичный сайт (doza-parfum.by)
+  crm/    → Next.js App Router – CRM (crm.doza-parfum.by)
 packages/
   db/     → Prisma schema + migrations + Prisma Client
   shared/ → TypeScript типы, утилиты (форматирование BYN, телефон)
@@ -62,7 +62,7 @@ docker compose logs -f
 
 - PostgreSQL 16 установлен как служба `postgresql-x64-16` (суперпароль `postgres`).
 - БД `doza` / пользователь `doza` / пароль `doza_dev_pass` (с правом CREATEDB для shadow-базы Prisma).
-- `.env` в корне — для сайта (Astro) и Prisma CLI; `apps/crm/.env.local` — для Next.js CRM.
+- `.env` в корне – для сайта (Astro) и Prisma CLI; `apps/crm/.env.local` – для Next.js CRM.
 - **Вход в CRM:** `admin@doza-parfum.by` / `admin123` (создаётся сидом).
 
 ## Текущее состояние
@@ -72,13 +72,13 @@ docker compose logs -f
 - CRM: NextAuth + RBAC, дашборд, заказы (смена статуса → списание остатков + начисление баллов), оффлайн-касса, клиенты, аналитика, лояльность, настройки, пользователи
 - CRM: полное редактирование карточек товара (бренд, ноты, описание, объёмы, фото по URL, похожие, % баллов, порог, архив, копирование)
 - CRM: журнал оффлайн-продаж + отмена закрытой продажи с реверсом остатков/баллов (`offline_sale_edits`)
-- CRM: загрузка фото файлами с конвертацией в WebP (Sharp), общий каталог `uploads/`, отдача `/uploads/*` обоими приложениями (в проде — nginx)
+- CRM: загрузка фото файлами с конвертацией в WebP (Sharp), общий каталог `uploads/`, отдача `/uploads/*` обоими приложениями (в проде – nginx)
 - Лояльность: партионный учёт, FIFO-списание/начисление
 - Обе сборки проходят (`next build` 19 маршрутов / `astro build`)
 
 ⏳ Следующие шаги:
 - Редактирование позиций закрытой продажи (сейчас доступна только отмена)
-- Деплой на VPS (Docker Compose готов, но не протестирован — Docker не установлен локально)
+- Деплой на VPS (Docker Compose готов, но не протестирован – Docker не установлен локально)
 - Реальные фото/контент, Telegram-токен
 
 ## Переменные окружения
@@ -96,8 +96,8 @@ TELEGRAM_CHAT_ID=...
 ## Ключевые бизнес-правила
 
 ### Остатки (мл)
-- Базовая единица — миллилитр
-- `inventory.quantity_ml` — текущий остаток
+- Базовая единица – миллилитр
+- `inventory.quantity_ml` – текущий остаток
 - Каждое изменение пишется в `inventory_log`
 - При остатке ниже `low_stock_threshold` → подсветка в CRM
 
@@ -141,7 +141,7 @@ crm_users
 
 Новые поступления заводятся правкой `packages/db/prisma/seed-products.mjs`
 (карточка) и `catalog-prices.mjs` (цены 3/5/10 мл из `doza_prices.xlsx`),
-фото — `apps/site/public/img/products/<slug>.webp`, WebP 997×1333.
+фото – `apps/site/public/img/products/<slug>.webp`, WebP 997×1333.
 
 ```bash
 node packages/db/prisma/seed-products.mjs             # только добавить новое
@@ -152,7 +152,7 @@ node packages/db/prisma/seed-similar.mjs --verbose    # с разбором, к�
 ```
 
 Обычный запуск идемпотентен: заводит недостающие товары и не касается тех,
-что уже в каталоге. `seed-similar.mjs` устроен так же — заполняет только тех,
+что уже в каталоге. `seed-similar.mjs` устроен так же – заполняет только тех,
 у кого блок «Похожие ароматы» пуст, и не трогает подобранное руками в CRM.
 Подбор идёт по пирамиде нот, полу и ценовой лиге (`src/similar-rules.ts`).
 
@@ -165,8 +165,8 @@ node packages/db/prisma/seed-similar.mjs --verbose    # с разбором, к�
 ## Загрузка фото
 
 - Общий каталог `uploads/` в корне репо (gitignored).
-- CRM `POST /api/upload` — Sharp → WebP (≤1000×1333, q82), сохраняет в `uploads/`, возвращает `/uploads/<name>.webp`.
-- Оба приложения отдают `/uploads/*` из каталога (dev). В проде — nginx напрямую из общего docker-volume `uploads`.
+- CRM `POST /api/upload` – Sharp → WebP (≤1000×1333, q82), сохраняет в `uploads/`, возвращает `/uploads/<name>.webp`.
+- Оба приложения отдают `/uploads/*` из каталога (dev). В проде – nginx напрямую из общего docker-volume `uploads`.
 - Путь к каталогу: `getUploadsDir()` из `@doza/shared/uploads` (env `UPLOADS_DIR` или `<корень>/uploads`).
 
 Полная схема: `packages/db/prisma/schema.prisma`

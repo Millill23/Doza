@@ -22,7 +22,7 @@ try {
 const paid = result?.paymentStatus === "paid";
 ---
 
-<Layout title={paid ? "Заказ оплачен — DOZA" : "Проверяем платёж — DOZA"}>
+<Layout title={paid ? "Заказ оплачен – DOZA" : "Проверяем платёж – DOZA"}>
   <section class="container-luxe max-w-2xl py-16">
     {
       paid ? (
@@ -49,10 +49,10 @@ const paid = result?.paymentStatus === "paid";
               ? "Не получилось сразу подтвердить оплату."
               : "Банк ещё не подтвердил операцию."}{" "}
             Если деньги списаны, заказ подтвердится автоматически в течение
-            нескольких минут — повторно платить не нужно.
+            нескольких минут – повторно платить не нужно.
           </p>
           <p class="mt-4 text-sm text-ivory-faint">
-            Остались вопросы — напишите на{" "}
+            Остались вопросы – напишите на{" "}
             <span class="text-gold-400">{COMPANY.email}</span> или позвоните{" "}
             <span class="text-gold-400">{COMPANY.phones[0]}</span>.
           </p>

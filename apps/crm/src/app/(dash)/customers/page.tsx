@@ -83,7 +83,7 @@ export default async function CustomersPage() {
                   <td className="px-4 py-3 text-xs text-ivory-faint">
                     {c.lastPurchaseAt
                       ? `${c.lastPurchaseAt.toLocaleDateString("ru-RU")} · ${formatByn(Number(c.lastPurchaseSum ?? 0))}`
-                      : "—"}
+                      : "–"}
                   </td>
                   <td className="px-4 py-3 text-xs text-ivory-faint">
                     {c.registeredAt.toLocaleDateString("ru-RU")}

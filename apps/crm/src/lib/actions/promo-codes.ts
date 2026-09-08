@@ -8,7 +8,7 @@ import { requireRole } from "@/lib/session";
 /**
  * Промокоды: заведение, отключение, удаление.
  *
- * Код хранится в верхнем регистре — покупатель набирает как придётся, и
+ * Код хранится в верхнем регистре – покупатель набирает как придётся, и
  * приведение к канону должно быть в одном месте для сайта, кассы и CRM.
  */
 
@@ -29,13 +29,13 @@ export async function createPromoCode(input: {
 
   const code = normalizePromoCode(input.code);
   if (code.length < 3)
-    throw new Error("Промокод — минимум 3 символа");
+    throw new Error("Промокод – минимум 3 символа");
   if (code.length > PROMO_CODE_MAX_LENGTH)
-    throw new Error(`Промокод — не длиннее ${PROMO_CODE_MAX_LENGTH} символов`);
+    throw new Error(`Промокод – не длиннее ${PROMO_CODE_MAX_LENGTH} символов`);
 
   const percent = Number(input.discountPercent);
   if (!Number.isFinite(percent) || percent <= 0 || percent > 100)
-    throw new Error("Скидка — от 1 до 100 процентов");
+    throw new Error("Скидка – от 1 до 100 процентов");
 
   const now = new Date();
   const startsAt = parseDate(input.startsAt, now);
@@ -74,7 +74,7 @@ export async function createPromoCode(input: {
   revalidatePath("/promo-codes");
 }
 
-/** Выключить или включить обратно. Удалять не обязательно — история чеков жива. */
+/** Выключить или включить обратно. Удалять не обязательно – история чеков жива. */
 export async function togglePromoCode(id: number, isActive: boolean) {
   await requireRole(["admin"]);
   await prisma.promoCode.update({ where: { id }, data: { isActive } });
@@ -84,7 +84,7 @@ export async function togglePromoCode(id: number, isActive: boolean) {
 /**
  * Удалить код.
  *
- * Заказы и продажи, оформленные по нему, остаются — связь просто обнуляется.
+ * Заказы и продажи, оформленные по нему, остаются – связь просто обнуляется.
  * Иначе удаление кода стирало бы из отчётов настоящую выручку.
  */
 export async function deletePromoCode(id: number) {

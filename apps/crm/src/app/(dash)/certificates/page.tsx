@@ -11,7 +11,7 @@ import {
 export const dynamic = "force-dynamic";
 
 function fmt(d: Date | null): string {
-  if (!d) return "—";
+  if (!d) return "–";
   return d.toLocaleString("ru-RU", {
     day: "2-digit",
     month: "2-digit",
@@ -40,7 +40,7 @@ export default async function CertificatesPage() {
     take: 100,
   });
 
-  // «Действующий» — с остатком и не просроченный: именно столько денег магазин
+  // «Действующий» – с остатком и не просроченный: именно столько денег магазин
   // ещё должен покупателям.
   const now = new Date();
   const active = certificates.filter(
@@ -53,7 +53,7 @@ export default async function CertificatesPage() {
         <div>
           <h1 className="mb-1 font-serif text-3xl text-ivory">Сертификаты</h1>
           <p className="text-sm text-ivory-faint">
-            Действующих: {active}. Срок жизни — {CERTIFICATE_LIFETIME_DAYS} дней
+            Действующих: {active}. Срок жизни – {CERTIFICATE_LIFETIME_DAYS} дней
             с выпуска. Сертификатом можно расплатиться в кассе (остаток
             сохраняется) либо один раз обменять его на баллы.
           </p>
@@ -107,7 +107,7 @@ export default async function CertificatesPage() {
                       {left > 0 ? (
                         <span className="text-gold-400">{left.toFixed(2)}</span>
                       ) : (
-                        <span className="text-ivory-faint">—</span>
+                        <span className="text-ivory-faint">–</span>
                       )}
                     </td>
                     <td className={`px-4 py-3 text-xs ${st.cls}`}>
@@ -129,7 +129,7 @@ export default async function CertificatesPage() {
                     <td className="px-4 py-3 text-xs text-ivory-muted">
                       {c.customer
                         ? `${c.customer.name} (${c.customer.phone})`
-                        : "—"}
+                        : "–"}
                     </td>
                     <td className="px-4 py-3 text-xs text-ivory-faint">
                       {fmt(c.issuedAt)} · {c.issuedBy?.name ?? "куплен на сайте"}

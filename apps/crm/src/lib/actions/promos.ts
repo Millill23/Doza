@@ -40,7 +40,7 @@ export async function createPromo(input: CreatePromoInput) {
   if (cashback != null && (cashback <= 0 || cashback > 90))
     throw new Error("Кешбек должен быть 1–90%");
 
-  // Выбирается только дата: начало — с 00:00 указанного дня, окончание —
+  // Выбирается только дата: начало – с 00:00 указанного дня, окончание –
   // до конца указанного дня включительно.
   const startsAt = isDayString(input.startsAt) ? startOfDay(input.startsAt) : null;
   const endsAt = isDayString(input.endsAt) ? endOfDay(input.endsAt) : null;

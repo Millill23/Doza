@@ -93,7 +93,7 @@ export async function saveProduct(payload: ProductPayload): Promise<number> {
         });
     const pid = product.id;
 
-    // 2. Объёмы — синхронизация
+    // 2. Объёмы – синхронизация
     const existingVols = await tx.productVolume.findMany({ where: { productId: pid } });
     const keepVolIds = new Set(payload.volumes.filter((v) => v.id).map((v) => v.id));
     for (const ev of existingVols) {
@@ -114,7 +114,7 @@ export async function saveProduct(payload: ProductPayload): Promise<number> {
       }
     }
 
-    // 3. Фото — синхронизация
+    // 3. Фото – синхронизация
     const existingPhotos = await tx.productPhoto.findMany({ where: { productId: pid } });
     const keepPhotoIds = new Set(payload.photos.filter((p) => p.id).map((p) => p.id));
     for (const ep of existingPhotos) {
@@ -135,7 +135,7 @@ export async function saveProduct(payload: ProductPayload): Promise<number> {
       }
     }
 
-    // 4. Похожие — полная пересборка
+    // 4. Похожие – полная пересборка
     await tx.productSimilar.deleteMany({ where: { productId: pid } });
     const similar = payload.similarIds.filter((sid) => sid !== pid);
     for (const sid of similar) {

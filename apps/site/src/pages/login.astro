@@ -4,11 +4,11 @@ import LoginForm from "../components/LoginForm.tsx";
 import { currentCustomerId } from "../lib/customer-auth";
 
 // Проверяем, что клиент из cookie ещё есть в базе. Иначе отправим его в
-// кабинет, тот вернёт его сюда — и так по кругу до ERR_TOO_MANY_REDIRECTS.
+// кабинет, тот вернёт его сюда – и так по кругу до ERR_TOO_MANY_REDIRECTS.
 if (await currentCustomerId(Astro.cookies)) return Astro.redirect("/account");
 ---
 
-<Layout title="Вход — DOZA" noindex={true}>
+<Layout title="Вход – DOZA" noindex={true}>
   <section class="container-luxe py-12">
     <header class="mb-8 text-center">
       <h1 class="font-serif text-4xl font-semibold text-gold-gradient">Вход в кабинет</h1>

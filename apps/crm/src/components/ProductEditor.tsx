@@ -149,7 +149,7 @@ export default function ProductEditor({
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-      {/* Левая колонка — основное */}
+      {/* Левая колонка – основное */}
       <div className="space-y-6">
         <div className="rounded-2xl border border-ink-600/60 bg-ink-700 p-6">
           <h2 className="mb-4 font-serif text-xl text-ivory">Основное</h2>
@@ -267,7 +267,7 @@ export default function ProductEditor({
         </div>
       </div>
 
-      {/* Правая колонка — настройки + сохранение */}
+      {/* Правая колонка – настройки + сохранение */}
       <div className="space-y-6 lg:sticky lg:top-8 lg:self-start">
         <div className="rounded-2xl border border-ink-600/60 bg-ink-700 p-6">
           <h2 className="mb-4 font-serif text-xl text-ivory">Параметры</h2>

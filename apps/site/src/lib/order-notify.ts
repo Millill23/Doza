@@ -7,7 +7,7 @@ import { notifyTelegram, tgEscape } from "./telegram";
  *
  * Вызывается после подтверждения оплаты, а не при создании заказа: магазин
  * работает по предоплате, и неоплаченный заказ собирать нельзя. Оповещать о
- * каждой попытке было бы шумом — покупатель может открыть страницу банка и
+ * каждой попытке было бы шумом – покупатель может открыть страницу банка и
  * закрыть её.
  */
 export async function notifyOrder(orderId: number, note: string): Promise<void> {
@@ -30,7 +30,7 @@ export async function notifyOrder(orderId: number, note: string): Promise<void> 
     `👤 ${tgEscape(order.customerName)}`,
     `📞 +${order.customerPhone}`,
     `🚚 ${order.deliveryType === "pickup" ? "Самовывоз" : "Доставка почтой"}`,
-    // Адрес одной строкой — в таком виде его и переписывают на бланк.
+    // Адрес одной строкой – в таком виде его и переписывают на бланк.
     order.deliveryType === "post"
       ? `📍 ${tgEscape(
           [order.postalCode, order.region, order.city, order.address]
@@ -49,7 +49,7 @@ export async function notifyOrder(orderId: number, note: string): Promise<void> 
     `<b>Состав:</b>`,
     ...order.items.map(
       (i) =>
-        `• ${tgEscape(`${i.product.brand.name} ${i.product.name}, ${i.volumeMl} мл ×${i.qty}`)} — ${formatByn(Number(i.priceByn) * i.qty)}`,
+        `• ${tgEscape(`${i.product.brand.name} ${i.product.name}, ${i.volumeMl} мл ×${i.qty}`)} – ${formatByn(Number(i.priceByn) * i.qty)}`,
     ),
     ``,
     `Сумма: <b>${formatByn(Number(order.totalByn))}</b>`,

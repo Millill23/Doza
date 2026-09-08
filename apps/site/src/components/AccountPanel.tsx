@@ -167,7 +167,7 @@ export default function AccountPanel({ name, phone, balance, batches, orders, bi
       <div className="rounded-2xl border border-ink-600/60 bg-ink-700 p-6">
         <h2 className="mb-1 font-serif text-xl text-ivory">Подарочный сертификат</h2>
         <p className="mb-4 text-sm text-ivory-faint">
-          Введите код с сертификата — баллы зачислятся на ваш счёт.
+          Введите код с сертификата – баллы зачислятся на ваш счёт.
         </p>
 
         {certDone ? (
@@ -258,7 +258,7 @@ export default function AccountPanel({ name, phone, balance, batches, orders, bi
         <h2 className="mb-1 font-serif text-xl text-ivory">Личные данные</h2>
         <p className="mb-4 text-xs leading-relaxed text-ivory-faint">
           Мы дарим баллы на день рождения и скидку к вашим памятным датам.
-          Поэтому изменить дату после сохранения нельзя — если ошиблись,
+          Поэтому изменить дату после сохранения нельзя – если ошиблись,
           скажите продавцу, и мы поправим.
         </p>
 
@@ -287,7 +287,7 @@ export default function AccountPanel({ name, phone, balance, batches, orders, bi
               </button>
             </div>
             <p className="mt-1 text-[11px] text-ivory-faint">
-              Указывается один раз — потом изменить нельзя.
+              Указывается один раз – потом изменить нельзя.
             </p>
           </div>
         )}
@@ -301,7 +301,7 @@ export default function AccountPanel({ name, phone, balance, batches, orders, bi
               key={d.id}
               className="rounded-lg border border-ink-600/60 bg-ink-800 px-3 py-2 text-sm text-ivory"
             >
-              {ru(d.date)} — {d.description}
+              {ru(d.date)} – {d.description}
             </li>
           ))}
           {dates.length === 0 && (

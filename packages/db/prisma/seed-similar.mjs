@@ -4,12 +4,12 @@ import { pickSimilar } from "../src/similar-rules.ts";
 /**
  * Заполнить блок «Похожие ароматы».
  *
- * Подбор идёт по пирамиде нот, полу и ценовой лиге — правила и их обоснование
+ * Подбор идёт по пирамиде нот, полу и ценовой лиге – правила и их обоснование
  * в `src/similar-rules.ts`, там же тесты.
  *
  * По умолчанию скрипт трогает только те товары, у которых похожие ещё не
  * заданы: подборку правят руками в CRM, и перезатирать её при каждом новом
- * поступлении нельзя. Полный пересчёт — по явному `--rewrite`.
+ * поступлении нельзя. Полный пересчёт – по явному `--rewrite`.
  */
 const REWRITE = process.argv.includes("--rewrite");
 const LIMIT = 4;
@@ -30,7 +30,7 @@ async function main() {
       notesBase: true,
       brand: { select: { name: true } },
       volumes: { where: { volumeMl: 3 }, select: { priceByn: true } },
-      // `similarTo` — связи, исходящие от товара: те, кого мы показываем рядом.
+      // `similarTo` – связи, исходящие от товара: те, кого мы показываем рядом.
       similarTo: { select: { similarId: true } },
     },
   });
@@ -48,7 +48,7 @@ async function main() {
 
   console.log(
     REWRITE
-      ? `♻️  Пересчёт похожих для всех ${products.length} товаров — ручные подборки будут потеряны`
+      ? `♻️  Пересчёт похожих для всех ${products.length} товаров – ручные подборки будут потеряны`
       : `🔗 Подбор похожих: ${products.length} товаров, заполняем только пустые`,
   );
 
@@ -86,7 +86,7 @@ async function main() {
   }
 
   if (empty.length > 0) {
-    console.log(`\n⚠️  Не нашлось близких (${empty.length}) — блок останется пустым:`);
+    console.log(`\n⚠️  Не нашлось близких (${empty.length}) – блок останется пустым:`);
     for (const n of empty) console.log(`   ${n}`);
   }
 

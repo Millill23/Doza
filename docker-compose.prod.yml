@@ -6,7 +6,7 @@
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile tools run --rm migrate
 #
 # Отличия от базового docker-compose.yml:
-#  - site/crm слушают ТОЛЬКО на 127.0.0.1 — наружу их публикует Plesk (nginx + SSL);
+#  - site/crm слушают ТОЛЬКО на 127.0.0.1 – наружу их публикует Plesk (nginx + SSL);
 #  - nginx-контейнер выключен (его роль выполняет nginx самого Plesk);
 #  - добавлен одноразовый сервис migrate (prisma migrate deploy + seed).
 
@@ -19,7 +19,7 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
 
-  # nginx-контейнер не нужен — фронтит Plesk. Прячем в неактивный профиль.
+  # nginx-контейнер не нужен – фронтит Plesk. Прячем в неактивный профиль.
   nginx:
     profiles:
       - disabled

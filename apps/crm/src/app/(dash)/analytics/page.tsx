@@ -75,14 +75,14 @@ export default async function AnalyticsPage({
           )}
         </Card>
 
-        <Card title="Аутсайдеры — кандидаты на скидку">
+        <Card title="Аутсайдеры – кандидаты на скидку">
           {worstByMl.length === 0 ? (
             <p className="text-sm text-ivory-faint">Нет данных.</p>
           ) : (
             <>
               <p className="mb-3 text-xs text-ivory-faint">
                 Меньше всего продаж за период. Товары с нулём не продавались ни
-                разу — на них и стоит делать упор.
+                разу – на них и стоит делать упор.
               </p>
               <ul className="space-y-2">
                 {worstByMl.map((r, i) => (
@@ -169,7 +169,7 @@ export default async function AnalyticsPage({
                   className="flex justify-between rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 text-sm"
                 >
                   <span className="text-ivory">
-                    {i.product.brand.name} — {i.product.name}
+                    {i.product.brand.name} – {i.product.name}
                   </span>
                   <span className="text-red-300">{i.quantityMl} мл</span>
                 </div>

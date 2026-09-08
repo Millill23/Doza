@@ -21,7 +21,7 @@ const paid = result?.paymentStatus === "paid";
 const refunded = (result?.pointsRefunded ?? 0) > 0;
 ---
 
-<Layout title={paid ? "Заказ оплачен — DOZA" : "Оплата не прошла — DOZA"}>
+<Layout title={paid ? "Заказ оплачен – DOZA" : "Оплата не прошла – DOZA"}>
   <section class="container-luxe max-w-2xl py-16">
     {
       paid ? (
@@ -43,7 +43,7 @@ const refunded = (result?.pointsRefunded ?? 0) > 0;
           <p class="mb-2 text-4xl">✕</p>
           <h1 class="mb-3 font-serif text-2xl text-ivory">Оплата не прошла</h1>
           <p class="text-sm leading-relaxed text-ivory-muted">
-            Деньги не списаны. Заказ не оформлен — товары остались в корзине,
+            Деньги не списаны. Заказ не оформлен – товары остались в корзине,
             можно попробовать оплатить ещё раз.
           </p>
           {refunded && (
@@ -66,7 +66,7 @@ const refunded = (result?.pointsRefunded ?? 0) > 0;
             </a>
           </div>
           <p class="mt-5 text-sm text-ivory-faint">
-            Если деньги всё же списались — напишите на{" "}
+            Если деньги всё же списались – напишите на{" "}
             <span class="text-gold-400">{COMPANY.email}</span> или позвоните{" "}
             <span class="text-gold-400">{COMPANY.phones[0]}</span>, разберёмся.
           </p>

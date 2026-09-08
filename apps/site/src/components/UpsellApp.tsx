@@ -10,7 +10,7 @@ import {
 /**
  * Шаг между корзиной и оплатой: предлагаем добрать похожий аромат со скидкой.
  *
- * Ничего не навязываем: отказаться — это просто нажать «Перейти к оплате»,
+ * Ничего не навязываем: отказаться – это просто нажать «Перейти к оплате»,
  * кнопка стоит на виду и не выглядит второстепенной.
  */
 
@@ -73,7 +73,7 @@ export default function UpsellApp() {
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** Итог заказа со скидками — считает сервер, показываем над кнопкой оплаты. */
+  /** Итог заказа со скидками – считает сервер, показываем над кнопкой оплаты. */
   const [total, setTotal] = useState<number | null>(null);
 
   useEffect(() => {
@@ -81,7 +81,7 @@ export default function UpsellApp() {
     const items = readCart();
 
     // Сюда попадают только из корзины, с заполненной формой. Прямой заход или
-    // потерянная сессия — возвращаем назад, а не показываем полупустой шаг.
+    // потерянная сессия – возвращаем назад, а не показываем полупустой шаг.
     if (!saved || items.length === 0) {
       window.location.replace("/cart");
       return;
@@ -114,7 +114,7 @@ export default function UpsellApp() {
     })();
   }, []);
 
-  // Итог пересчитывает сервер — он же применяет скидку. Показывать сумму,
+  // Итог пересчитывает сервер – он же применяет скидку. Показывать сумму,
   // посчитанную здесь, значило бы обещать цену, которой можем не подтвердить.
   useEffect(() => {
     if (cart.length === 0) return;
@@ -136,7 +136,7 @@ export default function UpsellApp() {
         const data = await r.json();
         if (!cancelled && data.cart) setTotal(data.cart.net);
       } catch {
-        /* сумму просто не покажем — оплату это не блокирует */
+        /* сумму просто не покажем – оплату это не блокирует */
       }
     })();
     return () => {
@@ -151,7 +151,7 @@ export default function UpsellApp() {
     );
   }
 
-  /** Задать количество. 0 — убрать позицию из корзины совсем. */
+  /** Задать количество. 0 – убрать позицию из корзины совсем. */
   function setQty(offer: Offer, opt: Option, qty: number) {
     const next = readCart();
     const i = next.findIndex(
@@ -169,7 +169,7 @@ export default function UpsellApp() {
         brand: offer.brand,
         image: offer.image,
         volumeMl: opt.volumeMl,
-        // Цену всё равно пересчитает сервер — здесь она только для корзины.
+        // Цену всё равно пересчитает сервер – здесь она только для корзины.
         priceByn: opt.discountedByn,
         qty,
         fromUpsell: true,
@@ -221,7 +221,7 @@ export default function UpsellApp() {
             </p>
             <p className="mt-1.5 text-sm font-light text-ivory-muted">
               Мы подобрали ароматы, близкие к вашему выбору. Скидка действует
-              только при оформлении этого заказа — отдельно потом купить по этой
+              только при оформлении этого заказа – отдельно потом купить по этой
               цене не получится.
             </p>
           </div>
@@ -235,7 +235,7 @@ export default function UpsellApp() {
                 <a href={`/product/${o.slug}`} className="relative block">
                   <img
                     src={o.image}
-                    alt={`${o.brand} — ${o.name}, парфюм на распив`}
+                    alt={`${o.brand} – ${o.name}, парфюм на распив`}
                     loading="lazy"
                     className="aspect-[3/4] w-full object-cover"
                   />

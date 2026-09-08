@@ -84,7 +84,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     // Доставку считает сервер по той же формуле, что и приём заказа: иначе
     // корзина покажет одну сумму, а платёжная страница выставит другую.
     // Электронный сертификат везти некуда: если в корзине только такие,
-    // доставка не нужна и плата за неё не берётся — как и при оформлении.
+    // доставка не нужна и плата за неё не берётся – как и при оформлении.
     const shipping = needsShipping({
       hasProducts: items.length > 0,
       certificates,
@@ -98,7 +98,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       cart,
       upsellCount,
       delivery: { ...delivery, hint: freeDeliveryHint(delivery), needed: shipping },
-      // Товарная часть — без сертификатов. По ней корзина считает потолок
+      // Товарная часть – без сертификатов. По ней корзина считает потолок
       // списания баллов: сертификат за баллы купить нельзя.
       goodsNet:
         Math.round(

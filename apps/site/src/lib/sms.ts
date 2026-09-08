@@ -4,7 +4,7 @@ import { notifyTelegram } from "./telegram";
 
 /**
  * Отправка SMS с сайта: шлюз, журнал и Telegram связаны в одном месте.
- * `userId` здесь нет — с сайта отправляет не сотрудник, а сам сценарий.
+ * `userId` здесь нет – с сайта отправляет не сотрудник, а сам сценарий.
  */
 export function sendSmsFromSite(opts: {
   kind: SmsKind;

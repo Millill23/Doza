@@ -27,7 +27,7 @@ export function isValidCustomerName(input: string): boolean {
 
 /**
  * Проверить и вернуть нормализованное имя.
- * Бросает Error с понятным текстом — сообщение показывается продавцу/клиенту.
+ * Бросает Error с понятным текстом – сообщение показывается продавцу/клиенту.
  */
 export function assertCustomerName(input: string): string {
   const name = normalizeCustomerName(input);

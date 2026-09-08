@@ -97,7 +97,7 @@ export default async function DashboardPage({
   const userId = Number(session?.user?.id);
   const isAdmin = session?.user?.role === "admin";
 
-  // Месяц из адреса: без параметра — текущий. Премия считается календарным
+  // Месяц из адреса: без параметра – текущий. Премия считается календарным
   // месяцем, поэтому и смотреть её надо помесячно, а не «за 30 дней».
   const month = parseMonth(searchParams.month);
   const selected = monthKey(month);
@@ -110,7 +110,7 @@ export default async function DashboardPage({
     salesMonths(),
   ]);
 
-  // Выбранный месяц может быть старше первой продажи (адрес правят руками) —
+  // Выбранный месяц может быть старше первой продажи (адрес правят руками) –
   // тогда он всё равно должен быть в списке, иначе селект покажет чужое.
   const monthOptions = months.includes(selected) ? months : [...months, selected];
   const labels = Object.fromEntries(
@@ -215,7 +215,7 @@ export default async function DashboardPage({
                   className="flex items-center justify-between rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 text-sm"
                 >
                   <span className="text-ivory">
-                    {i.product.brand.name} — {i.product.name}
+                    {i.product.brand.name} – {i.product.name}
                     {isSoldOut(i.quantityMl) && (
                       // Продавцу важно знать не «мало», а «на сайте уже нельзя
                       // купить»: это повод заказать флакон сегодня.

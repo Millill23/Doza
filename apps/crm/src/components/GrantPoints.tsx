@@ -168,7 +168,7 @@ export default function GrantPoints() {
           )}
           {notFound && (
             <p className="mt-1.5 text-xs text-red-300">
-              Клиент не найден — операция возможна только с существующим.
+              Клиент не найден – операция возможна только с существующим.
             </p>
           )}
         </div>

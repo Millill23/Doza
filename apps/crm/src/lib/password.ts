@@ -3,8 +3,8 @@ import bcrypt from "bcryptjs";
 
 /**
  * Проверка пароля. Поддерживает два формата:
- *  - "dev$<sha256hex>" — упрощённый формат из dev-сида
- *  - bcrypt-хеш — для пользователей, созданных через CRM
+ *  - "dev$<sha256hex>" – упрощённый формат из dev-сида
+ *  - bcrypt-хеш – для пользователей, созданных через CRM
  */
 export async function verifyPassword(
   password: string,

@@ -9,7 +9,7 @@ import { PrismaClient } from "@prisma/client";
  */
 function loadEnv() {
   if (process.env.DATABASE_URL) return;
-  // @ts-ignore — доступно в Node >= 20.12
+  // @ts-ignore – доступно в Node >= 20.12
   if (typeof process.loadEnvFile !== "function") return;
 
   let dir = process.cwd();

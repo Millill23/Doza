@@ -27,7 +27,7 @@ export default function OfflineRegister({
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
-  // Клиент уже создан — ждём, пока он откроет ссылку из SMS.
+  // Клиент уже создан – ждём, пока он откроет ссылку из SMS.
   const [customerId, setCustomerId] = useState<number | null>(null);
   const [confirmed, setConfirmed] = useState(false);
 
@@ -47,7 +47,7 @@ export default function OfflineRegister({
         const s = await getConsentStatus(customerId);
         if (s.confirmed) setConfirmed(true);
       } catch {
-        // сеть моргнула — просто ждём следующей попытки
+        // сеть моргнула – просто ждём следующей попытки
       }
     }, 3000);
     return () => clearInterval(timer);
@@ -77,7 +77,7 @@ export default function OfflineRegister({
         setStep(2);
         if (r.alreadyConfirmed) setInfo("Клиент уже давал согласие ранее.");
         else if (!r.smsSent)
-          setInfo("SMS не настроены — ссылка не отправлена, отправьте повторно.");
+          setInfo("SMS не настроены – ссылка не отправлена, отправьте повторно.");
       } catch (e) {
         setErr((e as Error).message);
       }
@@ -139,7 +139,7 @@ export default function OfflineRegister({
 
           <p className="rounded-lg border border-ink-600/60 bg-ink-800 p-3 text-xs leading-relaxed text-ivory-faint">
             Клиенту придёт SMS со ссылкой на согласие с обработкой персональных
-            данных. Без него баллы не начисляются — покупать это не мешает.
+            данных. Без него баллы не начисляются – покупать это не мешает.
           </p>
 
           {err && <p className="text-sm text-red-300">{err}</p>}
@@ -162,7 +162,7 @@ export default function OfflineRegister({
               </p>
               <p className="text-xs leading-relaxed text-ivory-faint">
                 Попросите открыть ссылку из SMS и нажать «Я согласен(на)».
-                Ждать не обязательно — продажу можно оформлять уже сейчас, баллы
+                Ждать не обязательно – продажу можно оформлять уже сейчас, баллы
                 начислятся, как только он подтвердит.
               </p>
             </div>
