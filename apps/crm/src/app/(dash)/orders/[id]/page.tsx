@@ -9,6 +9,11 @@ import {
   PAYMENT_STATUS_LABEL,
 } from "@/lib/labels";
 import { orderStatusLabel, type OrderStatusValue } from "@doza/db/order-rules";
+import {
+  isPostDelivery,
+  needsPostalAddress,
+  needsOffice,
+} from "@doza/db/delivery-rules";
 import OrderActions from "@/components/OrderActions";
 import { requireRole } from "@/lib/session";
 
@@ -73,10 +78,19 @@ export default async function OrderDetailPage({
           </div>
 
           {/* Данные посылки – их заполняет покупатель при оформлении, и именно
-              они попадают на бланк отправления. */}
-          {order.deliveryType === "post" && (
+              они попадают на бланк отправления.
+
+              Что показывать, решают те же функции, что спрашивают данные на
+              сайте. Раньше здесь стояло `deliveryType === "post"` – значение
+              времён, когда почта была одна. После появления Белпочты и
+              Европочты ни один заказ под это условие не подходил, и блок
+              просто исчез: адрес лежал в базе, а продавец видел пустую
+              карточку и звонил покупателю спрашивать то, что тот уже ввёл. */}
+          {isPostDelivery(order.deliveryType) && (
             <div className="rounded-2xl border border-ink-600/60 bg-ink-700 p-6">
-              <h2 className="mb-4 font-serif text-xl text-ivory">Доставка</h2>
+              <h2 className="mb-4 font-serif text-xl text-ivory">
+                Доставка · {DELIVERY_LABEL[order.deliveryType]}
+              </h2>
               <dl className="grid grid-cols-2 gap-3 text-sm">
                 <dt className="text-ivory-faint">Получатель</dt>
                 <dd className="text-ivory">
@@ -88,14 +102,48 @@ export default async function OrderDetailPage({
                     .filter(Boolean)
                     .join(" ") || "–"}
                 </dd>
-                <dt className="text-ivory-faint">Индекс</dt>
-                <dd className="text-ivory">{order.postalCode ?? "–"}</dd>
-                <dt className="text-ivory-faint">Область</dt>
-                <dd className="text-ivory">{order.region ?? "–"}</dd>
-                <dt className="text-ivory-faint">Город</dt>
-                <dd className="text-ivory">{order.city ?? "–"}</dd>
-                <dt className="text-ivory-faint">Адрес</dt>
-                <dd className="text-ivory">{order.address ?? "–"}</dd>
+
+                {needsPostalAddress(order.deliveryType) && (
+                  <>
+                    <dt className="text-ivory-faint">Индекс</dt>
+                    <dd className="text-ivory">{order.postalCode ?? "–"}</dd>
+                    <dt className="text-ivory-faint">Область</dt>
+                    <dd className="text-ivory">{order.region ?? "–"}</dd>
+                    <dt className="text-ivory-faint">Город</dt>
+                    <dd className="text-ivory">{order.city ?? "–"}</dd>
+                    <dt className="text-ivory-faint">Адрес</dt>
+                    <dd className="text-ivory">{order.address ?? "–"}</dd>
+                  </>
+                )}
+
+                {needsOffice(order.deliveryType) && (
+                  <>
+                    {/* Телефон получателя – по нему выдают посылку в
+                        отделении, и он может отличаться от телефона клиента. */}
+                    <dt className="text-ivory-faint">Телефон получателя</dt>
+                    <dd className="text-ivory">
+                      {order.recipientPhone ? formatPhone(order.recipientPhone) : "–"}
+                    </dd>
+                    <dt className="text-ivory-faint">Отделение</dt>
+                    <dd className="text-ivory">
+                      {order.europostOfficeCode ? (
+                        <>
+                          <span className="text-gold-400">
+                            №{order.europostOfficeCode}
+                          </span>
+                          {order.europostOfficeText && (
+                            <span className="block text-ivory-muted">
+                              {order.europostOfficeText}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        "–"
+                      )}
+                    </dd>
+                  </>
+                )}
+
                 {order.deliveryService && (
                   <>
                     <dt className="text-ivory-faint">Служба</dt>

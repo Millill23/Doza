@@ -1,5 +1,11 @@
 import { prisma } from "@doza/db";
 import { formatByn } from "@doza/shared";
+import {
+  DELIVERY_TYPE_LABEL,
+  isPostDelivery,
+  needsPostalAddress,
+  needsOffice,
+} from "@doza/db/delivery-rules";
 import { notifyTelegram, tgEscape } from "./telegram";
 
 /**
@@ -29,21 +35,32 @@ export async function notifyOrder(orderId: number, note: string): Promise<void> 
     // и Telegram отклоняет сообщение целиком.
     `👤 ${tgEscape(order.customerName)}`,
     `📞 +${order.customerPhone}`,
-    `🚚 ${order.deliveryType === "pickup" ? "Самовывоз" : "Доставка почтой"}`,
-    // Адрес одной строкой – в таком виде его и переписывают на бланк.
-    order.deliveryType === "post"
-      ? `📍 ${tgEscape(
+    // Называем службу, а не «доставка почтой»: собирая посылку, продавец
+    // должен видеть, куда её нести.
+    `🚚 ${DELIVERY_TYPE_LABEL[order.deliveryType]}`,
+    // Куда едет посылка. Что именно показывать, решают те же функции, что
+    // спрашивают данные при оформлении. Раньше тут стояло `=== "post"` –
+    // значение времён, когда почта была одна, – и после появления Белпочты с
+    // Европочтой адрес пропал из уведомления совсем.
+    needsPostalAddress(order.deliveryType)
+      ? // Адрес одной строкой – в таком виде его и переписывают на бланк.
+        `📍 ${tgEscape(
           [order.postalCode, order.region, order.city, order.address]
             .filter(Boolean)
             .join(", "),
         )}`
       : "",
-    order.deliveryType === "post"
+    needsOffice(order.deliveryType) && order.europostOfficeCode
+      ? `📍 Отделение №${tgEscape(order.europostOfficeCode)}${
+          order.europostOfficeText ? `, ${tgEscape(order.europostOfficeText)}` : ""
+        }`
+      : "",
+    isPostDelivery(order.deliveryType)
       ? `📦 Получатель: ${tgEscape(
           [order.recipientLastName, order.recipientFirstName, order.recipientMiddleName]
             .filter(Boolean)
             .join(" "),
-        )}`
+        )}${order.recipientPhone ? `, +${order.recipientPhone}` : ""}`
       : "",
     ``,
     `<b>Состав:</b>`,
