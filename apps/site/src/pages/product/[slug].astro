@@ -5,6 +5,7 @@ import ProductCard from "../../components/ProductCard.astro";
 import { getProduct } from "../../lib/products";
 import { GENDER_LABELS } from "../../lib/types";
 import { productMeta, productFaq } from "../../lib/seo";
+import { contentParams } from "../../lib/pixel";
 
 const { slug } = Astro.params;
 const product = slug ? await getProduct(slug) : null;
@@ -21,6 +22,14 @@ const notes = [
 
 const meta = productMeta(product);
 const faq = productFaq(product);
+
+// Meta Pixel: просмотр карточки. Цена – минимальная из объёмов, та же, что
+// покупатель видит на витрине.
+const pixelContent = contentParams({
+  id: product.id,
+  name: `${product.brand} ${product.name}`,
+  value: product.priceFrom,
+});
 ---
 
 <Layout
@@ -30,6 +39,14 @@ const faq = productFaq(product);
   ogImage={meta.ogImage}
   jsonLd={meta.jsonLd}
 >
+  <script is:inline define:vars={{ pixelContent }}>
+    // Пиксель может не загрузиться – блокировщик, нет сети, не задана
+    // переменная. Карточка товара от этого страдать не должна.
+    if (typeof window.fbq === "function") {
+      window.fbq("track", "ViewContent", pixelContent);
+    }
+  </script>
+
   <section class="container-luxe py-10">
     <!-- Назад + хлебные крошки -->
     <div class="mb-8 flex items-center gap-4">

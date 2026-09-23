@@ -35,6 +35,7 @@ import {
   type DeliveryTypeValue,
 } from "@doza/db/delivery-rules";
 import { saveCheckout, placeOrder, type CheckoutForm } from "../lib/checkout-client";
+import { trackPixel } from "../lib/pixel";
 import {
   readGiftCart,
   removeGift,
@@ -311,6 +312,17 @@ export default function CartApp() {
       })),
       loyaltySpend: effectiveSpend,
     };
+
+    // Meta Pixel: покупатель прошёл проверку формы и идёт платить. Шлём здесь,
+    // а не по клику на кнопку: клик с незаполненным адресом – это не начало
+    // оформления, а ошибка, и считать его конверсией нельзя.
+    trackPixel("InitiateCheckout", {
+      currency: "BYN",
+      value: toPay,
+      num_items: cart.reduce((n, i) => n + i.qty, 0),
+      content_type: "product",
+      content_ids: cart.map((i) => String(i.productId)),
+    });
 
     // Есть что предложить – сначала показываем предложение. Форма уже
     // проверена, поэтому дальше покупателю останется только нажать «оплатить».

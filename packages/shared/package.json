@@ -15,6 +15,7 @@
     "./delivery": "./src/delivery.ts",
     "./geo": "./src/geo.ts",
     "./europost-address": "./src/europost-address.ts",
-    "./company": "./src/company.ts"
+    "./company": "./src/company.ts",
+    "./meta-events": "./src/meta-events.ts"
   }
 }

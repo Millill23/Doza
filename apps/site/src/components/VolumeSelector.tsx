@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ProductVolume } from "../lib/types";
+import { trackPixel, contentParams } from "../lib/pixel";
 
 interface Props {
   productId: number;
@@ -60,15 +61,26 @@ export default function VolumeSelector({
 
   function handleAdd() {
     if (!current || soldOut) return;
+    const price = finalPrice(current.priceByn);
     addToCart({
       productId,
       name: productName,
       brand,
       image,
       volumeMl: current.volumeMl,
-      priceByn: finalPrice(current.priceByn),
+      priceByn: price,
       qty: 1,
     });
+    // Цену шлём со скидкой – ту, по которой товар лёг в корзину.
+    trackPixel(
+      "AddToCart",
+      contentParams({
+        id: productId,
+        name: `${brand} ${productName}`,
+        value: price,
+        quantity: 1,
+      }),
+    );
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   }

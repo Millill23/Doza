@@ -2,6 +2,8 @@
 import Layout from "../../layouts/Layout.astro";
 import { COMPANY } from "../../lib/company";
 import { verifyAndApply } from "../../lib/payment-verify";
+import { prisma } from "@doza/db";
+import { orderEventId } from "@doza/shared/meta-events";
 
 export const prerender = false;
 
@@ -20,9 +22,61 @@ try {
 }
 
 const paid = result?.paymentStatus === "paid";
+
+/**
+ * Покупка для пикселя.
+ *
+ * Это второй экземпляр того же события: первый уходит с сервера сразу после
+ * подтверждения оплаты. Оба несут один `event_id`, и Meta склеивает их в одно.
+ * Браузерный ценен тем, что приносит cookie и параметры рекламного перехода –
+ * с ними Meta лучше сопоставляет покупку с объявлением. Но полагаться только
+ * на него нельзя: покупатель может сюда и не дойти.
+ */
+let purchase: { eventId: string; value: number; ids: string[] } | null = null;
+if (paid && result) {
+  const order = await prisma.order.findUnique({
+    where: { id: result.orderId },
+    select: {
+      totalByn: true,
+      deliveryFeeByn: true,
+      loyaltySpentByn: true,
+      items: { select: { productId: true } },
+    },
+  });
+  if (order) {
+    purchase = {
+      eventId: orderEventId(result.orderId),
+      // Та же сумма, что ушла с карты: товары плюс доставка, минус баллы.
+      value:
+        Math.round(
+          (Number(order.totalByn) +
+            Number(order.deliveryFeeByn) -
+            Number(order.loyaltySpentByn)) * 100,
+        ) / 100,
+      ids: order.items.map((i) => String(i.productId)),
+    };
+  }
+}
 ---
 
 <Layout title={paid ? "Заказ оплачен – DOZA" : "Проверяем платёж – DOZA"}>
+  {purchase && (
+    <script is:inline define:vars={{ purchase }}>
+      if (typeof window.fbq === "function") {
+        window.fbq(
+          "track",
+          "Purchase",
+          {
+            currency: "BYN",
+            value: purchase.value,
+            content_type: "product",
+            content_ids: purchase.ids,
+          },
+          { eventID: purchase.eventId },
+        );
+      }
+    </script>
+  )}
   <section class="container-luxe max-w-2xl py-16">
     {
       paid ? (

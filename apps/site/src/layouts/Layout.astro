@@ -15,6 +15,43 @@ interface Props {
 }
 
 const SITE_URL = "https://doza-parfum.by";
+
+/**
+ * Meta Pixel. Читаем из окружения на сервере, а не через `import.meta.env`:
+ * переменные с префиксом PUBLIC_ Astro вшивает в бандл на сборке, и поменять
+ * номер пикселя было бы нельзя без пересборки образа.
+ *
+ * Не задан – пиксель не вставляется вовсе. При разработке статистику незачем
+ * засорять заказами, которых не было.
+ */
+// Только цифры: номер пикселя уходит прямо в разметку, и чужой символ из
+// переменной окружения не должен превращаться в тег.
+const metaPixelId = (process.env.META_PIXEL_ID ?? "").replace(/\D/g, "");
+
+/**
+ * Стандартный загрузчик Meta. Собираем строкой и вставляем через `set:html`:
+ * фигурные скобки внутри него Astro иначе принимает за выражение шаблона и
+ * спотыкается на сборке.
+ */
+const metaPixelSnippet = metaPixelId
+  ? `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?` +
+    `n.callMethod.apply(n,arguments):n.queue.push(arguments)};` +
+    `if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';` +
+    `n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;` +
+    `s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}` +
+    `(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');` +
+    `fbq('init','${metaPixelId}');fbq('track','PageView');`
+  : "";
+
+/**
+ * Запасной вариант для посетителей с выключенным JavaScript. Собран строкой по
+ * той же причине: свёрстанный тегом, он спотыкал компилятор Astro.
+ */
+const metaPixelNoscript = metaPixelId
+  ? `<img height="1" width="1" style="display:none" alt="" ` +
+    `src="https://www.facebook.com/tr?id=${metaPixelId}&ev=PageView&noscript=1" />`
+  : "";
+
 const {
   title = "DOZA – оригинальная парфюмерия на распив",
   description = "DOZA – магазин оригинальной парфюмерии на распив. Подберите свой аромат: верхние, средние и базовые ноты, объёмы 3, 5 и 10 мл.",
@@ -57,6 +94,10 @@ const {
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
+
+    <!-- Meta Pixel. Грузится асинхронно и не задерживает отрисовку. -->
+    {metaPixelSnippet && <script is:inline set:html={metaPixelSnippet} />}
+    {metaPixelNoscript && <noscript set:html={metaPixelNoscript} />}
 
     <!-- Структурированные данные (SEO + AI-движки) -->
     {jsonLd.map((ld) => (

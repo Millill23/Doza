@@ -3,6 +3,7 @@ import { settlePaidOrder } from "@doza/db/payments";
 import { paidSmsText } from "@doza/db/order-rules";
 import { issueOrderCertificates } from "@doza/db/certificates";
 import { notifyOrder } from "./order-notify";
+import { reportPurchase } from "./meta-capi";
 import { notifyTelegram } from "./telegram";
 import { sendSmsFromSite } from "./sms";
 
@@ -56,6 +57,14 @@ export async function onOrderPaid(
     await sendPaidSms(orderId, earned);
   } catch (e) {
     console.error("[order] SMS покупателю не отправлена:", e);
+  }
+
+  // Реклама – последней: она никому ничего не должна, и её сбой не может
+  // задерживать ни склад, ни продавца, ни SMS покупателю.
+  try {
+    await reportPurchase(orderId);
+  } catch (e) {
+    console.error("[order] покупка не отправлена в Meta:", e);
   }
 
   return { earned };

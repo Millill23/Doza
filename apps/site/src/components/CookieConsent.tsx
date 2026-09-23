@@ -28,8 +28,10 @@ export default function CookieConsent() {
     <div className="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-3xl rounded-2xl border border-ink-600/70 bg-ink-800/95 p-4 shadow-gold-lg backdrop-blur-md sm:p-5">
       <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-5">
         <p className="text-sm leading-relaxed text-ivory-muted">
-          Мы используем файлы cookie для работы сайта (корзина, сессия) и аналитики.
-          Продолжая пользоваться сайтом, вы соглашаетесь с их использованием и с{" "}
+          Мы используем файлы cookie для работы сайта (корзина, сессия), аналитики
+          и оценки эффективности рекламы – для последнего данные о посещении
+          передаются сервису Meta. Продолжая пользоваться сайтом, вы соглашаетесь
+          с этим и с{" "}
           <a href="/privacy" className="text-gold-400 underline-offset-2 hover:underline">
             Политикой обработки персональных данных
           </a>
