@@ -91,7 +91,16 @@ export default async function OrdersPage({
                     <div className="text-ivory">{o.customerName}</div>
                     <div className="text-xs text-ivory-faint">{formatPhone(o.customerPhone)}</div>
                   </td>
-                  <td className="px-4 py-3 text-ivory-muted">{DELIVERY_LABEL[o.deliveryType]}</td>
+                  <td className="px-4 py-3 text-ivory-muted">
+                    {DELIVERY_LABEL[o.deliveryType]}
+                    {/* Срочные заказы должны быть видны прямо в списке, без
+                        захода в карточку: их собирают вне очереди. */}
+                    {o.isExpress && (
+                      <span className="ml-2 rounded-full border border-gold-500/60 px-2 py-0.5 text-[11px] text-gold-300">
+                        🚀 экспресс
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-ivory-muted">{o.items.length}</td>
                   <td className="px-4 py-3 text-gold-400">{formatByn(Number(o.totalByn))}</td>
                   <td className="px-4 py-3">

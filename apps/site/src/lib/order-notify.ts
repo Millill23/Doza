@@ -25,10 +25,19 @@ export async function notifyOrder(orderId: number, note: string): Promise<void> 
   });
   if (!order) return;
 
+  // Доставка входит в списанное: именно столько ушло с карты. Раньше её тут не
+  // было, и уведомление называло сумму меньше настоящей.
+  const deliveryFee = Number(order.deliveryFeeByn);
   const toPay =
-    Math.round((Number(order.totalByn) - Number(order.loyaltySpentByn)) * 100) / 100;
+    Math.round(
+      (Number(order.totalByn) + deliveryFee - Number(order.loyaltySpentByn)) * 100,
+    ) / 100;
 
   const lines = [
+    // Экспресс – первое, что должен увидеть продавец: такую посылку несут на
+    // почту сегодня, а не в общей партии. Поэтому строка идёт выше номера
+    // заказа и кричит капсом: в ленте уведомлений её нельзя пролистать.
+    order.isExpress ? `🚀🚀🚀🚀 <b>ЭКСПРЕСС ЗАКАЗ</b> 🚀🚀🚀🚀` : "",
     `✅ <b>Оплачен заказ #${order.id}</b>`,
     ``,
     // Всё, что ввёл покупатель, экранируем: символ «<» ломает parse_mode=HTML
@@ -37,7 +46,9 @@ export async function notifyOrder(orderId: number, note: string): Promise<void> 
     `📞 +${order.customerPhone}`,
     // Называем службу, а не «доставка почтой»: собирая посылку, продавец
     // должен видеть, куда её нести.
-    `🚚 ${DELIVERY_TYPE_LABEL[order.deliveryType]}`,
+    `🚚 ${DELIVERY_TYPE_LABEL[order.deliveryType]}${
+      order.isExpress ? " · ЭКСПРЕСС EMS" : ""
+    }`,
     // Куда едет посылка. Что именно показывать, решают те же функции, что
     // спрашивают данные при оформлении. Раньше тут стояло `=== "post"` –
     // значение времён, когда почта была одна, – и после появления Белпочты с
@@ -70,6 +81,9 @@ export async function notifyOrder(orderId: number, note: string): Promise<void> 
     ),
     ``,
     `Сумма: <b>${formatByn(Number(order.totalByn))}</b>`,
+    deliveryFee > 0
+      ? `${order.isExpress ? "Экспресс EMS" : "Доставка"}: ${formatByn(deliveryFee)}`
+      : "",
     Number(order.loyaltySpentByn) > 0
       ? `Списано баллов: ${formatByn(Number(order.loyaltySpentByn))}`
       : "",

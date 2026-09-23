@@ -648,6 +648,10 @@ model Order {
   /// Телефон получателя. Для Европочты обязателен – по нему выдают посылку.
   recipientPhone  String?      @map("recipient_phone")
 
+  /// Экспресс-доставка EMS. Только для Белпочты: плата фиксированная и
+  /// заменяет обычную, а не добавляется к ней.
+  isExpress       Boolean      @default(false) @map("is_express")
+
   comment         String?
   /// Сумма товаров со скидками, без доставки.
   totalByn        Decimal     @map("total_byn") @db.Decimal(10, 2)

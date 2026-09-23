@@ -26,6 +26,7 @@ import {
   deliveryCost,
   needsPostalAddress,
   needsOffice,
+  canExpress,
   type DeliveryTypeValue,
 } from "@doza/db/delivery-rules";
 
@@ -60,6 +61,8 @@ interface OrderBody {
     officeCode?: string;
   };
   comment?: string;
+  /** Экспресс EMS. Учитывается только для Белпочты – см. `canExpress`. */
+  express?: boolean;
   /** Промокод, введённый покупателем. Регистр и пробелы не важны. */
   promoCode?: string;
   /** Подарочные сертификаты в корзине. */
@@ -211,9 +214,14 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
   // Доставка. Порог считается по сумме товаров до списания баллов: баллы –
   // способ оплаты, а не уменьшение заказа.
+  // Экспресс: галочку из браузера пропускаем через то же правило, что и
+  // расчёт корзины. Иначе заказ, отправленный мимо формы, уехал бы срочным
+  // Европочтой – услуги, которой нет, – или срочным самовывозом.
+  const express = body.express === true && shipping && canExpress(deliveryType);
+
   const delivery = shipping
-    ? deliveryCost({ type: deliveryType, goodsTotal: total })
-    : { fee: 0, missingForFree: 0, free: true };
+    ? deliveryCost({ type: deliveryType, goodsTotal: total, express })
+    : { fee: 0, missingForFree: 0, free: true, express: false };
 
   // Клиент (upsert по телефону)
   const existing = await prisma.customer.findUnique({
@@ -293,6 +301,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
           }
         : {}),
       comment: (body.comment ?? "").trim() || null,
+      isExpress: delivery.express,
       promoCodeId: promo?.id ?? null,
       totalByn: total,
       deliveryFeeByn: delivery.fee,

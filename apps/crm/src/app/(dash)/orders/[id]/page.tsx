@@ -36,7 +36,14 @@ export default async function OrderDetailPage({
   });
   if (!order) notFound();
 
-  const toPay = Number(order.totalByn) - Number(order.loyaltySpentByn);
+  // Доставка входит в списанное: именно эту сумму покупатель платит на
+  // странице банка. Без неё карточка показывала бы меньше, чем ушло с карты, –
+  // с экспрессом за пятнадцать рублей расхождение стало бы заметным.
+  const deliveryFee = Number(order.deliveryFeeByn);
+  const toPay =
+    Math.round(
+      (Number(order.totalByn) + deliveryFee - Number(order.loyaltySpentByn)) * 100,
+    ) / 100;
   const paid = order.paymentStatus === "paid";
 
   return (
@@ -50,6 +57,13 @@ export default async function OrderDetailPage({
         <span className={`rounded-full border px-3 py-1 text-xs ${ORDER_STATUS_STYLE[order.status]}`}>
           {orderStatusLabel(order.status, order.deliveryType)}
         </span>
+        {/* Экспресс – рядом со статусом, а не внутри блока доставки: такую
+            посылку несут на почту сегодня, и узнать об этом надо сразу. */}
+        {order.isExpress && (
+          <span className="rounded-full border border-gold-500 bg-gold-500/15 px-3 py-1 text-xs font-semibold text-gold-300">
+            🚀 Экспресс EMS
+          </span>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
@@ -92,6 +106,12 @@ export default async function OrderDetailPage({
                 Доставка · {DELIVERY_LABEL[order.deliveryType]}
               </h2>
               <dl className="grid grid-cols-2 gap-3 text-sm">
+                {order.isExpress && (
+                  <>
+                    <dt className="text-ivory-faint">Тариф</dt>
+                    <dd className="font-medium text-gold-300">Экспресс EMS</dd>
+                  </>
+                )}
                 <dt className="text-ivory-faint">Получатель</dt>
                 <dd className="text-ivory">
                   {[
@@ -180,6 +200,12 @@ export default async function OrderDetailPage({
                 <span>Сумма</span>
                 <span>{formatByn(Number(order.totalByn))}</span>
               </div>
+              {deliveryFee > 0 && (
+                <div className="flex justify-between text-ivory-muted">
+                  <span>{order.isExpress ? "Экспресс EMS" : "Доставка"}</span>
+                  <span>{formatByn(deliveryFee)}</span>
+                </div>
+              )}
               {Number(order.loyaltySpentByn) > 0 && (
                 <div className="flex justify-between text-botanical-300">
                   <span>Списано баллов</span>

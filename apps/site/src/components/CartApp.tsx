@@ -30,6 +30,8 @@ import {
   DELIVERY_TYPE_LABEL,
   needsPostalAddress,
   needsOffice,
+  canExpress,
+  EXPRESS_FEE,
   type DeliveryTypeValue,
 } from "@doza/db/delivery-rules";
 import { saveCheckout, placeOrder, type CheckoutForm } from "../lib/checkout-client";
@@ -48,6 +50,8 @@ interface DeliveryInfo {
   missingForFree: number;
   free: boolean;
   hint: string | null;
+  /** Заказ едет экспрессом EMS. */
+  express?: boolean;
   /** Есть ли что везти. false – в заказе только электронные сертификаты. */
   needed?: boolean;
 }
@@ -99,6 +103,10 @@ export default function CartApp() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [delivery, setDelivery] = useState<DeliveryTypeValue>("pickup");
+  // Экспресс EMS. Возит только Белпочта, поэтому при смене способа галочка
+  // снимается сама – иначе она осталась бы взведённой невидимо для покупателя
+  // и сервер молча её проигнорировал.
+  const [express, setExpress] = useState(false);
   const [comment, setComment] = useState("");
 
   // Данные посылки – только для доставки почтой.
@@ -169,6 +177,7 @@ export default function CartApp() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             deliveryType: delivery,
+            express,
             promoCode,
             certificates: gifts.map((g) => ({
               denomination: g.denomination,
@@ -202,7 +211,7 @@ export default function CartApp() {
     return () => {
       cancelled = true;
     };
-  }, [cart, gifts, mounted, delivery, promoCodeDebounced]);
+  }, [cart, gifts, mounted, delivery, express, promoCodeDebounced]);
 
   useEffect(() => {
     const t = setTimeout(() => setPromoCodeDebounced(promoCode.trim()), 500);
@@ -291,6 +300,7 @@ export default function CartApp() {
           }
         : undefined,
       comment,
+      express: express && canExpress(delivery),
       promoCode,
       certificates: gifts.map((g) => ({
         denomination: g.denomination,
@@ -546,7 +556,12 @@ export default function CartApp() {
             {DELIVERY_CHOICES.map((v) => (
               <button
                 key={v} type="button"
-                onClick={() => setDelivery(v)}
+                onClick={() => {
+                  setDelivery(v);
+                  // Экспресс возит только Белпочта. Перешёл на другой способ –
+                  // галочка не должна остаться взведённой втихую.
+                  if (!canExpress(v)) setExpress(false);
+                }}
                 className={`min-h-[44px] cursor-pointer rounded-lg border px-1 text-sm transition-colors ${
                   delivery === v
                     ? "border-gold-500 bg-gold-500/10 text-gold-300"
@@ -557,8 +572,31 @@ export default function CartApp() {
               </button>
             ))}
           </div>
+          {/* Экспресс EMS – услуга Белпочты, у остальных способов её нет. */}
+          {canExpress(delivery) && (
+            <label className="mt-2 flex cursor-pointer items-start gap-2.5 rounded-lg border border-ink-600 bg-ink-800/40 p-3 transition-colors hover:border-gold-600/50">
+              <input
+                type="checkbox"
+                checked={express}
+                onChange={(e) => setExpress(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-gold-500"
+              />
+              <span className="text-sm leading-relaxed text-ivory-muted">
+                <span className="text-ivory">Экспресс-доставка EMS</span>
+                <span className="ml-2 text-gold-400">
+                  {formatByn(EXPRESS_FEE)}
+                </span>
+                <span className="mt-0.5 block text-xs text-ivory-faint">
+                  Срочная отправка. Цена фиксированная и заменяет обычную
+                  доставку – порог бесплатной на неё не действует.
+                </span>
+              </span>
+            </label>
+          )}
+
           {/* Подсказку показываем только когда до бесплатной реально близко –
-              иначе это не помощь, а уговор купить лишнего. */}
+              иначе это не помощь, а уговор купить лишнего. Сервер молчит о ней
+              при экспрессе: добирать до бесплатной там нечего. */}
           {deliveryInfo?.hint && (
             <p className="mt-2 rounded-lg border border-gold-600/30 bg-gold-500/5 p-2.5 text-xs leading-relaxed text-gold-400">
               {deliveryInfo.hint}
@@ -736,7 +774,7 @@ export default function CartApp() {
           )}
           {deliveryInfo && deliveryInfo.fee > 0 && (
             <div className="flex justify-between text-ivory-muted">
-              <span>Доставка</span>
+              <span>{deliveryInfo.express ? "Экспресс EMS" : "Доставка"}</span>
               <span>{formatByn(deliveryInfo.fee)}</span>
             </div>
           )}

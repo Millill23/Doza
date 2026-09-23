@@ -7,6 +7,8 @@ import assert from "node:assert/strict";
 import {
   DELIVERY_FEE,
   FREE_DELIVERY_FROM,
+  EXPRESS_FEE,
+  canExpress,
   deliveryCost,
   freeDeliveryHint,
   isPostDelivery,
@@ -90,4 +92,61 @@ test("старые заказы «почтой» считаются адресн
   // Значение осталось в базе от времён, когда почта была одна.
   assert.equal(needsPostalAddress("post"), true);
   assert.equal(isPostDelivery("post"), true);
+});
+
+// ── Экспресс EMS ────────────────────────────────────────────────────────────
+
+test("экспресс возит только Белпочта", () => {
+  // EMS – услуга Белпочты. У Европочты своя сеть, у самовывоза нет посылки.
+  assert.equal(canExpress("belpochta"), true);
+  assert.equal(canExpress("europost"), false);
+  assert.equal(canExpress("pickup"), false);
+});
+
+test("экспресс заменяет обычную доставку, а не добавляется к ней", () => {
+  const c = deliveryCost({ type: "belpochta", goodsTotal: 55, express: true });
+  assert.equal(c.fee, EXPRESS_FEE, "платят цену экспресса, а не 15 + 10");
+  assert.equal(c.express, true);
+  assert.equal(c.free, false);
+});
+
+test("порог бесплатной доставки на экспресс не распространяется", () => {
+  // Иначе заказ на 150 рублей уехал бы срочным за ноль: бесплатной срочной
+  // отправки не бывает.
+  const c = deliveryCost({
+    type: "belpochta",
+    goodsTotal: FREE_DELIVERY_FROM + 50,
+    express: true,
+  });
+  assert.equal(c.fee, EXPRESS_FEE);
+  assert.equal(c.free, false);
+});
+
+test("экспресс не молчит про подсказку, а снимает её", () => {
+  const c = deliveryCost({ type: "belpochta", goodsTotal: 10, express: true });
+  assert.equal(c.missingForFree, 0);
+  assert.equal(freeDeliveryHint(c), null, "добирать до бесплатной незачем");
+});
+
+test("галочка экспресса у Европочты не действует", () => {
+  // Форма прячет её, но запрос в браузере правят руками: считаем как обычную.
+  const c = deliveryCost({ type: "europost", goodsTotal: 55, express: true });
+  assert.equal(c.fee, DELIVERY_FEE);
+  assert.equal(c.express, false);
+});
+
+test("галочка экспресса при самовывозе ничего не стоит", () => {
+  const c = deliveryCost({ type: "pickup", goodsTotal: 55, express: true });
+  assert.equal(c.fee, 0);
+  assert.equal(c.express, false);
+});
+
+test("без галочки Белпочта считается по-старому", () => {
+  const cheap = deliveryCost({ type: "belpochta", goodsTotal: 55 });
+  assert.equal(cheap.fee, DELIVERY_FEE);
+  assert.equal(cheap.express, false);
+
+  const free = deliveryCost({ type: "belpochta", goodsTotal: FREE_DELIVERY_FROM });
+  assert.equal(free.fee, 0);
+  assert.equal(free.express, false);
 });

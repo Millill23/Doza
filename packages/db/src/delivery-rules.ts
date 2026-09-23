@@ -29,6 +29,19 @@ export const DELIVERY_FEE = 10;
 /** Сумма заказа, начиная с которой доставка бесплатна. */
 export const FREE_DELIVERY_FROM = 100;
 
+/** Экспресс-доставка EMS: срочная отправка Белпочтой. */
+export const EXPRESS_FEE = 15;
+
+/**
+ * Можно ли заказать экспресс этим способом.
+ *
+ * EMS – услуга Белпочты. У Европочты своя сеть отделений и своя скорость, а
+ * самовывоз срочным не бывает: посылки нет вовсе.
+ */
+export function canExpress(type: DeliveryTypeValue): boolean {
+  return type === "belpochta";
+}
+
 export function isPostDelivery(type: DeliveryTypeValue): boolean {
   return type !== "pickup";
 }
@@ -40,6 +53,8 @@ export interface DeliveryCost {
   missingForFree: number;
   /** Доставка бесплатна: самовывоз или сумма перевалила порог. */
   free: boolean;
+  /** Заказ едет экспрессом EMS. */
+  express: boolean;
 }
 
 /**
@@ -53,20 +68,30 @@ export function deliveryCost(opts: {
   type: DeliveryTypeValue;
   /** Сумма товаров после скидок, без баллов и без самой доставки. */
   goodsTotal: number;
+  /** Покупатель выбрал экспресс EMS. */
+  express?: boolean;
 }): DeliveryCost {
   if (!isPostDelivery(opts.type)) {
-    return { fee: 0, missingForFree: 0, free: true };
+    return { fee: 0, missingForFree: 0, free: true, express: false };
+  }
+
+  // Экспресс – отдельная услуга, а не надбавка к обычной доставке: платят
+  // ровно её цену. Порог бесплатной сюда не достаёт – бесплатной срочной
+  // отправки не бывает, и складывать пятнадцать рублей с десятью тоже нельзя.
+  if (opts.express && canExpress(opts.type)) {
+    return { fee: EXPRESS_FEE, missingForFree: 0, free: false, express: true };
   }
 
   const goods = Math.max(0, opts.goodsTotal);
   if (goods >= FREE_DELIVERY_FROM) {
-    return { fee: 0, missingForFree: 0, free: true };
+    return { fee: 0, missingForFree: 0, free: true, express: false };
   }
 
   return {
     fee: DELIVERY_FEE,
     missingForFree: Math.round((FREE_DELIVERY_FROM - goods) * 100) / 100,
     free: false,
+    express: false,
   };
 }
 
@@ -77,6 +102,9 @@ export function deliveryCost(opts: {
  * при уже бесплатной – напоминание превратилось бы в уговор купить лишнего.
  */
 export function freeDeliveryHint(cost: DeliveryCost): string | null {
+  // Экспресс платный при любой сумме – уговаривать добрать до бесплатной
+  // значит обещать то, чего не будет.
+  if (cost.express) return null;
   if (cost.free || cost.missingForFree <= 0) return null;
   return `Закажите ещё на ${cost.missingForFree.toFixed(2)} BYN – и доставка будет бесплатной`;
 }

@@ -32,6 +32,8 @@ export interface CheckoutForm {
     officeCode: string;
   };
   comment: string;
+  /** Экспресс EMS. Только для Белпочты. */
+  express?: boolean;
   /** Промокод, введённый покупателем. Пустая строка – код не вводили. */
   promoCode?: string;
   /** Подарочные сертификаты в заказе. */
@@ -95,6 +97,7 @@ export async function placeOrder(
         delivery: form.delivery,
         europost: form.europost,
         comment: form.comment,
+        express: form.express === true,
         promoCode: form.promoCode,
         certificates: form.certificates ?? [],
         loyaltySpend: form.loyaltySpend,

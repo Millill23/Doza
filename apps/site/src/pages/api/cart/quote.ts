@@ -35,6 +35,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   const deliveryType: DeliveryTypeValue = DELIVERY_CHOICES.includes(body.deliveryType)
     ? body.deliveryType
     : "pickup";
+  // Право на экспресс решает `deliveryCost`: галочка из браузера – это
+  // просьба, а не разрешение.
+  const express = body.express === true;
 
   const customerId = await currentCustomerId(cookies);
   const vipPercent = await vipPercentFor(customerId);
@@ -90,8 +93,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       certificates,
     });
     const delivery = shipping
-      ? deliveryCost({ type: deliveryType, goodsTotal: cart.net })
-      : { fee: 0, missingForFree: 0, free: true };
+      ? deliveryCost({ type: deliveryType, goodsTotal: cart.net, express })
+      : { fee: 0, missingForFree: 0, free: true, express: false };
     return json({
       ok: true,
       session,
