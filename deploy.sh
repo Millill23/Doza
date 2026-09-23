@@ -24,6 +24,16 @@ $C build migrate
 echo "==> применение миграций (migrate deploy, БЕЗ seed)"
 $C run --rm migrate sh -c "npx prisma migrate deploy"
 
+# nginx резолвит имена контейнеров через переменную (см. nginx/nginx.conf),
+# поэтому новый адрес сайта он подхватывает сам. Конфиг всё же перечитываем:
+# он монтируется файлом и мог поменяться вместе с кодом.
+echo "==> перечитать конфиг nginx"
+if $C exec -T nginx nginx -t 2>/dev/null; then
+  $C exec -T nginx nginx -s reload || echo "   не перечитан – проверьте вручную"
+else
+  echo "   nginx не отвечает или конфиг с ошибкой – проверьте вручную"
+fi
+
 echo "==> статус"
 $C ps
 echo -n "site/catalog -> "; curl -s -o /dev/null -w "%{http_code}\n" --max-time 15 http://127.0.0.1:4321/catalog || true
