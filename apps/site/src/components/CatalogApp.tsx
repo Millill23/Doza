@@ -94,7 +94,7 @@ export default function CatalogApp({
     if (onlyBoosted) params.set("boosted", "1");
     if (onlyWeekly) params.set("week", "1");
     const qs = params.toString();
-    const newUrl = qs ? `/catalog?${qs}` : "/catalog";
+    const newUrl = qs ? `/?${qs}` : "/";
     window.history.replaceState(null, "", newUrl);
   }, [query, gender, selectedBrands, onlyBoosted, onlyWeekly]);
 

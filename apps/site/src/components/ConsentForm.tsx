@@ -37,7 +37,7 @@ export default function ConsentForm({ token }: { token: string }) {
           Согласие получено – теперь мы начисляем вам баллы за покупки.
         </p>
         <a
-          href="/catalog"
+          href="/"
           className="mt-6 inline-flex h-11 items-center justify-center rounded-full bg-gold-gradient px-8 text-sm font-medium text-ink-900"
         >
           В каталог

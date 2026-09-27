@@ -10,11 +10,11 @@ import { getCustomerId } from "../lib/customer-auth";
  */
 
 const links = [
-  { href: "/catalog", label: "Каталог" },
+  { href: "/", label: "Каталог" },
   { href: "/finder", label: "Подобрать аромат" },
-  { href: "/catalog?gender=male", label: "Мужские" },
-  { href: "/catalog?gender=female", label: "Женские" },
-  { href: "/catalog?gender=unisex", label: "Унисекс" },
+  { href: "/?gender=male", label: "Мужские" },
+  { href: "/?gender=female", label: "Женские" },
+  { href: "/?gender=unisex", label: "Унисекс" },
   { href: "/about", label: "О нас" },
 ];
 
@@ -80,6 +80,23 @@ if (customerId) {
 
     <!-- Действия -->
     <div class="flex items-center gap-3 sm:gap-4">
+      <!-- Поиск. Отдельной кнопкой в шапке, потому что поле в каталоге ниже
+           покупатели просто не замечали и спрашивали, есть ли у нас поиск.
+           То, что в каталоге, остаётся на месте: привыкшим к нему ничего не
+           меняем. -->
+      <button
+        type="button"
+        id="search-toggle"
+        aria-label="Поиск по каталогу"
+        aria-expanded="false"
+        aria-controls="search-bar"
+        class="inline-flex h-10 w-10 items-center justify-center rounded-full text-ivory-muted transition-colors duration-200 hover:text-gold-400"
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-3.5-3.5"></path>
+        </svg>
+      </button>
       {
         customerName ? (
           <a
@@ -138,6 +155,45 @@ if (customerId) {
     </div>
   </nav>
 
+  <!-- Строка поиска. Скрыта, пока не нажали лупу: в свёрнутом виде шапка
+       остаётся короткой, а на телефоне это половина первого экрана. -->
+  <div id="search-bar" hidden class="border-t border-ink-600/60 bg-ink-900/95">
+    <form
+      id="search-form"
+      action="/"
+      method="get"
+      class="container-luxe flex items-center gap-3 py-3"
+      role="search"
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 text-gold-500" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"></circle>
+        <path d="m20 20-3.5-3.5"></path>
+      </svg>
+      <input
+        id="search-input"
+        type="search"
+        name="q"
+        autocomplete="off"
+        placeholder="Бренд или название аромата"
+        class="h-10 w-full bg-transparent text-base text-ivory placeholder:text-ivory-faint focus:outline-none"
+      />
+      <button
+        type="submit"
+        class="h-10 shrink-0 rounded-full bg-gold-gradient px-5 text-sm font-medium text-ink-900"
+      >
+        Найти
+      </button>
+      <button
+        type="button"
+        id="search-close"
+        aria-label="Закрыть поиск"
+        class="h-10 w-10 shrink-0 text-ivory-faint transition-colors hover:text-gold-400"
+      >
+        ✕
+      </button>
+    </form>
+  </div>
+
 </header>
 
 <script is:inline>
@@ -171,6 +227,56 @@ if (customerId) {
       } else {
         badge.classList.add("hidden");
       }
+    }
+
+    // ── Поиск в шапке ──────────────────────────────────────────────────────
+    var bar = document.getElementById("search-bar");
+    var toggle = document.getElementById("search-toggle");
+    var input = document.getElementById("search-input");
+    var form = document.getElementById("search-form");
+
+    function openSearch() {
+      if (!bar) return;
+      bar.hidden = false;
+      toggle.setAttribute("aria-expanded", "true");
+      // Подставляем текущий запрос: поиск, открытый поверх результатов,
+      // должен показывать то, что уже искали, а не пустое поле.
+      try {
+        var q = new URLSearchParams(window.location.search).get("q");
+        if (q && !input.value) input.value = q;
+      } catch (e) {}
+      input.focus();
+      input.select();
+    }
+
+    function closeSearch() {
+      if (!bar) return;
+      bar.hidden = true;
+      toggle.setAttribute("aria-expanded", "false");
+    }
+
+    if (toggle) {
+      toggle.addEventListener("click", function () {
+        if (bar.hidden) openSearch();
+        else closeSearch();
+      });
+    }
+    var closeBtn = document.getElementById("search-close");
+    if (closeBtn) closeBtn.addEventListener("click", closeSearch);
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && bar && !bar.hidden) closeSearch();
+    });
+
+    // Пустой запрос ведёт в каталог целиком – это честнее, чем страница
+    // «ничего не найдено» на пустую строку.
+    if (form) {
+      form.addEventListener("submit", function (e) {
+        if (!input.value.trim()) {
+          e.preventDefault();
+          window.location.href = "/";
+        }
+      });
     }
 
     update();

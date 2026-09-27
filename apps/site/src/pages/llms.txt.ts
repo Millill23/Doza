@@ -39,7 +39,7 @@ export const GET: APIRoute = async () => {
   }
   lines.push("");
   lines.push("## Ссылки");
-  lines.push(`- Каталог: ${SITE_URL}/catalog`);
+  lines.push(`- Каталог: ${SITE_URL}/`);
   lines.push(`- Подбор аромата: ${SITE_URL}/finder`);
   lines.push(`- Доставка и оплата: ${SITE_URL}/delivery`);
   lines.push(`- Программа лояльности: ${SITE_URL}/loyalty`);

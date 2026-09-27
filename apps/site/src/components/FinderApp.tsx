@@ -89,7 +89,7 @@ export default function FinderApp({ products }: Props) {
         {results.length === 0 ? (
           <div className="rounded-xl border border-ink-600/60 bg-ink-700 p-10 text-center text-ivory-muted">
             Не нашли точного совпадения.{" "}
-            <a href="/catalog" className="text-gold-400 hover:text-gold-300">
+            <a href="/" className="text-gold-400 hover:text-gold-300">
               Посмотрите весь каталог
             </a>
             .
@@ -131,7 +131,7 @@ export default function FinderApp({ products }: Props) {
 
         <div className="mt-8 text-center">
           <a
-            href="/catalog"
+            href="/"
             className="inline-flex h-11 items-center rounded-full border border-gold-500/70 px-6 text-sm text-gold-400 transition-colors hover:bg-gold-500/10"
           >
             Смотреть весь каталог

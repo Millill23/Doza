@@ -1,64 +1,12 @@
 ---
-import Layout from "../layouts/Layout.astro";
-import CatalogApp from "../components/CatalogApp.tsx";
-import { getProducts, getBrands } from "../lib/products";
-import { activeWeeklyPromo } from "@doza/db/weekly-promo";
-import { catalogItemListLd } from "../lib/seo";
-import type { Gender } from "../lib/types";
-
-const url = new URL(Astro.request.url);
-const genderParam = (url.searchParams.get("gender") ?? "") as Gender | "";
-const queryParam = url.searchParams.get("q") ?? "";
-const boostedParam = url.searchParams.get("boosted") === "1";
-const weekParam = url.searchParams.get("week") === "1";
-const brandsParam = (url.searchParams.get("brands") ?? "")
-  .split(",")
-  .map((b) => decodeURIComponent(b.trim()))
-  .filter(Boolean);
-
-const [products, brands, weeklyPromo] = await Promise.all([
-  getProducts(),
-  getBrands(),
-  activeWeeklyPromo(),
-]);
-
-// Подборку показываем, только если в ней остались живые товары: пустая
-// вывеска ведёт покупателя на пустой каталог.
-const weekly =
-  weeklyPromo && weeklyPromo.productIds.length > 0
-    ? {
-        name: weeklyPromo.name,
-        percent: weeklyPromo.discountPercent,
-        productIds: weeklyPromo.productIds,
-      }
-    : null;
+/**
+ * Старый адрес каталога.
+ *
+ * Каталог переехал на главную: лишний клик между покупателем и товаром убрали.
+ * Здесь остаётся переадресация – на `/catalog` ведут ссылки из поиска, из
+ * переписок и из чужих постов, и ломать их нельзя. Строка запроса едет с
+ * собой, иначе `/catalog?gender=male` терял бы фильтр.
+ */
+const { search } = new URL(Astro.request.url);
+return Astro.redirect("/" + search, 301);
 ---
-
-<Layout
-  title="Каталог парфюмерии на распив – DOZA"
-  description="Каталог оригинальной парфюмерии на распив: мужские, женские и унисекс ароматы известных брендов. Объёмы 3, 5 и 10 мл, цены в BYN, оплата картой онлайн."
-  jsonLd={[catalogItemListLd(products)]}
->
-  <section class="container-luxe py-12">
-    <header class="mb-10 text-center">
-      <p class="mb-3 text-xs font-light uppercase tracking-[0.25em] text-gold-500">
-        Коллекция ароматов
-      </p>
-      <h1 class="font-serif text-4xl font-semibold text-gold-gradient sm:text-5xl">
-        Каталог
-      </h1>
-    </header>
-
-    <CatalogApp
-      client:load
-      products={products}
-      brands={brands}
-      initialGender={genderParam}
-      initialQuery={queryParam}
-      initialBrands={brandsParam}
-      initialBoosted={boostedParam}
-      weekly={weekly}
-      initialWeekly={weekParam}
-    />
-  </section>
-</Layout>

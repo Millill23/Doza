@@ -374,7 +374,7 @@ export default function CartApp() {
           подтверждения.
         </p>
         <a
-          href="/catalog"
+          href="/"
           className="inline-flex h-11 items-center justify-center rounded-full border border-gold-500/70 px-6 text-sm text-gold-400 transition-colors hover:bg-gold-500/10"
         >
           Продолжить покупки
@@ -389,7 +389,7 @@ export default function CartApp() {
       <div className="mx-auto max-w-md rounded-2xl border border-ink-600/60 bg-ink-700 p-10 text-center">
         <p className="mb-6 text-ivory-muted">Ваша корзина пуста.</p>
         <a
-          href="/catalog"
+          href="/"
           className="inline-flex h-11 items-center justify-center rounded-full bg-gold-gradient px-6 text-sm font-medium text-ink-900 shadow-gold transition-all hover:shadow-gold-lg"
         >
           Перейти в каталог

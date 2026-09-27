@@ -135,7 +135,7 @@ export function productMeta(p: ProductDetail): SeoMeta {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Каталог", item: `${SITE_URL}/catalog` },
+      { "@type": "ListItem", position: 1, name: "Каталог", item: `${SITE_URL}/` },
       { "@type": "ListItem", position: 2, name: `${p.brand} ${p.name}`, item: url },
     ],
   };

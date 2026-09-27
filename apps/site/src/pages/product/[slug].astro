@@ -11,7 +11,7 @@ const { slug } = Astro.params;
 const product = slug ? await getProduct(slug) : null;
 
 if (!product) {
-  return Astro.redirect("/catalog");
+  return Astro.redirect("/");
 }
 
 const notes = [
@@ -61,7 +61,7 @@ const pixelContent = contentParams({
         Назад
       </button>
       <nav class="text-sm font-light text-ivory-faint">
-        <a href="/catalog" class="transition-colors hover:text-gold-400">Каталог</a>
+        <a href="/" class="transition-colors hover:text-gold-400">Каталог</a>
         <span class="mx-2">/</span>
         <span class="text-ivory-muted">{product.brand}</span>
       </nav>
@@ -78,7 +78,7 @@ const pixelContent = contentParams({
           if (window.history.length > 1 && ref && ref.indexOf(window.location.origin) === 0) {
             window.history.back();
           } else {
-            window.location.href = "/catalog";
+            window.location.href = "/";
           }
         });
       })();

@@ -5,8 +5,8 @@ import { SITE_URL } from "../lib/seo";
 export const prerender = false;
 
 const STATIC = [
+  // Главная и есть каталог, отдельной страницы каталога больше нет.
   "/",
-  "/catalog",
   "/finder",
   "/about",
   "/delivery",
