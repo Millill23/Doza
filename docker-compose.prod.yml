@@ -1,4 +1,4 @@
-# Production-оверрайд для деплоя за Plesk (или любым внешним reverse-proxy).
+# Production-оверрайд для деплоя.
 #
 # Запуск:
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
@@ -6,8 +6,7 @@
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile tools run --rm migrate
 #
 # Отличия от базового docker-compose.yml:
-#  - site/crm слушают ТОЛЬКО на 127.0.0.1 – наружу их публикует Plesk (nginx + SSL);
-#  - nginx-контейнер выключен (его роль выполняет nginx самого Plesk);
+#  - site/crm слушают ТОЛЬКО на 127.0.0.1 – наружу их публикует nginx;
 #  - добавлен одноразовый сервис migrate (prisma migrate deploy + seed).
 
 services:
@@ -18,11 +17,17 @@ services:
   crm:
     ports:
       - "127.0.0.1:3000:3000"
+    environment:
+      # Какой коммит собран в этот образ. Проставляет deploy.sh, отдаёт
+      # /api/admin/health. Без этого «что реально задеплоено» приходится
+      # выяснять по косвенным признакам – однажды это стоило полдня.
+      GIT_COMMIT: ${GIT_COMMIT:-}
 
-  # nginx-контейнер не нужен – фронтит Plesk. Прячем в неактивный профиль.
-  nginx:
-    profiles:
-      - disabled
+  # nginx раньше сидел в профиле `disabled` – предполагалось, что наружу
+  # смотрит Plesk. Плеска нет, сайт обслуживает этот самый контейнер, и
+  # выключённым профилем он выпадал из-под управления deploy.sh: конфиг
+  # менялся в репозитории, а контейнер жил со старым, пока его не пнут руками.
+  nginx: {}
 
   migrate:
     build:

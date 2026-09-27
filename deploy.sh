@@ -15,6 +15,10 @@ C="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
 echo "==> git pull"
 git pull --ff-only
 
+# Коммит уезжает в окружение crm – его отдаёт /api/admin/health.
+export GIT_COMMIT="$(git rev-parse --short HEAD)"
+echo "==> деплоим коммит $GIT_COMMIT"
+
 echo "==> сборка и запуск site/crm/nginx"
 $C up -d --build
 

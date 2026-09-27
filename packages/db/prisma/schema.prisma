@@ -521,6 +521,21 @@ model SmsLog {
   @@map("sms_log")
 }
 
+/// Журнал технической апишки. Только изменения: чтение сюда не пишем, иначе
+/// таблица распухнет, а искать в ней будет нечего.
+model AdminApiLog {
+  id        Int      @id @default(autoincrement())
+  method    String
+  path      String
+  status    Int
+  /// Что именно изменилось – человекочитаемо, для поиска задним числом.
+  summary   String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("admin_api_log")
+}
+
 model CustomerDate {
   id          Int      @id @default(autoincrement())
   customerId  Int      @map("customer_id")
