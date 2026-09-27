@@ -20,6 +20,11 @@ export interface ParsedOfficeAddress {
   street: string;
   /** Номер дома без квартиры и помещения. */
   house: string;
+  /**
+   * Тип улицы словом: «улица», «проезд», «шоссе». Пусто, если в адресе его не
+   * было. Нужен для запроса к геокодеру – с ним он находит заметно лучше.
+   */
+  streetType: string;
 }
 
 export interface OfficeQuery {
@@ -31,8 +36,19 @@ export interface OfficeQuery {
 /** «г.», «аг.», «Сеницкий с/с» – всё, чем помечают населённый пункт. */
 const SETTLEMENT = /^(г|аг|гп|пгт|п|д|с|к\.?п)\.\s*|^(.+?)\s+с\/с$/i;
 
+/**
+ * Сокращения типа улицы. Порядок важен: длинные варианты идут первыми.
+ *
+ * Раньше «пр» стоял перед «пр-д», и из «пр-д Алексея Гаранина» срезалось
+ * только «пр» – геокодер получал «-д Алексея Гаранина» и, разумеется, ничего
+ * не находил.
+ */
+/**
+ * За сокращением обязательна точка или пробел. Иначе однобуквенное «ш»
+ * съедало первую букву улицы: «Шевченко» превращалось в «евченко».
+ */
 const STREET_TYPE =
-  /^(ул|пр-т|пр|б-р|бул|пер|ш|тр-т|мкр|пл|пр-д|тракт|наб)\.?\s*/i;
+  /^(пр-т|пр-д|тр-т|б-р|бул|тракт|мкр|наб|пер|ул|пр|пл|ш)(?:\.\s*|\s+)/i;
 
 /**
  * Типы объектов Nominatim в порядке убывания точности.
@@ -50,6 +66,15 @@ const HOUSE_TYPES = new Set([
   "commercial",
   "retail",
   "yes",
+  // Отделение Европочты в OSM часто размечено как офис, а не как магазин или
+  // здание. Без этого типа точный ответ отбрасывался как «центр города», и
+  // ночная задача годами перебирала одни и те же адреса впустую.
+  "office",
+  "industrial",
+  "craft",
+  "healthcare",
+  "leisure",
+  "tourism",
 ]);
 
 const STREET_TYPES = new Set([
@@ -65,6 +90,12 @@ const STREET_TYPES = new Set([
   "footway",
   "service",
   "unclassified",
+  // Обобщённый ответ про дорогу. Приходит, когда у улицы в OSM не проставлен
+  // конкретный класс, – но это всё равно улица, а не город.
+  "highway",
+  "track",
+  "path",
+  "motorway",
 ]);
 
 /** Что нам на самом деле вернул геокодер. */
@@ -94,6 +125,34 @@ function houseOf(part: string): string {
   // Квартира и помещение идут после дефиса – геокодеру они только мешают.
   const m = part.match(/(\d+\s*[а-яa-z]?)(?=\s*(?:-|\/|$|,))/i);
   return m ? m[1].replace(/\s+/g, "") : "";
+}
+
+/**
+ * Сокращение типа улицы – полным словом.
+ *
+ * Nominatim ищет по названиям как они записаны в OpenStreetMap, а там улицы
+ * зовутся «улица Казинца», а не «Казинца». Без этого слова половина адресов не
+ * находилась вовсе: восемь отделений так и остались без точки на карте.
+ */
+const STREET_TYPE_WORD: Record<string, string> = {
+  "ул": "улица",
+  "пр": "проспект",
+  "пр-т": "проспект",
+  "пр-д": "проезд",
+  "б-р": "бульвар",
+  "бул": "бульвар",
+  "пер": "переулок",
+  "ш": "шоссе",
+  "тр-т": "тракт",
+  "тракт": "тракт",
+  "мкр": "микрорайон",
+  "пл": "площадь",
+  "наб": "набережная",
+};
+
+function streetTypeWord(part: string): string {
+  const m = part.match(STREET_TYPE);
+  return m ? (STREET_TYPE_WORD[m[1].toLowerCase()] ?? "") : "";
 }
 
 function isSettlement(part: string): boolean {
@@ -134,8 +193,9 @@ export function parseOfficeAddress(raw: string): ParsedOfficeAddress {
     streetAt >= 0 ? stripInitials(rest[streetAt].replace(STREET_TYPE, "").trim()) : "";
 
   const house = streetAt >= 0 ? houseOf(rest[streetAt + 1] ?? "") : "";
+  const streetType = streetAt >= 0 ? streetTypeWord(rest[streetAt]) : "";
 
-  return { locality, street, house };
+  return { locality, street, house, streetType };
 }
 
 /**
@@ -145,11 +205,28 @@ export function parseOfficeAddress(raw: string): ParsedOfficeAddress {
  * знать, что улицу найти не удалось: такой ответ мы отбрасываем.
  */
 export function officeQueries(raw: string): OfficeQuery[] {
-  const { locality, street, house } = parseOfficeAddress(raw);
+  const { locality, street, house, streetType } = parseOfficeAddress(raw);
   const queries: OfficeQuery[] = [];
 
+  // Сначала – с типом улицы словом. Проверено на тех адресах, что не давались
+  // годами: «улица Тексер 4, Барановичи» находит дом, «Барановичи, Тексер» –
+  // только квартал, то есть ничего.
+  if (locality && street && house && streetType) {
+    queries.push({ q: `${streetType} ${street} ${house}, ${locality}`, expect: "house" });
+  }
   if (locality && street && house) {
     queries.push({ q: `${locality}, ${street} ${house}`, expect: "house" });
+  }
+
+  // Дом без буквенного индекса. «улица Смоленская 5А» не находится, «улица
+  // Смоленская 5» – находится: литера у здания в OpenStreetMap часто не
+  // размечена. Соседний корпус точнее, чем вся улица, и куда точнее, чем ничего.
+  const bare = house.replace(/[^\d]/g, "");
+  if (locality && street && streetType && bare && bare !== house) {
+    queries.push({ q: `${streetType} ${street} ${bare}, ${locality}`, expect: "house" });
+  }
+  if (locality && street && streetType) {
+    queries.push({ q: `${streetType} ${street}, ${locality}`, expect: "street" });
   }
   if (locality && street) {
     queries.push({ q: `${locality}, ${street}`, expect: "street" });
@@ -158,4 +235,36 @@ export function officeQueries(raw: string): OfficeQuery[] {
     queries.push({ q: locality, expect: "locality" });
   }
   return queries;
+}
+
+/** Найденная точка с оценкой того, насколько геокодер попал. */
+export interface GeoHit {
+  lat: number;
+  lng: number;
+  precision: Precision;
+}
+
+/**
+ * Выбрать лучшее из двух попаданий.
+ *
+ * Нужна потому, что брать первое попадание нельзя: запросы идут от точного к
+ * общему, но геокодер на точный вопрос отвечает чем найдёт. На «улица
+ * Смоленская 5А» он вернул всю улицу, и перебор останавливался – хотя
+ * следующий запрос, без литеры дома, находил само здание.
+ *
+ * Ответ уровня «город» не попадание вовсе: он выглядит как обычная точка, но
+ * означает «улицу найти не удалось, вот вам центр», и врёт на километры.
+ */
+export function bestHit(a: GeoHit | null, b: GeoHit | null): GeoHit | null {
+  const usable = (h: GeoHit | null) => (h && h.precision !== "locality" ? h : null);
+  const x = usable(a);
+  const y = usable(b);
+  if (!x) return y;
+  if (!y) return x;
+  return x.precision === "house" ? x : y;
+}
+
+/** Точнее уже не найти – перебор можно прекращать. */
+export function isExactHit(hit: GeoHit | null): boolean {
+  return hit?.precision === "house";
 }

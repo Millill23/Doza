@@ -1,6 +1,12 @@
 import type { APIRoute } from "astro";
 import { prisma } from "@doza/db";
-import { officeQueries, precisionOf } from "@doza/shared/europost-address";
+import {
+  officeQueries,
+  precisionOf,
+  bestHit,
+  isExactHit,
+  type GeoHit,
+} from "@doza/shared/europost-address";
 
 export const prerender = false;
 
@@ -52,7 +58,7 @@ export const GET: APIRoute = async ({ request }) => {
   const failed: string[] = [];
 
   for (const office of todo) {
-    let found: { lat: number; lng: number } | null = null;
+    let found: GeoHit | null = null;
 
     for (const { q } of officeQueries(office.address)) {
       try {
@@ -67,18 +73,24 @@ export const GET: APIRoute = async ({ request }) => {
             lon: string;
             addresstype?: string;
           }[];
-          // Ответ уровня города отбрасываем: он выглядит как обычная точка, но
-          // означает «улицу найти не удалось, вот вам центр». Такая точка не
-          // просто бесполезна – она врёт покупателю про расстояние.
-          if (data[0] && precisionOf(data[0].addresstype) !== "locality") {
-            found = { lat: Number(data[0].lat), lng: Number(data[0].lon) };
+          // Ответ уровня города `bestHit` отбрасывает сам: он выглядит как
+          // обычная точка, но означает «улицу найти не удалось, вот вам
+          // центр», и врёт покупателю про расстояние.
+          if (data[0]) {
+            found = bestHit(found, {
+              lat: Number(data[0].lat),
+              lng: Number(data[0].lon),
+              precision: precisionOf(data[0].addresstype),
+            });
           }
         }
       } catch (e) {
         console.error(`[geocode] сбой запроса для «${q}»:`, e);
       }
       await sleep(PAUSE_MS);
-      if (found) break;
+      // Останавливаемся только на доме: попадание в улицу могло бы перехватить
+      // более точный запрос, идущий следом.
+      if (isExactHit(found)) break;
     }
 
     if (found) {

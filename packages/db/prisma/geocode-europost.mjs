@@ -4,6 +4,8 @@ import { dirname, join } from "node:path";
 import {
   officeQueries,
   precisionOf,
+  bestHit,
+  isExactHit,
 } from "../../shared/src/europost-address.ts";
 
 /**
@@ -60,12 +62,15 @@ async function lookup(query) {
  * улице Nominatim охотно возвращает город целиком.
  */
 async function geocode(address) {
+  let best = null;
   for (const { q } of officeQueries(address)) {
-    const found = await lookup(q);
+    best = bestHit(best, await lookup(q));
     await sleep(PAUSE_MS);
-    if (found && found.precision !== "locality") return found;
+    // Останавливаемся только на доме: улица могла бы перехватить более точный
+    // запрос, идущий следом – например, тот же дом без литеры.
+    if (isExactHit(best)) break;
   }
-  return null;
+  return best;
 }
 
 async function main() {
