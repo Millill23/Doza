@@ -7,7 +7,7 @@ import {
 } from "@doza/db/promos";
 import { effectiveCashbackPercent } from "@doza/db/pricing";
 import { isSoldOut } from "@doza/db/stock-rules";
-import type { ProductCard, ProductDetail, Gender } from "./types";
+import type { ProductCard, ProductDetail, FinderProduct, Gender } from "./types";
 
 /**
  * Слой данных каталога. Читает из PostgreSQL через Prisma (@doza/db).
@@ -199,17 +199,15 @@ export async function getBrands(): Promise<string[]> {
   return brands.map((b) => b.name);
 }
 
-export interface FinderProduct extends ProductCard {
-  /** склеенные ноты (для скоринга подбора аромата) */
-  notes: string;
-}
-
 /** Товары для квиз-подборщика: карточка + строка нот. */
 export async function getFinderProducts(): Promise<FinderProduct[]> {
   const [products, globalPercent, globalPromo] = await Promise.all([
     prisma.product.findMany({
       where: { isArchived: false },
-      include: cardInclude,
+      include: {
+        ...cardInclude,
+        similarTo: { select: { similarId: true } },
+      },
       orderBy: { id: "asc" },
     }),
     getGlobalCashback(),
@@ -220,6 +218,8 @@ export async function getFinderProducts(): Promise<FinderProduct[]> {
     notesTop: string | null;
     notesMid: string | null;
     notesBase: string | null;
+    description: string | null;
+    similarTo: { similarId: number }[];
   })[])
     // Подбор ведёт к одной карточке и обещает попадание – советовать аромат,
     // который нельзя купить, значит обмануть на последнем шаге.
@@ -230,5 +230,10 @@ export async function getFinderProducts(): Promise<FinderProduct[]> {
         .filter(Boolean)
         .join(", ")
         .toLowerCase(),
+      notesTop: p.notesTop ?? undefined,
+      notesMid: p.notesMid ?? undefined,
+      notesBase: p.notesBase ?? undefined,
+      description: p.description ?? undefined,
+      similarIds: p.similarTo.map((link) => link.similarId),
     }));
 }

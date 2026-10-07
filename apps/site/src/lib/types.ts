@@ -33,6 +33,15 @@ export interface ProductDetail extends ProductCard {
   similar: ProductCard[];
 }
 
+export interface FinderProduct extends ProductCard {
+  notes: string;
+  notesTop?: string;
+  notesMid?: string;
+  notesBase?: string;
+  description?: string;
+  similarIds: number[];
+}
+
 export const GENDER_LABELS: Record<Gender, string> = {
   male: "Мужской",
   female: "Женский",

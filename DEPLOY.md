@@ -1,15 +1,15 @@
-# Деплой DOZA на хостинг (Plesk / VPS)
+# Деплой DOZA на VPS через Docker Compose
 
-Сайт (`doza-parfum.by`) и CRM (`crm.doza-parfum.by`) – это два Node.js-приложения
-на общей базе **PostgreSQL**. Хостинг даёт только MySQL – поэтому базу мы поднимаем
-**в Docker-контейнере** вместе с приложениями. Plesk используем для доменов и
-бесплатного SSL (Let's Encrypt), который проксирует запросы на наши контейнеры.
+Сайт (`doza-parfum.by`) и CRM (`crm.doza-parfum.by`) – два Node.js-приложения
+на общей базе **PostgreSQL**. Docker Compose запускает PostgreSQL, приложения и
+свой Nginx, который принимает трафик на портах 80/443. На VPS эти порты должны
+быть свободны; текущий Compose не рассчитан на одновременный Plesk nginx.
 
 ```
-Интернет → Plesk nginx (80/443, SSL)
-            ├─ doza-parfum.by      → 127.0.0.1:4321  (контейнер site)
-            └─ crm.doza-parfum.by  → 127.0.0.1:3000  (контейнер crm)
-Docker: postgres + site + crm + том uploads (для фото)
+Интернет → Docker nginx (80/443, TLS)
+            ├─ doza-parfum.by      → site:4321
+            └─ crm.doza-parfum.by  → crm:3000
+Docker: postgres + site + crm + nginx + тома pgdata/uploads/certbot
 ```
 
 ---
@@ -40,11 +40,8 @@ git clone <URL_ВАШЕГО_РЕПОЗИТОРИЯ> doza
 cd doza
 ```
 
-**Вариант Б – через файловый менеджер Plesk:** загрузите архив проекта,
-распакуйте, затем зайдите в каталог через SSH (`cd ~/doza`).
-
-> Plesk Git-авто-деплой для этого проекта не подходит: он рассчитан на одно
-> приложение, а у нас монорепозиторий из двух приложений со сборкой в Docker.
+Для текущего Docker-варианта нужен Git-клон на VPS. Изменения из локальной
+копии должны быть отправлены в удалённый репозиторий до запуска `deploy.sh`.
 
 ---
 
@@ -55,15 +52,16 @@ cp .env.example .env
 nano .env
 ```
 
-Заполните (пароль БД и `NEXTAUTH_SECRET` придумайте свои):
+Заполните (для пароля БД используйте hex-строку, чтобы её не пришлось
+кодировать внутри `DATABASE_URL`):
 
 ```env
 POSTGRES_USER=doza
-POSTGRES_PASSWORD=ПРИДУМАЙТЕ_НАДЁЖНЫЙ_ПАРОЛЬ
+POSTGRES_PASSWORD=ТОТ_ЖЕ_РЕЗУЛЬТАТ_openssl_rand_hex_24
 POSTGRES_DB=doza
 
 # host = "db" (имя сервиса в docker-compose), пароль – тот же, что выше
-DATABASE_URL=postgresql://doza:ПРИДУМАЙТЕ_НАДЁЖНЫЙ_ПАРОЛЬ@db:5432/doza
+DATABASE_URL=postgresql://doza:ТОТ_ЖЕ_ПАРОЛЬ@db:5432/doza
 
 # сгенерировать: openssl rand -base64 32
 NEXTAUTH_SECRET=ВСТАВЬТЕ_СЛУЧАЙНУЮ_СТРОКУ
@@ -76,8 +74,11 @@ TELEGRAM_CHAT_ID=
 
 Сохранить в nano: `Ctrl+O`, `Enter`, затем `Ctrl+X`.
 
-Сгенерировать секрет для `NEXTAUTH_SECRET`:
+Сгенерируйте hex-пароль БД и случайный секрет командами ниже; первый результат
+впишите одинаково в `POSTGRES_PASSWORD` и в `DATABASE_URL`, второй — в
+`NEXTAUTH_SECRET`:
 ```bash
+openssl rand -hex 24
 openssl rand -base64 32
 ```
 
@@ -86,59 +87,58 @@ openssl rand -base64 32
 ## Шаг 3. Собрать и запустить
 
 ```bash
-# Сборка образов и запуск БД + сайта + CRM (первый раз – несколько минут)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Сборка образов и запуск БД + сайта + CRM. Nginx запустим после получения TLS.
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build db site crm
 
-# Применить миграции и наполнить БД (таблицы, тестовые товары, админ)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile tools run --rm migrate
+# Только для ПЕРВОГО запуска на пустой БД: применить миграции и добавить
+# начальные настройки, тестовые товары и стартового администратора.
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile tools run --rm --build migrate sh -c 'npx prisma migrate deploy && node prisma/seed.mjs'
+```
+
+Эта команда предназначена только для первого запуска на пустой БД. Сид не
+меняет существующие записи, однако может добавить демо-товары и стартового
+админа, если их нет. Образ `migrate` теперь по умолчанию запускает только
+миграции. Если база уже содержит рабочие данные, не запускайте сид. Примените
+только миграции отдельной командой:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile tools run --rm --build migrate
 ```
 
 Проверка, что контейнеры живы и отвечают локально:
 ```bash
-docker compose ps
+docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
 curl -I http://127.0.0.1:4321        # сайт → HTTP 200
 curl -I http://127.0.0.1:3000/login  # CRM  → HTTP 200
 ```
 
 ---
 
-## Шаг 4. Настроить домены и SSL в Plesk
+## Шаг 4. DNS, TLS и Nginx
 
-1. **DNS.** Убедитесь, что A-записи указывают на IP сервера:
-   - `doza-parfum.by` → IP
-   - `crm.doza-parfum.by` → IP
-   - (по желанию `www.doza-parfum.by` → IP)
+1. **DNS.** Убедитесь, что A-записи всех трёх имён указывают на IP VPS:
+   `doza-parfum.by`, `www.doza-parfum.by` и `crm.doza-parfum.by`.
 
-2. **Создайте в Plesk:**
-   - домен `doza-parfum.by`
-   - субдомен `crm.doza-parfum.by`
+2. Убедитесь, что порты 80 и 443 свободны. Compose публикует Docker Nginx
+   именно на них; если на сервере установлен Plesk, его nginx займёт эти порты
+   и контейнер не запустится.
 
-3. **Reverse-proxy.** Для каждого зайдите:
-   **Hosting & DNS → Apache & nginx Settings**:
-   - снимите галочку **«Proxy mode»** (чтобы nginx обслуживал напрямую);
-   - в поле **«Additional nginx directives»** вставьте:
-
-   Для `doza-parfum.by`:
-   ```nginx
-   location / {
-       proxy_pass http://127.0.0.1:4321;
-       proxy_http_version 1.1;
-       proxy_set_header Host $host;
-       proxy_set_header X-Real-IP $remote_addr;
-       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-       proxy_set_header X-Forwarded-Proto $scheme;
-       proxy_set_header Upgrade $http_upgrade;
-       proxy_set_header Connection "upgrade";
-   }
+3. Выпустите Let's Encrypt сертификат до запуска Nginx. Из `~/doza` выполните:
+   ```bash
+   mkdir -p nginx/certbot/conf nginx/certbot/www
+   docker run --rm -p 80:80 -v "$PWD/nginx/certbot/conf:/etc/letsencrypt" certbot/certbot certonly --standalone --email ВАШ_EMAIL --agree-tos --no-eff-email -d doza-parfum.by -d www.doza-parfum.by -d crm.doza-parfum.by
    ```
 
-   Для `crm.doza-parfum.by` – то же самое, но `proxy_pass http://127.0.0.1:3000;`
+4. Запустите Docker Nginx:
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d nginx
+   ```
 
-   Нажмите **Apply / OK**.
-
-4. **SSL.** Для каждого домена:
-   **SSL/TLS Certificates → Install (Let's Encrypt)** → отметьте основной домен
-   (и `www` для главного) → выпустить. Plesk сам продлевает сертификаты.
+   Сертификаты исключены из Git и Docker-образов. Nginx отдаёт ACME challenge
+   из `nginx/certbot/www`. Добавьте продление через `crontab -e` (замените путь
+   на домашний каталог вашего пользователя):
+   ```cron
+   0 3 * * * /bin/bash /home/ВАШ_ПОЛЬЗОВАТЕЛЬ/doza/renew-cert.sh >> /home/ВАШ_ПОЛЬЗОВАТЕЛЬ/doza-cert-renew.log 2>&1
+   ```
 
 После этого:
 - https://doza-parfum.by – сайт
@@ -167,16 +167,15 @@ curl -I http://127.0.0.1:3000/login  # CRM  → HTTP 200
 
 ```bash
 cd ~/doza
-git pull
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-# если были новые миграции БД:
-docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile tools run --rm --build migrate
+./deploy.sh
 ```
 
-⚠️ **`--build` в команде `run` обязателен.** Сервис `migrate` сидит в профиле
-`tools`, поэтому `up -d --build` его не пересобирает: образ остаётся тем, что
-был при прошлой сборке. Внутри него – старые файлы, и запуск падает на
-`Cannot find module` или молча не применяет новые миграции.
+Скрипт обновляет код через `git pull --ff-only`, пересобирает приложение и
+образ миграций, затем выполняет `prisma migrate deploy` без сида. Он не удаляет
+том PostgreSQL и не запускает `seed.mjs`.
+
+`deploy.sh` сам пересобирает миграционный образ, поэтому старые файлы миграций
+не останутся в контейнере. Сидирование не входит в обычное обновление.
 
 ### Разовые скрипты каталога
 
@@ -198,18 +197,20 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml \
 
 ```bash
 # логи
-docker compose logs -f site
-docker compose logs -f crm
-docker compose logs -f db
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f site
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f crm
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f db
 
 # перезапуск одного сервиса
 docker compose -f docker-compose.yml -f docker-compose.prod.yml restart crm
 
-# бэкап БД
-docker compose exec db pg_dump -U doza doza > backup_$(date +%F).sql
+# бэкап БД до обновления (файл вне репозитория)
+backup="$HOME/doza-backup-$(date +%F-%H%M%S).sql"
+docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T db pg_dump -U doza doza > "$backup"
+chmod 600 "$backup"
 
 # восстановление БД
-cat backup.sql | docker compose exec -T db psql -U doza doza
+cat backup.sql | docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T db psql -U doza doza
 ```
 
 ---

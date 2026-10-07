@@ -18,5 +18,9 @@ tz_text.txt
 uploads/*
 !uploads/.gitkeep
 
+# TLS-сертификаты и ACME challenge (сертификат содержит закрытый ключ)
+nginx/certbot/conf/
+nginx/certbot/www/
+
 # Материалы от bePaid (инструкции, логотипы) — не часть кода
 bepaid_instructions/

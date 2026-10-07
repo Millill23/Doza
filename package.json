@@ -9,7 +9,7 @@
     "db:migrate": "pnpm --filter @doza/db prisma migrate dev",
     "db:generate": "pnpm --filter @doza/db prisma generate",
     "db:studio": "pnpm --filter @doza/db prisma studio",
-    "build": "pnpm --filter @doza/db prisma generate && pnpm -r build"
+    "build": "pnpm --filter @doza/db generate && pnpm -r build"
   },
   "workspaces": [
     "apps/*",

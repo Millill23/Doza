@@ -1,4 +1,4 @@
-# Одноразовый образ для применения миграций и сидирования БД в продакшене.
+# Одноразовый образ для применения миграций БД в продакшене.
 # В рантайм-образах site/crm нет Prisma CLI, поэтому миграции гоняем отдельно.
 #
 # Контекст сборки — корень репозитория (см. docker-compose.prod.yml).
@@ -14,13 +14,12 @@ WORKDIR /app
 COPY packages/db/package.json ./package.json
 RUN npm install --no-audit --no-fund
 
-# Схема, миграции и сид
+# Схема, миграции и сид (сид запускается только явной командой на пустой БД)
 COPY packages/db/prisma ./prisma
 COPY packages/db/src ./src
 
 # Сгенерировать Prisma Client (нужен для seed.mjs)
 RUN npx prisma generate
 
-# migrate deploy — применяет существующие миграции (без интерактива),
-# затем seed — наполняет справочники/настройки/админа (upsert, идемпотентно).
-CMD sh -c "npx prisma migrate deploy && node prisma/seed.mjs"
+# Безопасное поведение по умолчанию: обновить схему, не запускать сид.
+CMD ["npx", "prisma", "migrate", "deploy"]
