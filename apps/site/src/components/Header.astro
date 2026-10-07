@@ -196,6 +196,36 @@ if (customerId) {
 
 </header>
 
+<!-- На телефонах основная навигация скрыта, поэтому подбору нужен отдельный
+     заметный вход. Кнопка находится вне sticky-шапки и не занимает экран при
+     прокрутке. -->
+{
+  Astro.url.pathname !== "/finder" && (
+    <div class="container-luxe py-2 md:hidden">
+      <a
+        href="/finder"
+        class="flex min-h-11 items-center justify-center gap-2 rounded-full bg-gold-gradient px-5 text-sm font-medium text-ink-900 transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-300"
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.7"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="m12 3 1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2L12 3Z" />
+          <path d="m19 15 .9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15Z" />
+        </svg>
+        Подобрать аромат
+      </a>
+    </div>
+  )
+}
+
 <script is:inline>
   (function () {
     // ── Счётчик корзины ────────────────────────────────────────────────────
