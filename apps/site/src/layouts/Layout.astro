@@ -67,6 +67,45 @@ const {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Yandex.Metrika: загружается в начале head, чтобы успеть зафиксировать визит. -->
+    <script is:inline>
+      window.dataLayer = window.dataLayer || [];
+
+      // Вебвизор видит взаимодействия со страницей, но не должен сохранять
+      // введённый посетителем текст. Наблюдатель также помечает поля,
+      // добавленные клиентскими приложениями после загрузки страницы.
+      (function () {
+        function maskInputValues(node) {
+          if (!node || node.nodeType !== 1) return;
+          if (node.matches && node.matches("input, textarea")) {
+            node.classList.add("ym-disable-keys");
+          }
+          if (node.querySelectorAll) {
+            node.querySelectorAll("input, textarea").forEach(function (field) {
+              field.classList.add("ym-disable-keys");
+            });
+          }
+        }
+
+        maskInputValues(document.documentElement);
+        new MutationObserver(function (mutations) {
+          mutations.forEach(function (mutation) {
+            mutation.addedNodes.forEach(maskInputValues);
+          });
+        }).observe(document.documentElement, { childList: true, subtree: true });
+      })();
+
+      (function(m,e,t,r,i,k,a){
+          m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+          m[i].l=1*new Date();
+          for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+          k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+      })(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=113664707', 'ym');
+
+      ym(113664707, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});
+    </script>
+
     <meta name="description" content={description} />
     <link rel="icon" type="image/png" href="/logo.png" />
     <link rel="apple-touch-icon" href="/logo.png" />
@@ -129,6 +168,16 @@ const {
     </style>
   </head>
   <body class="bg-ink-900 text-ivory antialiased">
+    <noscript>
+      <div>
+        <img
+          src="https://mc.yandex.ru/watch/113664707"
+          style="position:absolute; left:-9999px;"
+          alt=""
+        />
+      </div>
+    </noscript>
+
     <!-- ── Лоадер (появляется мгновенно, гаснет после загрузки) ── -->
     <div id="doza-loader">
       <div class="dl-inner">
