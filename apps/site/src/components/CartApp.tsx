@@ -23,6 +23,7 @@ interface Quote {
   net: number;
   discount: number;
   kind: "none" | "vip" | "social" | "date" | "promo" | "super";
+  superPromoName?: string;
 }
 import { BELARUS_REGIONS, validateDelivery } from "@doza/shared/delivery";
 import {
@@ -779,7 +780,8 @@ export default function CartApp() {
           {discount > 0 && (
             <div className="flex justify-between text-gold-400">
               <span>
-                Скидка{quote?.kind === "vip" ? " по VIP-карте" : ""}
+                {quote?.superPromoName ??
+                  (quote?.kind === "vip" ? "Скидка по VIP-карте" : "Скидка")}
               </span>
               <span>−{formatByn(discount)}</span>
             </div>

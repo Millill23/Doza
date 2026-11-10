@@ -1,6 +1,6 @@
 import { prisma } from "@doza/db";
 import { priceCart, type DiscountKind } from "@doza/db/pricing";
-import { pickActivePromo, getGlobalPromo, mergePromos } from "@doza/db/promos";
+import { pickActivePromo, getGlobalPromo, getActiveSuperPromo } from "@doza/db/promos";
 import { upsellPercentFor } from "@doza/db/upsell-rules";
 import { offerableProductIds } from "./upsell";
 import { shortages, shortageMessage, type StockLine } from "@doza/db/stock-rules";
@@ -58,6 +58,7 @@ export interface CartQuote {
   net: number;
   discount: number;
   kind: DiscountKind;
+  superPromoName?: string;
 }
 
 /** Ошибка расчёта, которую можно показать покупателю. */
@@ -169,8 +170,11 @@ export async function quoteCart(
 
   const byKey = new Map(volumes.map((v) => [`${v.productId}:${v.volumeMl}`, v]));
 
-  // Акция «на все товары» не привязана к товару – достаём отдельно.
-  const globalPromo = await getGlobalPromo();
+  const now = new Date();
+  const [globalPromo, superPromo] = await Promise.all([
+    getGlobalPromo(now),
+    getActiveSuperPromo(now),
+  ]);
 
   // Что мы вправе продать со скидкой допродажи. Считаем сами, по своей
   // таблице похожих: пометка в корзине – заявка, а не разрешение.
@@ -192,6 +196,7 @@ export async function quoteCart(
     if (!rec) throw new CartError(`Позиция недоступна (товар ${item.productId})`);
 
     const qty = Math.max(1, Math.floor(item.qty || 1));
+    if (!Number.isSafeInteger(qty)) throw new CartError("Некорректное количество товара");
     const promo = pickActivePromo(
       rec.product.promos.map((pr) => ({
         discountPercent: pr.discountPercent != null ? Number(pr.discountPercent) : null,
@@ -199,6 +204,7 @@ export async function quoteCart(
         startsAt: pr.startsAt,
         endsAt: pr.endsAt,
       })),
+      now,
     );
     productPromoPercent[item.productId] = Math.max(
       productPromoPercent[item.productId] ?? 0,
@@ -242,18 +248,28 @@ export async function quoteCart(
     promoCodePercent: opts.promoCodePercent ?? 0,
     productPromoPercent,
     allProductsPromoPercent: globalPromo.discountPercent,
+    superPromo,
   });
 
   return {
-    lines: lines.map((l, i) => ({
-      productId: l.productId,
-      volumeMl: meta[i].volumeMl,
-      qty: l.qty,
-      // Цена единицы – из итога по позиции: так сумма позиций всегда сходится
-      // с тем, что покупатель видел в корзине.
-      priceByn: Math.round((priced.lineNet[i] / l.qty) * 100) / 100,
-      label: meta[i].label,
-    })),
+    lines: lines.flatMap((l, i) => {
+      // После супер-акции итог позиции может не делиться на количество.
+      // Распределяем остаток по копейке, чтобы сохранить точную сумму заказа.
+      const totalCents = Math.round(priced.lineNet[i] * 100);
+      const unitCents = Math.floor(totalCents / l.qty);
+      const remainder = totalCents % l.qty;
+      const line = { productId: l.productId, volumeMl: meta[i].volumeMl };
+      const label = meta[i].label;
+      if (remainder === 0) {
+        return [{ ...line, qty: l.qty, priceByn: unitCents / 100, label }];
+      }
+      const baseQty = l.qty - remainder;
+      const name = label.replace(/ ×\d+$/, "");
+      return [
+        { ...line, qty: baseQty, priceByn: unitCents / 100, label: `${name} ×${baseQty}` },
+        { ...line, qty: remainder, priceByn: (unitCents + 1) / 100, label: `${name} ×${remainder}` },
+      ];
+    }),
     certificates,
     // Сертификаты добавляются к суммам, но скидкой не затрагиваются: размер
     // скидки – это скидка на товары, и раздувать её сертификатом нельзя.
@@ -261,5 +277,6 @@ export async function quoteCart(
     net: Math.round((priced.net + certTotal) * 100) / 100,
     discount: priced.discount,
     kind: priced.kind,
+    superPromoName: priced.kind === "super" ? superPromo?.name : undefined,
   };
 }

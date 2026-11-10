@@ -185,24 +185,29 @@ function superScenario(
   rule: SuperPromoRule,
 ): { lineNet: number[]; total: number; freeUnits: number } {
   const lineNet: number[] = [];
-  const units: { lineIndex: number; price: number }[] = [];
+  const eligible: { lineIndex: number; price: number; qty: number }[] = [];
+  let eligibleQty = 0;
 
   input.lines.forEach((l, i) => {
     const pct = promoFor(input, l);
     const unit = unitAfter(l.unitPrice, pct);
     lineNet.push(r2(unit * l.qty));
     if (rule.isEligible(l.productId)) {
-      for (let k = 0; k < l.qty; k++) units.push({ lineIndex: i, price: unit });
+      eligible.push({ lineIndex: i, price: unit, qty: l.qty });
+      eligibleQty += l.qty;
     }
   });
 
   const groupSize = Math.max(2, Math.floor(rule.groupSize || 3));
-  const freeUnits = Math.floor(units.length / groupSize);
+  const freeUnits = Math.floor(eligibleQty / groupSize);
   if (freeUnits > 0) {
-    units.sort((a, b) => a.price - b.price);
-    for (let i = 0; i < freeUnits; i++) {
-      const u = units[i];
-      lineNet[u.lineIndex] = r2(lineNet[u.lineIndex] - u.price);
+    eligible.sort((a, b) => a.price - b.price);
+    let remaining = freeUnits;
+    for (const line of eligible) {
+      if (remaining === 0) break;
+      const freeQty = Math.min(remaining, line.qty);
+      lineNet[line.lineIndex] = r2(lineNet[line.lineIndex] - line.price * freeQty);
+      remaining -= freeQty;
     }
   }
 
