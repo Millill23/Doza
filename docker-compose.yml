@@ -93,7 +93,7 @@ services:
               echo "[cron] geocode-offices -> НЕ ОТВЕТИЛ"
             fi
           fi
-          for task in "crm:3000/api/cron/promo-reminders" "crm:3000/api/cron/daily-rewards" "site:4321/api/cron/reconcile-payments"; do
+          for task in "crm:3000/api/cron/promo-reminders" "crm:3000/api/cron/daily-rewards" "site:4321/api/cron/reconcile-payments" "crm:3000/api/cron/sms-campaigns"; do
             answer=$$(wget -q -O- "http://$${task}?key=$${CRON_SECRET}" 2>&1)
             code=$$?
             if [ $$code -eq 0 ]; then

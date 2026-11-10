@@ -306,8 +306,49 @@ model Customer {
   loyaltyLog      LoyaltyLog[]
   certificatesBought    GiftCertificate[] @relation("CertificateBuyer")
   certificatesActivated GiftCertificate[] @relation("CertificateActivatedFor")
+  smsCampaignRecipients SmsCampaignRecipient[]
 
   @@map("customers")
+}
+
+model SmsCampaign {
+  id          String   @id @db.Uuid
+  text        String
+  points      Decimal  @db.Decimal(10, 2)
+  reason      String?
+  loyaltyDays Int      @map("loyalty_days")
+  userId      Int      @map("user_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  recipients  SmsCampaignRecipient[]
+
+  @@map("sms_campaigns")
+}
+
+enum SmsCampaignRecipientStatus {
+  pending
+  sending
+  accepted
+  failed
+  skipped
+  uncertain
+}
+
+model SmsCampaignRecipient {
+  id           Int                        @id @default(autoincrement())
+  campaignId   String                     @db.Uuid @map("campaign_id")
+  customerId   Int?                       @map("customer_id")
+  status       SmsCampaignRecipientStatus @default(pending)
+  attempts     Int                        @default(0)
+  nextAttempt  DateTime                   @default(now()) @map("next_attempt")
+  pointsGranted Boolean                   @default(false) @map("points_granted")
+  error        String?
+  campaign     SmsCampaign                @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  customer     Customer?                  @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@unique([campaignId, customerId])
+  @@index([status, nextAttempt])
+  @@index([customerId])
+  @@map("sms_campaign_recipients")
 }
 
 /// Статус согласия на обработку ПД для программы лояльности.

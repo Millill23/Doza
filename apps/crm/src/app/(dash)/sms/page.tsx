@@ -58,6 +58,9 @@ export default async function SmsPage({
   return (
     <div>
       <h1 className="mb-1 font-serif text-3xl text-ivory">SMS-рассылки</h1>
+      <a href="/sms/campaigns" className="mb-4 inline-block text-sm text-gold-300 hover:underline">
+        Создать массовую рассылку или посмотреть кампании →
+      </a>
       <p className="mb-8 max-w-3xl text-sm leading-relaxed text-ivory-faint">
         Что уходит клиентам и от кого. За последние 30 дней отправлено{" "}
         <span className="text-ivory">{total30d}</span> сообщений. Повторные
@@ -157,7 +160,9 @@ export default async function SmsPage({
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-xs">
                     {r.ok ? (
-                      <span className="text-green-300">доставлено</span>
+                      <span className="text-green-300">
+                        {r.kind === "campaign" ? "принято шлюзом" : "доставлено"}
+                      </span>
                     ) : (
                       <span className="text-red-300" title={r.error ?? undefined}>
                         не ушло

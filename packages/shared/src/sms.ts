@@ -10,6 +10,7 @@ export interface SmsResult {
   ok: boolean;
   code?: string; // код результата от API (id сообщения при успехе)
   error?: string;
+  uncertain?: boolean; // Шлюз мог принять SMS до потери ответа.
 }
 
 /** Нормализация телефона к формату 375XXXXXXXXX (только цифры). */
@@ -20,7 +21,7 @@ export function smsPhone(phone: string): string {
   return d;
 }
 
-export async function sendSms(phone: string, message: string): Promise<SmsResult> {
+export async function sendSms(phone: string, message: string, signal?: AbortSignal): Promise<SmsResult> {
   const user = process.env.SMS_LOGIN;
   const password = process.env.SMS_PASSWORD;
   const sender = process.env.SMS_SENDER || "doza-parfum";
@@ -38,7 +39,7 @@ export async function sendSms(phone: string, message: string): Promise<SmsResult
   url.searchParams.set("sender", sender);
 
   try {
-    const res = await fetch(url.toString(), { method: "GET" });
+    const res = await fetch(url.toString(), { method: "GET", signal });
     const text = (await res.text()).trim();
     // API возвращает код результата: положительное число (id сообщения) = успех,
     // отрицательное / нечисловое с текстом ошибки = неудача.
@@ -46,10 +47,13 @@ export async function sendSms(phone: string, message: string): Promise<SmsResult
     if (res.ok && Number.isFinite(asNum) && asNum > 0) {
       return { ok: true, code: text };
     }
+    if (signal && !/^-[0-9]+$/.test(text)) {
+      return { ok: false, uncertain: true, error: "Шлюз не подтвердил результат отправки" };
+    }
     return { ok: false, code: text, error: `Ошибка SMS: ${text}` };
   } catch (e) {
     console.error("[sms] ошибка отправки:", e);
-    return { ok: false, error: "Сбой отправки SMS" };
+    return { ok: false, uncertain: true, error: "Сбой отправки SMS" };
   }
 }
 
