@@ -12,9 +12,14 @@ function byn(n: number) {
   return `${n.toFixed(2)} BYN`;
 }
 
-export default function GrantPoints() {
+export default function GrantPoints({
+  customerId,
+}: {
+  customerId?: number;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const [submitting, setSubmitting] = useState(false);
   const [phone, setPhone] = useState("");
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
@@ -77,42 +82,46 @@ export default function GrantPoints() {
     );
   }
 
-  const isGrant = mode === "grant";
+  const isGrant = customerId === undefined && mode === "grant";
 
   return (
     <div className="rounded-2xl border border-ink-600/60 bg-ink-700 p-6">
-      <h2 className="mb-3 font-serif text-xl text-ivory">Баллы вручную</h2>
+      <h2 className="mb-3 font-serif text-xl text-ivory">
+        {customerId === undefined ? "Баллы вручную" : "Ручное списание баллов"}
+      </h2>
 
-      <div className="mb-3 flex gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            setMode("grant");
-            setErr(null);
-          }}
-          className={`rounded-full border px-4 py-1.5 text-xs transition-colors ${
-            isGrant
-              ? "border-gold-500 bg-gold-500/15 text-gold-300"
-              : "border-ink-600 text-ivory-muted hover:border-gold-500"
-          }`}
-        >
-          Начислить
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setMode("deduct");
-            setErr(null);
-          }}
-          className={`rounded-full border px-4 py-1.5 text-xs transition-colors ${
-            !isGrant
-              ? "border-red-400 bg-red-500/15 text-red-300"
-              : "border-ink-600 text-ivory-muted hover:border-red-400"
-          }`}
-        >
-          Списать
-        </button>
-      </div>
+      {customerId === undefined && (
+        <div className="mb-3 flex gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setMode("grant");
+              setErr(null);
+            }}
+            className={`rounded-full border px-4 py-1.5 text-xs transition-colors ${
+              isGrant
+                ? "border-gold-500 bg-gold-500/15 text-gold-300"
+                : "border-ink-600 text-ivory-muted hover:border-gold-500"
+            }`}
+          >
+            Начислить
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode("deduct");
+              setErr(null);
+            }}
+            className={`rounded-full border px-4 py-1.5 text-xs transition-colors ${
+              !isGrant
+                ? "border-red-400 bg-red-500/15 text-red-300"
+                : "border-ink-600 text-ivory-muted hover:border-red-400"
+            }`}
+          >
+            Списать
+          </button>
+        </div>
+      )}
 
       <p className="mb-4 text-xs text-ivory-faint">
         {isGrant
@@ -121,57 +130,59 @@ export default function GrantPoints() {
       </p>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <label className="mb-1 block text-xs uppercase tracking-wide text-gold-500">
-            Телефон клиента
-          </label>
-          <div className="flex gap-2">
-            <input
-              value={phone}
-              onChange={(e) => {
-                setPhone(e.target.value);
-                setFound(null);
-                setNotFound(false);
-              }}
-              placeholder="+375…"
-              className={field}
-            />
-            <button
-              onClick={() =>
-                start(async () => {
-                  setErr(null);
-                  const r = await findCustomerForPoints(phone);
-                  if (r.found) {
-                    setFound({ name: r.name, balance: r.balance, vipCard: r.vipCard });
-                    setNotFound(false);
-                  } else {
-                    setFound(null);
-                    setNotFound(true);
-                  }
-                })
-              }
-              disabled={pending}
-              className="shrink-0 rounded-lg border border-gold-600/50 px-3 text-xs text-gold-400 hover:border-gold-500 disabled:opacity-50"
-            >
-              Найти
-            </button>
+        {customerId === undefined && (
+          <div>
+            <label className="mb-1 block text-xs uppercase tracking-wide text-gold-500">
+              Телефон клиента
+            </label>
+            <div className="flex gap-2">
+              <input
+                value={phone}
+                onChange={(e) => {
+                  setPhone(e.target.value);
+                  setFound(null);
+                  setNotFound(false);
+                }}
+                placeholder="+375…"
+                className={field}
+              />
+              <button
+                onClick={() =>
+                  start(async () => {
+                    setErr(null);
+                    const r = await findCustomerForPoints(phone);
+                    if (r.found) {
+                      setFound({ name: r.name, balance: r.balance, vipCard: r.vipCard });
+                      setNotFound(false);
+                    } else {
+                      setFound(null);
+                      setNotFound(true);
+                    }
+                  })
+                }
+                disabled={pending}
+                className="shrink-0 rounded-lg border border-gold-600/50 px-3 text-xs text-gold-400 hover:border-gold-500 disabled:opacity-50"
+              >
+                Найти
+              </button>
+            </div>
+            {found && (
+              <p className="mt-1.5 text-xs text-botanical-300">
+                {found.name}, баланс: {byn(found.balance)}
+                {found.vipCard && (
+                  <span className="ml-1 rounded-full bg-gold-gradient px-2 py-0.5 text-[10px] font-semibold text-ink-900">
+                    ⭐ VIP
+                  </span>
+                )}
+              </p>
+            )}
+            {notFound && (
+              <p className="mt-1.5 text-xs text-red-300">
+                Клиент не найден – операция возможна только с существующим.
+              </p>
+            )}
           </div>
-          {found && (
-            <p className="mt-1.5 text-xs text-botanical-300">
-              {found.name}, баланс: {byn(found.balance)}
-              {found.vipCard && (
-                <span className="ml-1 rounded-full bg-gold-gradient px-2 py-0.5 text-[10px] font-semibold text-ink-900">
-                  ⭐ VIP
-                </span>
-              )}
-            </p>
-          )}
-          {notFound && (
-            <p className="mt-1.5 text-xs text-red-300">
-              Клиент не найден – операция возможна только с существующим.
-            </p>
-          )}
-        </div>
+        )}
 
         <div>
           <label className="mb-1 block text-xs uppercase tracking-wide text-gold-500">
@@ -208,34 +219,44 @@ export default function GrantPoints() {
       {err && <p className="mt-3 text-sm text-red-300">{err}</p>}
 
       <button
-        onClick={() =>
-          start(async () => {
-            try {
-              setErr(null);
-              const payload = { phone, amount: Number(amount), reason };
-              const res = isGrant
-                ? await grantPoints(payload)
-                : await deductPoints(payload);
-              setDone({
-                name: res.name,
-                amount: res.amount,
-                balance: res.balance,
-                mode,
-              });
-              router.refresh();
-            } catch (e) {
-              setErr((e as Error).message);
+        onClick={async () => {
+          setSubmitting(true);
+          try {
+            setErr(null);
+            const payload = { phone, amount: Number(amount), reason };
+            const res = isGrant
+              ? await grantPoints(payload)
+              : await deductPoints(customerId === undefined
+                ? payload
+                : { customerId, amount: payload.amount, reason });
+            if ("ok" in res) {
+              setErr(res.error);
+              return;
             }
-          })
+            setDone({
+              name: res.name,
+              amount: res.amount,
+              balance: res.balance,
+              mode: isGrant ? "grant" : "deduct",
+            });
+            router.refresh();
+          } catch (e) {
+            setErr((e as Error).message);
+          } finally {
+            setSubmitting(false);
+          }
+        }}
+        disabled={
+          pending || submitting || (customerId === undefined && !phone.trim())
+          || Number(amount) < 0.01 || reason.trim().length < 3
         }
-        disabled={pending || !phone.trim() || !amount.trim() || reason.trim().length < 3}
         className={`mt-4 rounded-full px-6 py-2.5 text-sm font-medium disabled:opacity-50 ${
           isGrant
             ? "bg-gold-gradient text-ink-900"
             : "border border-red-400/60 text-red-300 hover:bg-red-500/10"
         }`}
       >
-        {pending
+        {submitting
           ? isGrant
             ? "Начисляем…"
             : "Списываем…"

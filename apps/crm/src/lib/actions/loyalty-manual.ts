@@ -121,15 +121,11 @@ export async function grantPoints(input: {
  * SMS клиенту НЕ отправляется – это корректирующее действие магазина; в
  * Telegram уходит запись для аудита.
  */
-export async function deductPoints(input: {
-  phone: string;
+export async function deductPoints(input: ({ phone: string } | { customerId: number }) & {
   amount: number;
   reason: string;
 }) {
   const session = await requireRole(["admin"]);
-
-  const phone = toStoredPhone(input.phone ?? "");
-  if (phone.length < 9) throw new Error("Укажите корректный телефон клиента");
 
   const amount = Math.round(Number(input.amount) * 100) / 100;
   if (!Number.isFinite(amount) || amount <= 0)
@@ -138,24 +134,25 @@ export async function deductPoints(input: {
   const reason = (input.reason ?? "").trim();
   if (reason.length < 3) throw new Error("Укажите причину списания");
 
-  const customer = await prisma.customer.findUnique({ where: { phone } });
-  if (!customer) throw new Error("Клиент с таким телефоном не найден");
-
-  const before = await getBalance(customer.id);
-  if (before <= 0) throw new Error("У клиента нет баллов");
-  if (amount > before)
-    throw new Error(
-      `Нельзя списать больше, чем есть на балансе (${fmt(before)})`,
-    );
+  const customer = await prisma.customer.findUnique({
+    where: "customerId" in input
+      ? { id: input.customerId }
+      : { phone: toStoredPhone(input.phone ?? "") },
+  });
+  if (!customer) throw new Error("Клиент не найден");
+  const { phone } = customer;
 
   const spent = await spendPoints(
     customer.id,
     amount,
     { type: "manual", id: Number(session.user.id) },
-    { reason },
+    { reason, requireFullAmount: true },
   );
 
   const balance = await getBalance(customer.id);
+  if (spent === 0) {
+    return { ok: false as const, error: `Недостаточно баллов. Доступно: ${fmt(balance)}.` };
+  }
 
   try {
     await notifyTelegram(
@@ -171,6 +168,7 @@ export async function deductPoints(input: {
   }
 
   revalidatePath("/loyalty");
+  revalidatePath("/customers");
   revalidatePath(`/customers/${customer.id}`);
 
   return { customerId: customer.id, name: customer.name, amount: spent, balance };

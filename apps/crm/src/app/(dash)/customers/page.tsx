@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@doza/db";
 import { formatByn, formatPhone } from "@doza/shared";
+import { digitsOnly, toStoredPhone } from "@doza/shared/phone";
 import { getBalancesMap } from "@/lib/customers-data";
 import { getSession } from "@/lib/session";
 import VipRegisterForm from "@/components/VipRegisterForm";
@@ -12,15 +13,43 @@ import { daysSinceRequest } from "@doza/db/consent-rules";
 
 export const dynamic = "force-dynamic";
 
-export default async function CustomersPage() {
-  const [customers, balances, session, pendingCount] = await Promise.all([
-    prisma.customer.findMany({ orderBy: { registeredAt: "desc" }, take: 200 }),
-    getBalancesMap(),
+const PAGE_SIZE = 50;
+
+export default async function CustomersPage({
+  searchParams,
+}: {
+  searchParams: { phone?: string; page?: string };
+}) {
+  const phone = typeof searchParams.phone === "string" ? searchParams.phone.trim() : "";
+  const digits = digitsOnly(phone);
+  const phoneFragment = /^80\d{9}$/.test(digits) ? toStoredPhone(digits) : digits;
+  const where = phone
+    ? { phone: phoneFragment ? { contains: phoneFragment } : "" }
+    : undefined;
+  const [total, session, pendingCount] = await Promise.all([
+    prisma.customer.count({ where }),
     getSession(),
     prisma.customer.count({ where: { consentStatus: "pending" } }),
   ]);
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const requestedPage = Number(searchParams.page);
+  const page = Number.isSafeInteger(requestedPage)
+    ? Math.min(pageCount, Math.max(1, requestedPage))
+    : 1;
+  const customers = await prisma.customer.findMany({
+    where,
+    orderBy: [{ registeredAt: "desc" }, { id: "desc" }],
+    skip: (page - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
+  });
+  const balances = await getBalancesMap(customers.map((customer) => customer.id));
   const isAdmin = session?.user?.role === "admin";
   const canBulk = isAdmin || session?.user?.role === "marketer";
+  const pageHref = (number: number) => ({
+    pathname: "/customers",
+    query: { ...(phone ? { phone } : {}), page: number },
+  });
+  const pageLinkClass = "rounded-lg border border-ink-600 px-3 py-2 text-sm text-gold-400 hover:border-gold-500";
 
   return (
     <div>
@@ -28,7 +57,7 @@ export default async function CustomersPage() {
         <div>
           <h1 className="mb-1 font-serif text-3xl text-ivory">Клиенты</h1>
           <p className="text-sm text-ivory-faint">
-            {customers.length} клиентов
+            {phone ? "Найдено клиентов" : "Всего клиентов"}: {total}
             {pendingCount > 0 && (
               <span className="text-amber-300"> · {pendingCount} без согласия</span>
             )}
@@ -46,9 +75,25 @@ export default async function CustomersPage() {
         </div>
       </div>
 
+      <form action="/customers" className="mb-5 flex flex-wrap items-end gap-2">
+        <label className="text-sm text-ivory-muted">
+          Поиск по телефону
+          <input
+            key={phone}
+            type="tel"
+            name="phone"
+            defaultValue={phone}
+            placeholder="+375 (29) 123-45-67"
+            className="mt-1 block rounded-lg border border-ink-600 bg-ink-800 px-3 py-2 text-ivory"
+          />
+        </label>
+        <button type="submit" className={pageLinkClass}>Найти</button>
+        {phone && <Link href="/customers" className={pageLinkClass}>Сбросить</Link>}
+      </form>
+
       {customers.length === 0 ? (
         <p className="rounded-xl border border-ink-600/60 bg-ink-700 p-10 text-center text-ivory-muted">
-          Клиентов пока нет.
+          {phone ? "Клиенты с таким номером не найдены." : "Клиентов пока нет."}
         </p>
       ) : (
         <div className="overflow-hidden rounded-xl border border-ink-600/60">
@@ -124,6 +169,13 @@ export default async function CustomersPage() {
             </tbody>
           </table>
         </div>
+      )}
+      {pageCount > 1 && (
+        <nav aria-label="Страницы списка клиентов" className="mt-4 flex flex-wrap items-center justify-end gap-3">
+          <span className="text-sm text-ivory-muted">Страница {page} из {pageCount}</span>
+          {page > 1 && <Link href={pageHref(page - 1)} className={pageLinkClass}>Назад</Link>}
+          {page < pageCount && <Link href={pageHref(page + 1)} className={pageLinkClass}>Далее</Link>}
+        </nav>
       )}
     </div>
   );

@@ -8,6 +8,7 @@ import VipManager from "@/components/VipManager";
 import CustomerEdit from "@/components/CustomerEdit";
 import ConsentPanel from "@/components/ConsentPanel";
 import CustomerDelete from "@/components/CustomerDelete";
+import GrantPoints from "@/components/GrantPoints";
 import { isConsentOverdue, CONSENT_TTL_DAYS } from "@doza/db/consent-rules";
 import { getSession } from "@/lib/session";
 
@@ -98,6 +99,8 @@ export default async function CustomerDetailPage({
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <div className="space-y-6">
+          {isAdmin && <GrantPoints customerId={customer.id} />}
+
           {/* Партии баллов */}
           <div className="rounded-2xl border border-ink-600/60 bg-ink-700 p-6">
             <h2 className="mb-4 font-serif text-xl text-ivory">Баллы по партиям</h2>

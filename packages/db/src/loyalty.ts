@@ -140,7 +140,7 @@ export async function spendPoints(
   customerId: number,
   amountByn: number,
   ref: { type: string; id: number },
-  opts?: { reason?: string },
+  opts?: { reason?: string; requireFullAmount?: boolean },
 ): Promise<number> {
   if (amountByn <= 0) return 0;
 
@@ -155,6 +155,14 @@ export async function spendPoints(
       orderBy: [{ expiresAt: "asc" }, { createdAt: "asc" }],
     });
 
+    if (opts?.requireFullAmount) {
+      const availableCents = batches.reduce(
+        (sum, batch) => sum + Math.round(Number(batch.amountByn) * 100),
+        0,
+      );
+      if (availableCents < Math.round(amountByn * 100)) return 0;
+    }
+
     let remaining = amountByn;
     let spentTotal = 0;
 
@@ -164,8 +172,8 @@ export async function spendPoints(
       const take = Math.min(available, remaining);
 
       await tx.loyaltyBatch.update({
-        where: { id: batch.id },
-        data: { amountByn: available - take },
+        where: { id: batch.id, amountByn: batch.amountByn },
+        data: { amountByn: { decrement: take } },
       });
       await tx.loyaltyLog.create({
         data: {
@@ -179,10 +187,10 @@ export async function spendPoints(
         },
       });
 
-      remaining -= take;
+      remaining = Math.round((remaining - take) * 100) / 100;
       spentTotal += take;
     }
 
-    return spentTotal;
+    return Math.round(spentTotal * 100) / 100;
   });
 }
