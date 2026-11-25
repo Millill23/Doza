@@ -12,10 +12,10 @@ export default async function DashLayout({
   const name = session.user.name ?? session.user.email ?? "";
 
   return (
-    <div className="flex min-h-screen">
+    <div className="min-h-screen lg:flex">
       <Sidebar role={role} name={name} />
-      <main className="flex-1 overflow-x-hidden">
-        <div className="mx-auto max-w-6xl px-8 py-8">{children}</div>
+      <main className="min-w-0 flex-1 overflow-x-auto">
+        <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8 lg:px-8">{children}</div>
       </main>
     </div>
   );

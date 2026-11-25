@@ -9,6 +9,9 @@
     background-color: #0e0d0a;
     color: #f5f1e8;
   }
+  html:has(#crm-mobile-menu[open]) {
+    overflow: hidden;
+  }
   body {
     font-family: "Montserrat", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;

@@ -62,7 +62,7 @@ export default async function OrdersPage({
           Заказов нет.
         </p>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-ink-600/60">
+        <div className="overflow-x-auto rounded-xl border border-ink-600/60">
           <table className="w-full text-sm">
             <thead className="bg-ink-800 text-left text-xs uppercase tracking-wide text-ivory-faint">
               <tr>
