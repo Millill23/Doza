@@ -9,6 +9,7 @@ import {
   checkCertificate,
 } from "@/lib/actions/cash";
 import { applyCertificate, daysLeft } from "@doza/db/certificate-rules";
+import { isOfflineOnlyVolume } from "@doza/db/volume-rules";
 import PhoneInput from "@/components/PhoneInput";
 import { ConsentRequestButton } from "@/components/ConsentControls";
 import {
@@ -258,7 +259,7 @@ export default function CashRegister({
           qty: 1,
           promoDiscount: p.discountPercent || 0,
           inSuperPromo: p.inSuperPromo === true,
-          atomizerId: match.length === 1 ? match[0].id : null,
+          atomizerId: !isOfflineOnlyVolume(v.volumeMl) && match.length === 1 ? match[0].id : null,
         },
       ];
     });
@@ -491,7 +492,7 @@ export default function CashRegister({
                     onClick={() => addLine(p, v)}
                     className="rounded-lg border border-ink-600 px-3 py-1.5 text-xs text-ivory-muted transition-colors hover:border-gold-500 hover:text-gold-300"
                   >
-                    {v.volumeMl} мл · {byn(v.priceByn)}
+                    {v.volumeMl} мл{isOfflineOnlyVolume(v.volumeMl) ? " (остаток)" : ""} · {byn(v.priceByn)}
                   </button>
                 ))}
               </div>

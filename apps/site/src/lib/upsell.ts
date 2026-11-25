@@ -1,4 +1,5 @@
 import { prisma } from "@doza/db";
+import { OFFLINE_ONLY_VOLUMES } from "@doza/db/volume-rules";
 import {
   UPSELL_PERCENT,
   UPSELL_VOLUMES,
@@ -87,7 +88,10 @@ export async function buildUpsell(lines: CartLine[]): Promise<UpsellItem[]> {
       brand: { select: { name: true } },
       photos: { orderBy: { sortOrder: "asc" }, take: 1 },
       volumes: {
-        where: { isActive: true, volumeMl: { in: [...UPSELL_VOLUMES] } },
+        where: {
+          isActive: true,
+          volumeMl: { in: [...UPSELL_VOLUMES], notIn: OFFLINE_ONLY_VOLUMES },
+        },
         orderBy: { volumeMl: "asc" },
       },
     },

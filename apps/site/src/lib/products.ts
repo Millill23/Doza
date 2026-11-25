@@ -7,6 +7,7 @@ import {
 } from "@doza/db/promos";
 import { effectiveCashbackPercent } from "@doza/db/pricing";
 import { isSoldOut } from "@doza/db/stock-rules";
+import { OFFLINE_ONLY_VOLUMES } from "@doza/db/volume-rules";
 import type { ProductCard, ProductDetail, FinderProduct, Gender } from "./types";
 
 /**
@@ -105,7 +106,7 @@ const promoSelect = {
 const cardInclude = {
   brand: { select: { name: true } },
   photos: { orderBy: { sortOrder: "asc" as const }, take: 1 },
-  volumes: { where: { isActive: true } },
+  volumes: { where: { isActive: true, volumeMl: { notIn: OFFLINE_ONLY_VOLUMES } } },
   promos: { select: promoSelect },
   inventory: { select: { quantityMl: true } },
 };
@@ -144,7 +145,7 @@ export async function getProduct(slug: string): Promise<ProductDetail | null> {
     include: {
       brand: { select: { name: true } },
       photos: { orderBy: { sortOrder: "asc" } },
-      volumes: { where: { isActive: true }, orderBy: { volumeMl: "asc" } },
+      volumes: { ...cardInclude.volumes, orderBy: { volumeMl: "asc" } },
       promos: { select: promoSelect },
       inventory: { select: { quantityMl: true } },
     },

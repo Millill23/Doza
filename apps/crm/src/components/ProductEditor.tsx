@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { isOfflineOnlyVolume } from "@doza/db/volume-rules";
 import { saveProduct, type ProductPayload } from "@/lib/actions/product-edit";
 
 interface Brand {
@@ -223,6 +224,9 @@ export default function ProductEditor({
                   <input type="checkbox" checked={v.isActive} onChange={(e) => updateVolume(idx, { isActive: e.target.checked })} className="h-4 w-4 accent-gold-500" />
                   активен
                 </label>
+                {isOfflineOnlyVolume(v.volumeMl) && (
+                  <span className="text-xs text-gold-400">Только офлайн-касса</span>
+                )}
                 <button onClick={() => removeVolume(idx)} className="ml-auto text-ivory-faint hover:text-red-300">✕</button>
               </div>
             ))}

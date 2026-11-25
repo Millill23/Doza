@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { PRICES } from "./catalog-prices.mjs";
+import { OFFLINE_ONLY_VOLUMES } from "../src/volume-rules.ts";
 const prisma = new PrismaClient();
 
 // Безопасное обновление ТОЛЬКО объёмов/цен каталога (3 / 5 / 10 мл по прайсу).
@@ -16,7 +17,9 @@ async function main() {
       continue;
     }
     const [p3, p5, p10] = PRICES[slug];
-    await prisma.productVolume.deleteMany({ where: { productId: product.id } });
+    await prisma.productVolume.deleteMany({
+      where: { productId: product.id, volumeMl: { notIn: OFFLINE_ONLY_VOLUMES } },
+    });
     await prisma.productVolume.createMany({
       data: [
         { productId: product.id, volumeMl: 3, priceByn: p3, isActive: true },

@@ -2,6 +2,7 @@ import { prisma } from "@doza/db";
 import { priceCart, type DiscountKind } from "@doza/db/pricing";
 import { pickActivePromo, getGlobalPromo, getActiveSuperPromo } from "@doza/db/promos";
 import { upsellPercentFor } from "@doza/db/upsell-rules";
+import { OFFLINE_ONLY_VOLUMES } from "@doza/db/volume-rules";
 import { offerableProductIds } from "./upsell";
 import { shortages, shortageMessage, type StockLine } from "@doza/db/stock-rules";
 import {
@@ -148,6 +149,7 @@ export async function quoteCart(
   const volumes = await prisma.productVolume.findMany({
     where: {
       isActive: true,
+      volumeMl: { notIn: OFFLINE_ONLY_VOLUMES },
       OR: items.map((i) => ({ productId: i.productId, volumeMl: i.volumeMl })),
     },
     include: {
